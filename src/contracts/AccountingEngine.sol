@@ -210,7 +210,19 @@ contract AccountingEngine is Authorizable, Modifiable, Disableable, IAccountingE
     lastSurplusTime = block.timestamp;
     emit AuctionSurplus(_id, 0, _params.surplusAmount * (100 - surplusIsTransferred) / 100);
 
-    if(surplusIsTransferred > 0) transferExtraSurplus();
+    //Transfer remaining surplus percentage
+    if(surplusIsTransferred > 0){
+      if (extraSurplusReceiver == address(0)) revert AccEng_NullSurplusReceiver();
+
+      safeEngine.transferInternalCoins({
+        _source: address(this),
+        _destination: extraSurplusReceiver,
+        _rad: _params.surplusAmount * surplusIsTransferred / 100
+      });
+
+      lastSurplusTime = block.timestamp;
+      emit TransferSurplus(extraSurplusReceiver, _params.surplusAmount * surplusIsTransferred / 100);
+    }
   }
 
   // Extra surplus transfers/surplus auction alternative
@@ -238,6 +250,14 @@ contract AccountingEngine is Authorizable, Modifiable, Disableable, IAccountingE
 
     lastSurplusTime = block.timestamp;
     emit TransferSurplus(extraSurplusReceiver, _params.surplusAmount * surplusIsTransferred / 100);
+
+    //auction remaining surplus percentage
+    if(surplusIsTransferred < 100){
+      uint _id = surplusAuctionHouse.startAuction({_amountToSell: _params.surplusAmount * (100 - surplusIsTransferred) / 100, _initialBid: 0});
+
+      lastSurplusTime = block.timestamp;
+      emit AuctionSurplus(_id, 0, _params.surplusAmount * (100 - surplusIsTransferred) / 100);
+    }
   }
 
   // --- Shutdown ---
