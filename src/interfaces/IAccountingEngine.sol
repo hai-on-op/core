@@ -143,7 +143,7 @@ interface IAccountingEngine is IAuthorizable, IDisableable, IModifiable {
 
   /**
    * @notice Getter for the unpacked contract parameters struct
-   * @return _surplusIsTransferred Whether the system transfers surplus instead of auctioning it [0/1]
+   * @return _surplusIsTransferred percent of the Surplus the system transfers instead of auctioning [0/1]
    * @return _surplusDelay Amount of seconds between surplus actions
    * @return _popDebtDelay Amount of seconds after which debt can be popped from debtQueue
    * @return _disableCooldown Amount of seconds to wait (post settlement) until surplus can be drained

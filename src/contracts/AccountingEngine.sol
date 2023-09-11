@@ -193,7 +193,7 @@ contract AccountingEngine is Authorizable, Modifiable, Disableable, IAccountingE
 
   /// @inheritdoc IAccountingEngine
   function auctionSurplus() external returns (uint256 _id) {
-    if (_params.surplusIsTransferred == 1) revert AccEng_SurplusAuctionDisabled();
+    if (_params.surplusIsTransferred == 100) revert AccEng_SurplusAuctionDisabled();
     if (_params.surplusAmount == 0) revert AccEng_NullAmount();
     if (block.timestamp < lastSurplusTime + _params.surplusDelay) revert AccEng_SurplusCooldown();
 

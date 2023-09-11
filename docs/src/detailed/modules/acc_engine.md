@@ -45,7 +45,7 @@ The Accounting Engine serves as the system's financial management hub, overseein
 - **Surplus Auction House**: Is called to start surplus auctions.
 - **Debt Auction House**: Is called to start debt auctions.
 - `postSettlementSurplusDrain`: Address to which surplus is sent following Global Settlement.
-- `surplusIsTransferred`: Whether the surplus should be either auctioned off or transferred.
+- `surplusIsTransferred`: Percent of the surplus that should be transfered vs auctioned off.
 - `surplusDelay`: Time lag before the surplus becomes eligible for either auction or transfer.
 - `popDebtDelay`: Time interval after which debt can be popped from the time-sensitive queue.
 - `disableCooldown`: The waiting period following Global Settlement, after which any remaining surplus should be transferred.
