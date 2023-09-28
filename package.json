@@ -22,7 +22,7 @@
     "deploy:mainnet": "bash -c 'source .env && forge script DeployMainnet --rpc-url $OP_MAINNET_RPC --broadcast --private-key $OP_MAINNET_DEPLOYER_PK --verify --etherscan-api-key $OP_ETHERSCAN_API_KEY'",
     "docs:build": "./build-docs.sh",
     "docs:run": "mdbook serve docs",
-    "lint:check": "yarn lint:sol && forge fmt",
+    "lint:check": "yarn lint:sol && forge fmt --check",
     "lint:fix": "sort-package-json && forge fmt && yarn lint:sol --fix",
     "lint:sol": "cross-env solhint 'src/**/*.sol' 'test/**/*.sol'",
     "prepare": "husky install",
