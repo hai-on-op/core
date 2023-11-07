@@ -133,11 +133,6 @@ contract LiquidationEngine is
           || _safeData.lockedCollateral * _safeEngCData.liquidationPrice
             >= _safeData.generatedDebt * _safeEngCData.accumulatedRate
       ) revert LiqEng_SAFENotUnsafe();
-
-      if (
-        currentOnAuctionSystemCoins >= _params.onAuctionSystemCoinLimit
-          || _params.onAuctionSystemCoinLimit - currentOnAuctionSystemCoins < _debtFloor
-      ) revert LiqEng_LiquidationLimitHit();
     }
 
     // If an approved saviour is set for this safe we give it a chance to safe the save.
@@ -179,6 +174,11 @@ contract LiquidationEngine is
           _limitAdjustedDebt != _safeData.generatedDebt
             && (_safeData.generatedDebt - _limitAdjustedDebt) * _safeEngCData.accumulatedRate < _debtFloor
         ) revert LiqEng_DustySAFE();
+
+        if (
+          currentOnAuctionSystemCoins >= _params.onAuctionSystemCoinLimit
+            || _params.onAuctionSystemCoinLimit - currentOnAuctionSystemCoins < _debtFloor
+        ) revert LiqEng_LiquidationLimitHit();
       }
 
       safeEngine.confiscateSAFECollateralAndDebt({
