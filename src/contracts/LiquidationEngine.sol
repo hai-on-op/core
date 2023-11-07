@@ -160,8 +160,7 @@ contract LiquidationEngine is
         ) / __cParams.liquidationPenalty
       );
 
-      uint256 _collateralToSell =
-        Math.min(_safeData.lockedCollateral, _safeData.lockedCollateral * _limitAdjustedDebt / _safeData.generatedDebt);
+      uint256 _collateralToSell = _safeData.lockedCollateral * _limitAdjustedDebt / _safeData.generatedDebt;
       uint256 _amountToRaise = (_limitAdjustedDebt * _safeEngCData.accumulatedRate).wmul(__cParams.liquidationPenalty);
 
       // --- Safety checks ---

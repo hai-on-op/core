@@ -1446,6 +1446,16 @@ contract Unit_LiquidationEngine_LiquidateSafe is Base {
         _liquidation.onAuctionSystemCoinLimit, _liquidation.currentOnAuctionSystemCoins, _liquidation.debtFloor
       )
     );
+    vm.assume(
+      _notNullCollateralToSell(
+        _liquidation.safeDebt,
+        _liquidation.safeCollateral,
+        _liquidation.liquidationQuantity,
+        _liquidation.accumulatedRate,
+        _liquidation.liquidationPenalty,
+        _liquidation.currentOnAuctionSystemCoins
+      )
+    );
 
     _mockValues(
       Liquidation({
