@@ -130,6 +130,10 @@ abstract contract MainnetParams is Contracts, Params {
     _safeEngineCParams[WSTETH].debtFloor = 5000 * RAD; // 5_000 COINs
     _liquidationEngineCParams[WSTETH].liquidationPenalty = 1.15e18; // WAD
 
+    _taxCollectorCParams[OP].stabilityFee = RAY + 11.11926e18; // + 42%/yr
+    _safeEngineCParams[OP].debtFloor = 10000 * RAD; // 10_000 COINs
+    _liquidationEngineCParams[OP].liquidationPenalty = 1.5e18; // WAD
+
     // --- Governance Params ---
     _governorParams = IHaiGovernor.HaiGovernorParams({
       votingDelay: 43_200, // 12 hours
