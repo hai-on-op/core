@@ -131,7 +131,7 @@ abstract contract MainnetParams is Contracts, Params {
     _liquidationEngineCParams[WSTETH].liquidationPenalty = 1.15e18; // WAD
 
     _taxCollectorCParams[OP].stabilityFee = RAY + 11.11926e18; // + 42%/yr
-    _safeEngineCParams[OP].debtFloor = 10000 * RAD; // 10_000 COINs
+    _safeEngineCParams[OP].debtFloor = 10_000 * RAD; // 10_000 COINs
     _liquidationEngineCParams[OP].liquidationPenalty = 1.5e18; // WAD
 
     // --- Governance Params ---

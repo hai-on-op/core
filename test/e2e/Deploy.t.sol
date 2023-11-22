@@ -4,8 +4,18 @@ pragma solidity 0.8.20;
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {Deploy, DeployMainnet, DeployGoerli} from '@script/Deploy.s.sol';
 
-import {ParamChecker, WETH, WSTETH, OP, WBTC, STONES} from '@script/Params.s.sol';
-import {OP_OPTIMISM, OP_CHAINLINK_ETH_USD_FEED} from '@script/Registry.s.sol';
+import {
+  ParamChecker,
+  WETH,
+  WSTETH,
+  OP,
+  WBTC,
+  STONES,
+  HAI_POOL_FEE_TIER,
+  HAI_POOL_OBSERVATION_CARDINALITY,
+  HAI_ETH_INITIAL_TICK
+} from '@script/Params.s.sol';
+import {UNISWAP_V3_FACTORY, OP_OPTIMISM, OP_CHAINLINK_ETH_USD_FEED} from '@script/Registry.s.sol';
 import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 
@@ -446,9 +456,40 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
 
   function setUp() public override {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
-    governor = address(69);
     super.setUp();
     run();
+
+    // NOTE: deploy [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
+    vm.startPrank(governor);
+
+    // Deploy HAI/WETH UniV3 pool
+    _deployUniV3Pool(
+      UNISWAP_V3_FACTORY,
+      address(collateral[WETH]),
+      address(systemCoin),
+      HAI_POOL_FEE_TIER,
+      HAI_POOL_OBSERVATION_CARDINALITY,
+      HAI_ETH_INITIAL_TICK // 2000 HAI = 1 ETH
+    );
+
+    // Setup HAI/WETH oracle feed
+    IBaseOracle _haiWethOracle = uniV3RelayerFactory.deployUniV3Relayer({
+      _baseToken: address(systemCoin),
+      _quoteToken: address(collateral[WETH]),
+      _feeTier: HAI_POOL_FEE_TIER,
+      _quotePeriod: 1 days
+    });
+
+    // Setup HAI/USD oracle feed
+    systemCoinOracle = denominatedOracleFactory.deployDenominatedOracle({
+      _priceSource: _haiWethOracle,
+      _denominationPriceSource: delayedOracle[WETH].priceSource(),
+      _inverted: false
+    });
+
+    oracleRelayer.modifyParameters('systemCoinOracle', abi.encode(systemCoinOracle));
+
+    vm.stopPrank();
 
     _governorAccounts = 1; // no delegate on production
   }
@@ -507,7 +548,6 @@ contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
 
   function setUp() public override {
     vm.createSelectFork(vm.rpcUrl('goerli'), FORK_BLOCK);
-    governor = address(69);
     super.setUp();
     run();
 
