@@ -35,24 +35,15 @@ contract TokenDistributor is Authorizable, ITokenDistributor {
   mapping(address _user => bool _hasClaimed) public claimed;
 
   /**
-   * @param  _root Bytes32 representation of the merkle root
    * @param  _token Address of the ERC20 token to be distributed
-   * @param  _totalClaimable Total amount of tokens to be distributed
-   * @param  _claimPeriodStart Timestamp when the claim period starts
-   * @param  _claimPeriodEnd Timestamp when the claim period ends
+   * @param  _tokenDistributorParams TokenDistributor valid parameters struct
    */
-  constructor(
-    bytes32 _root,
-    ERC20Votes _token,
-    uint256 _totalClaimable,
-    uint256 _claimPeriodStart,
-    uint256 _claimPeriodEnd
-  ) Authorizable(msg.sender) {
-    root = _root;
+  constructor(ERC20Votes _token, TokenDistributorParams memory _tokenDistributorParams) Authorizable(msg.sender) {
     token = ERC20Votes(address(_token).assertNonNull());
-    totalClaimable = _totalClaimable.assertNonNull();
-    claimPeriodStart = _claimPeriodStart.assertGt(block.timestamp);
-    claimPeriodEnd = _claimPeriodEnd.assertGt(claimPeriodStart);
+    root = _tokenDistributorParams.root;
+    totalClaimable = _tokenDistributorParams.totalClaimable.assertNonNull();
+    claimPeriodStart = _tokenDistributorParams.claimPeriodStart.assertGt(block.timestamp);
+    claimPeriodEnd = _tokenDistributorParams.claimPeriodEnd.assertGt(claimPeriodStart);
   }
 
   /// @inheritdoc ITokenDistributor

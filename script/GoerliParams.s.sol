@@ -9,9 +9,6 @@ abstract contract GoerliParams is Contracts, Params {
   uint256 constant OP_GOERLI_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
 
   function _getEnvironmentParams() internal override {
-    governor = 0xA6A772CCaa47eA3A6f267d31D782e8Ac5a5Ed743;
-    delegate = 0x8125aAa8F7912aEb500553a5b1710BB16f7A6C65;
-
     // Setup delegated collateral joins
     delegatee[OP] = governor;
 
@@ -142,5 +139,21 @@ abstract contract GoerliParams is Contracts, Params {
 
     _liquidationEngineCParams[OP].liquidationPenalty = 1.2e18; // 20%
     _collateralAuctionHouseParams[OP].maxDiscount = 0.5e18; // -50%
+
+    // --- Governance Params ---
+    _governorParams = IHaiGovernor.HaiGovernorParams({
+      votingDelay: 300, // 5 minutes
+      votingPeriod: 1200, // 20 minutes
+      proposalThreshold: 460_000e18, // 460k
+      quorumNumeratorValue: 1, // 1%
+      timelockMinDelay: 3600 // 1 hour
+    });
+
+    _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
+      root: 0x1c7788eabca460b90a129ae875a0e7fad60103a3fa45f97e6b512999f37f7688,
+      totalClaimable: 1_000_000e18,
+      claimPeriodStart: 1_700_622_000, // 22/11/23
+      claimPeriodEnd: 1_704_078_000 // 01/01/24
+    });
   }
 }

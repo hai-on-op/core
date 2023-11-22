@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {ERC20VotesForTest} from '@test/mocks/ERC20VotesForTest.sol';
-import {TokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
 import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
 
 abstract contract Hevm {
@@ -65,11 +65,13 @@ contract SingleTokenDistributorTest is HaiTest {
 
     vm.prank(deployer);
     tokenDistributor = new TokenDistributor(
-            merkleRoot,
             token,
-            totalClaimable,
-            claimPeriodStart,
-            claimPeriodEnd
+            ITokenDistributor.TokenDistributorParams(
+              merkleRoot,
+              totalClaimable,
+              claimPeriodStart,
+              claimPeriodEnd
+              )
         );
 
     vm.prank(deployer);

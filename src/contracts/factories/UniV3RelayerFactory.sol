@@ -20,12 +20,18 @@ contract UniV3RelayerFactory is Authorizable, IUniV3RelayerFactory {
 
   // --- Data ---
 
+  /// @notice Address of the UniswapV3Factory used to fetch the pool address
+  // solhint-disable-next-line var-name-mixedcase
+  address internal immutable _UNI_V3_FACTORY;
+
   /// @notice The enumerable set of deployed UniV3Relayer contracts
   EnumerableSet.AddressSet internal _uniV3Relayers;
 
   // --- Init ---
 
-  constructor() Authorizable(msg.sender) {}
+  constructor(address _uniV3Factory) Authorizable(msg.sender) {
+    _UNI_V3_FACTORY = _uniV3Factory;
+  }
 
   // --- Methods ---
 
@@ -36,7 +42,7 @@ contract UniV3RelayerFactory is Authorizable, IUniV3RelayerFactory {
     uint24 _feeTier,
     uint32 _quotePeriod
   ) external isAuthorized returns (IBaseOracle _uniV3Relayer) {
-    _uniV3Relayer = new UniV3RelayerChild(_baseToken, _quoteToken, _feeTier, _quotePeriod);
+    _uniV3Relayer = new UniV3RelayerChild(_UNI_V3_FACTORY, _baseToken, _quoteToken, _feeTier, _quotePeriod);
     _uniV3Relayers.add(address(_uniV3Relayer));
     emit NewUniV3Relayer(address(_uniV3Relayer), _baseToken, _quoteToken, _feeTier, _quotePeriod);
   }

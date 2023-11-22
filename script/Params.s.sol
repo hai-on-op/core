@@ -18,6 +18,8 @@ import {
   ITaxCollector,
   IGlobalSettlement,
   IPostSettlementSurplusAuctionHouse,
+  IHaiGovernor,
+  ITokenDistributor,
   IModifiable
 } from '@script/Contracts.s.sol';
 
@@ -27,9 +29,10 @@ import {WAD, RAY, RAD} from '@libraries/Math.sol';
 
 // HAI Params
 bytes32 constant HAI = bytes32('HAI'); // 0x4841490000000000000000000000000000000000000000000000000000000000
-uint256 constant HAI_INITIAL_PRICE = 1e18; // 1 HAI = 1 USD
-uint160 constant HAI_INITIAL_SQRT_PRICE_X96 = 1_867_425_699_159_540_000_000_000_000; // 1 HAI = 1800 USD
-uint160 constant HAI_INITIAL_SQRT_PRICE_X96_INVERSE = 3_361_366_258_487_168_395_124_000_000_000; // 1 HAI = 1800 USD
+uint256 constant HAI_USD_INITIAL_PRICE = 1e18; // 1 HAI = 1 USD
+uint256 constant HAI_ETH_INITIAL_PRICE = 0.0005e18; // 2000 HAI = 1 ETH
+int24 constant HAI_ETH_INITIAL_TICK = 76_013; // ~2000 HAI = 1 ETH
+
 uint24 constant HAI_POOL_FEE_TIER = 3000; // 0.3 %
 uint16 constant HAI_POOL_OBSERVATION_CARDINALITY = 5000; // Safest cardinality would be 43.2k (at 2s per block, 1d TWAP)
 
@@ -88,6 +91,10 @@ abstract contract Params {
 
   IGlobalSettlement.GlobalSettlementParams _globalSettlementParams;
   IPostSettlementSurplusAuctionHouse.PostSettlementSAHParams _postSettlementSAHParams;
+
+  // --- Governor params ---
+  IHaiGovernor.HaiGovernorParams _governorParams;
+  ITokenDistributor.TokenDistributorParams _tokenDistributorParams;
 }
 
 /**
