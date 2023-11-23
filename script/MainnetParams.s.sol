@@ -6,6 +6,9 @@ import '@script/Params.s.sol';
 abstract contract MainnetParams is Contracts, Params {
   // --- Mainnet Params ---
   function _getEnvironmentParams() internal override {
+    // Setup delegated collateral joins
+    delegatee[OP] = address(haiDelegatee);
+
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
       safeDebtCeiling: 10_000_000 * WAD, // WAD
       globalDebtCeiling: 10_000_000_000 * RAD // RAD

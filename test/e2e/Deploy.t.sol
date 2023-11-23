@@ -502,6 +502,10 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
     super.setupPostEnvironment();
   }
 
+  function test_Delegated_OP() public {
+    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), haiDelegatee);
+  }
+
   function test_pid_update_rate() public {
     _refreshChainlinkFeed(OP_CHAINLINK_ETH_USD_FEED, 2000e8);
 

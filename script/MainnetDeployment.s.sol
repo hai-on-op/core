@@ -21,7 +21,6 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
 
     // --- utils ---
     governor = 0x92e2973f4941eB4B8fa2fd334e630fEAd25454cF;
-    delegatee[OP] = governor;
 
     // --- ERC20s ---
     collateral[WETH] = IERC20Metadata(OP_WETH);
@@ -95,5 +94,6 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     timelock = TimelockController(payable(0x92e2973f4941eB4B8fa2fd334e630fEAd25454cF));
     haiGovernor = HaiGovernor(payable(0x7F9c9f7817a8915A103Bd4A1Bb7f841aA038327f));
     tokenDistributor = TokenDistributor(0x3b2fcC752b80EB91Be9dea3087B7C21F3749eB28);
+    haiDelegatee = 0x0000000000000000000000000000000000000420;
   }
 }

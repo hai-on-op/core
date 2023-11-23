@@ -159,6 +159,8 @@ abstract contract Common is Contracts, Params {
 
       timelock = TimelockController(payable(haiGovernor.timelock()));
 
+      haiDelegatee = address(new Placeholder());
+
       // sets timelock as protocol governor
       governor = address(timelock);
     }

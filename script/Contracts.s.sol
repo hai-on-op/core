@@ -158,4 +158,7 @@ abstract contract Contracts {
   TimelockController public timelock;
   HaiGovernor public haiGovernor;
   TokenDistributor public tokenDistributor;
+  address public haiDelegatee;
 }
+
+contract Placeholder {}
