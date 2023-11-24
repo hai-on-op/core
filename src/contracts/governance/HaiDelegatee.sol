@@ -25,31 +25,31 @@ contract HaiDelegatee is IHaiDelegatee, Ownable {
   /// @inheritdoc IHaiDelegatee
   function castVote(
     IGovernor _governor,
-    uint256 proposalId,
-    uint8 support
+    uint256 _proposalId,
+    uint8 _support
   ) public onlyDelegatee returns (uint256 _weight) {
-    return _governor.castVote(proposalId, support);
+    return _governor.castVote(_proposalId, _support);
   }
 
   /// @inheritdoc IHaiDelegatee
   function castVoteWithReason(
     IGovernor _governor,
-    uint256 proposalId,
-    uint8 support,
-    string memory reason
+    uint256 _proposalId,
+    uint8 _support,
+    string memory _reason
   ) public onlyDelegatee returns (uint256 _weight) {
-    return _governor.castVoteWithReason(proposalId, support, reason);
+    return _governor.castVoteWithReason(_proposalId, _support, _reason);
   }
 
   /// @inheritdoc IHaiDelegatee
   function castVoteWithReasonAndParams(
     IGovernor _governor,
-    uint256 proposalId,
-    uint8 support,
-    string memory reason,
-    bytes memory params
+    uint256 _proposalId,
+    uint8 _support,
+    string memory _reason,
+    bytes memory _params
   ) public onlyDelegatee returns (uint256 _weight) {
-    return _governor.castVoteWithReasonAndParams(proposalId, support, reason, params);
+    return _governor.castVoteWithReasonAndParams(_proposalId, _support, _reason, _params);
   }
 
   modifier onlyDelegatee() {

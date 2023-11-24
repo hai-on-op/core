@@ -8,9 +8,9 @@ interface IHaiDelegatee {
 
   /**
    * @notice Emitted when the delegatee of the contract is set
-   * @param delegatee The address of the new delegatee
+   * @param _delegatee The address of the new delegatee
    */
-  event DelegateeSet(address delegatee);
+  event DelegateeSet(address _delegatee);
 
   // --- Errors ---
 
