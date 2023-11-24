@@ -93,7 +93,7 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     // --- governance ---
     timelock = TimelockController(payable(0x7F9c9f7817a8915A103Bd4A1Bb7f841aA038327f));
     haiGovernor = HaiGovernor(payable(0x92e2973f4941eB4B8fa2fd334e630fEAd25454cF));
-    haiDelegatee = 0x325d7E58DA540F81665a50c638ea2C65Edc666B0;
+    haiDelegatee = HaiDelegatee(0x325d7E58DA540F81665a50c638ea2C65Edc666B0);
     
     tokenDistributor = TokenDistributor(0xB3339246086412Def028bB2212843a81c898606E);
   }

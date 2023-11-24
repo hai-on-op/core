@@ -503,7 +503,7 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
   }
 
   function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), haiDelegatee);
+    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
   }
 
   function test_pid_update_rate() public {

@@ -14,6 +14,10 @@ import {
   TimelockController
 } from '@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol';
 
+/**
+ * @title  HaiGovernor
+ * @notice This contract implements OpenZeppelin's Governor contract overriding the clock to use block.timestamp
+ */
 contract HaiGovernor is
   Governor,
   GovernorSettings,
