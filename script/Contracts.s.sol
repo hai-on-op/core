@@ -161,5 +161,3 @@ abstract contract Contracts {
   TokenDistributor public tokenDistributor;
   HaiDelegatee public haiDelegatee;
 }
-
-contract Placeholder {}
