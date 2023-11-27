@@ -21,6 +21,7 @@ import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 
 import '@script/Contracts.s.sol';
 import {GoerliDeployment} from '@script/GoerliDeployment.s.sol';
+import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 
 abstract contract CommonDeploymentTest is HaiTest, Deploy {
   uint256 _governorAccounts;
@@ -545,7 +546,19 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
   }
 }
 
-// TODO: contract OptimismDeploymentTest is OptimismDeployment, CommonDeploymentTest
+contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTest {
+  function setUp() public {
+    vm.createSelectFork(vm.rpcUrl('mainnet'), MAINNET_DEPLOYMENT_BLOCK);
+    _getEnvironmentParams();
+
+    // there is 1 governor accounts (timelock)
+    _governorAccounts = 1;
+  }
+
+  function test_Delegated_OP() public {
+    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
+  }
+}
 
 contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
   uint256 FORK_BLOCK = 17_400_000;
