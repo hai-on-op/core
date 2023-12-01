@@ -143,6 +143,7 @@ abstract contract MainnetParams is Contracts, Params {
       votingPeriod: 129_600, // 36 hours
       proposalThreshold: 5000e18, // 5k
       quorumNumeratorValue: 1, // 1%
+      quorumVoteExtension: 86_400, // 1 day
       timelockMinDelay: 86_400 // 1 day
     });
 
