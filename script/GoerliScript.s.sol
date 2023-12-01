@@ -12,7 +12,6 @@ import '@script/Registry.s.sol';
  * @title  GoerliScript
  * @notice This contract is used to deploy the system on Goerli
  * @dev    This contract imports deployed addresses from `GoerliDeployment.s.sol`
- * @dev    Mainnet has no scripting implementation (shouldn't be used with EOAs)
  */
 contract GoerliScript is GoerliDeployment, Common, Script {
   function setUp() public virtual {
