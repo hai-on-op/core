@@ -146,6 +146,7 @@ abstract contract GoerliParams is Contracts, Params {
       votingPeriod: 1200, // 20 minutes
       proposalThreshold: 460_000e18, // 460k
       quorumNumeratorValue: 1, // 1%
+      quorumVoteExtension: 1200, // 20 minutes
       timelockMinDelay: 3600 // 1 hour
     });
 

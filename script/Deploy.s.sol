@@ -90,6 +90,7 @@ contract DeployMainnet is MainnetParams, Deploy {
     IBaseOracle _ethUSDPriceFeed = chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_ETH_USD_FEED, 1 hours);
     IBaseOracle _wstethETHPriceFeed =
       chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_WSTETH_ETH_FEED, 1 hours);
+    IBaseOracle _opUSDPriceFeed = chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_OP_USD_FEED, 1 hours);
 
     IBaseOracle _wstethUSDPriceFeed = denominatedOracleFactory.deployDenominatedOracle({
       _priceSource: _wstethETHPriceFeed,
@@ -99,36 +100,18 @@ contract DeployMainnet is MainnetParams, Deploy {
 
     delayedOracle[WETH] = delayedOracleFactory.deployDelayedOracle(_ethUSDPriceFeed, 1 hours);
     delayedOracle[WSTETH] = delayedOracleFactory.deployDelayedOracle(_wstethUSDPriceFeed, 1 hours);
+    delayedOracle[OP] = delayedOracleFactory.deployDelayedOracle(_opUSDPriceFeed, 1 hours);
 
     collateral[WETH] = IERC20Metadata(OP_WETH);
     collateral[WSTETH] = IERC20Metadata(OP_WSTETH);
+    collateral[OP] = IERC20Metadata(OP_OPTIMISM);
 
     collateralTypes.push(WETH);
     collateralTypes.push(WSTETH);
+    collateralTypes.push(OP);
 
-    // Deploy HAI/WETH UniV3 pool
-    _deployUniV3Pool(
-      UNISWAP_V3_FACTORY,
-      address(collateral[WETH]),
-      address(systemCoin),
-      HAI_POOL_FEE_TIER,
-      HAI_POOL_OBSERVATION_CARDINALITY,
-      HAI_ETH_INITIAL_TICK // 2000 HAI = 1 ETH
-    );
-
-    // Setup HAI oracle feed
-    IBaseOracle _haiWethOracle = uniV3RelayerFactory.deployUniV3Relayer({
-      _baseToken: address(systemCoin),
-      _quoteToken: address(collateral[WETH]),
-      _feeTier: HAI_POOL_FEE_TIER,
-      _quotePeriod: 1 days
-    });
-
-    systemCoinOracle = denominatedOracleFactory.deployDenominatedOracle({
-      _priceSource: _haiWethOracle,
-      _denominationPriceSource: _ethUSDPriceFeed,
-      _inverted: false
-    });
+    // NOTE: Deploying the PID Controller turned off until governance action
+    systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
   }
 
   function setupPostEnvironment() public virtual override updateParams {}

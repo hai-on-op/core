@@ -23,7 +23,6 @@ abstract contract GoerliDeployment is Contracts, GoerliParams {
 
     // --- utils ---
     governor = 0x5bc1c8783b729eaCeEBfe01C220A12A8Dd704C15;
-    delegatee[OP] = governor;
 
     // --- ERC20s ---
     collateral[WETH] = IERC20Metadata(OP_WETH);

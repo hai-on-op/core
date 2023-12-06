@@ -9,17 +9,23 @@ import {GovernorCountingSimple} from '@openzeppelin/contracts/governance/extensi
 import {GovernorVotes, IVotes, Time} from '@openzeppelin/contracts/governance/extensions/GovernorVotes.sol';
 import {GovernorVotesQuorumFraction} from
   '@openzeppelin/contracts/governance/extensions/GovernorVotesQuorumFraction.sol';
+import {GovernorPreventLateQuorum} from '@openzeppelin/contracts/governance/extensions/GovernorPreventLateQuorum.sol';
 import {
   GovernorTimelockControl,
   TimelockController
 } from '@openzeppelin/contracts/governance/extensions/GovernorTimelockControl.sol';
 
+/**
+ * @title  HaiGovernor
+ * @notice This contract implements OpenZeppelin's Governor contract overriding the clock to use block.timestamp
+ */
 contract HaiGovernor is
   Governor,
   GovernorSettings,
   GovernorCountingSimple,
   GovernorVotes,
   GovernorVotesQuorumFraction,
+  GovernorPreventLateQuorum,
   GovernorTimelockControl
 {
   constructor(
@@ -31,6 +37,7 @@ contract HaiGovernor is
     GovernorSettings(_params.votingDelay, _params.votingPeriod, _params.proposalThreshold)
     GovernorVotes(_token)
     GovernorVotesQuorumFraction(_params.quorumNumeratorValue)
+    GovernorPreventLateQuorum(_params.quorumVoteExtension)
     GovernorTimelockControl(
       new TimelockController(_params.timelockMinDelay, new address[](0), new address[](0), address(this))
     )
@@ -112,5 +119,24 @@ contract HaiGovernor is
     returns (ProposalState _state)
   {
     return super.state(_proposalId);
+  }
+
+  function _castVote(
+    uint256 _proposalId,
+    address _account,
+    uint8 _support,
+    string memory _reason,
+    bytes memory _params
+  ) internal override(Governor, GovernorPreventLateQuorum) returns (uint256 _voteId) {
+    return super._castVote(_proposalId, _account, _support, _reason, _params);
+  }
+
+  function proposalDeadline(uint256 _proposalId)
+    public
+    view
+    override(Governor, GovernorPreventLateQuorum)
+    returns (uint256 _deadline)
+  {
+    return super.proposalDeadline(_proposalId);
   }
 }
