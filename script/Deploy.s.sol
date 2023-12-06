@@ -111,7 +111,7 @@ contract DeployMainnet is MainnetParams, Deploy {
     collateralTypes.push(OP);
 
     // NOTE: Deploying the PID Controller turned off until governance action
-    systemCoinOracle = new HardcodedOracle('HAI / USD', 1e18); // 1 HAI = 1 USD
+    systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
   }
 
   function setupPostEnvironment() public virtual override updateParams {}
