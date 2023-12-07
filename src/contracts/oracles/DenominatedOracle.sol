@@ -50,7 +50,7 @@ contract DenominatedOracle is IBaseOracle, IDenominatedOracle {
     inverted = _inverted;
 
     if (_inverted) {
-      symbol = string(abi.encodePacked('(', priceSource.symbol(), ')^-1 / (', denominationPriceSource.symbol(), ')'));
+      symbol = string(abi.encodePacked('(', priceSource.symbol(), ')^-1 * (', denominationPriceSource.symbol(), ')'));
     } else {
       symbol = string(abi.encodePacked('(', priceSource.symbol(), ') * (', denominationPriceSource.symbol(), ')'));
     }

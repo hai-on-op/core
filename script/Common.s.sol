@@ -5,6 +5,8 @@ import '@script/Contracts.s.sol';
 import '@script/Params.s.sol';
 import '@script/Registry.s.sol';
 
+import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
+
 abstract contract Common is Contracts, Params {
   uint256 internal _deployerPk = 69; // for tests
   uint256 internal _governorPK;
@@ -74,6 +76,9 @@ abstract contract Common is Contracts, Params {
     _revoke(accountingJob, _governor);
     _revoke(liquidationJob, _governor);
     _revoke(oracleJob, _governor);
+
+    // token distributor
+    if (address(tokenDistributor) != address(0)) _revoke(tokenDistributor, _governor);
   }
 
   function _revoke(IAuthorizable _contract, address _target) internal {
@@ -124,6 +129,9 @@ abstract contract Common is Contracts, Params {
     _delegate(accountingJob, __delegate);
     _delegate(liquidationJob, __delegate);
     _delegate(oracleJob, __delegate);
+
+    // token distributor
+    if (address(tokenDistributor) != address(0)) _delegate(tokenDistributor, __delegate);
   }
 
   function _delegate(IAuthorizable _contract, address _target) internal {
@@ -137,6 +145,25 @@ abstract contract Common is Contracts, Params {
   function deployTokens() public updateParams {
     systemCoin = new SystemCoin('HAI Index Token', 'HAI');
     protocolToken = new ProtocolToken('Protocol Token', 'KITE');
+  }
+
+  function deployGovernance() public updateParams {
+    IHaiGovernor.HaiGovernorParams memory _emptyGovernorParams;
+    // if governor params are not empty, deploy governor
+    if (keccak256(abi.encode(_governorParams)) != keccak256(abi.encode(_emptyGovernorParams))) {
+      haiGovernor = new HaiGovernor(
+        protocolToken,
+        'HaiGovernor',
+        _governorParams
+      );
+
+      timelock = TimelockController(payable(haiGovernor.timelock()));
+
+      haiDelegatee = new HaiDelegatee(address(timelock));
+
+      // sets timelock as protocol governor
+      governor = address(timelock);
+    }
   }
 
   function deployContracts() public updateParams {
@@ -154,6 +181,7 @@ abstract contract Common is Contracts, Params {
             address(protocolToken),
             _surplusAuctionHouseParams
         );
+
     debtAuctionHouse = new DebtAuctionHouse(
             address(safeEngine),
             address(protocolToken),
@@ -173,11 +201,15 @@ abstract contract Common is Contracts, Params {
             _liquidationEngineParams
         );
 
-    collateralAuctionHouseFactory =
-      new CollateralAuctionHouseFactory(address(safeEngine), address(liquidationEngine), address(oracleRelayer));
+    collateralAuctionHouseFactory = new CollateralAuctionHouseFactory(
+        address(safeEngine), 
+        address(liquidationEngine), 
+        address(oracleRelayer)
+        );
 
     // deploy Token adapters
     coinJoin = new CoinJoin(address(safeEngine), address(systemCoin));
+
     collateralJoinFactory = new CollateralJoinFactory(address(safeEngine));
   }
 
@@ -218,6 +250,21 @@ abstract contract Common is Contracts, Params {
             address(accountingEngine),
             address(postSettlementSurplusAuctionHouse)
         );
+  }
+
+  function deployTokenDistributor() public updateParams {
+    ITokenDistributor.TokenDistributorParams memory _emptyTokenDistributorParams;
+    // if token distributor params are not empty, deploy token distributor
+    if (keccak256(abi.encode(_tokenDistributorParams)) != keccak256(abi.encode(_emptyTokenDistributorParams))) {
+      // Deploy aidrop distributor contract
+      tokenDistributor = new TokenDistributor(
+        ERC20Votes(address(protocolToken)),
+        _tokenDistributorParams
+        );
+
+      // Mint initial supply to the distributor
+      protocolToken.mint(address(tokenDistributor), _tokenDistributorParams.totalClaimable);
+    }
   }
 
   function _setupGlobalSettlement() internal {
@@ -331,20 +378,24 @@ abstract contract Common is Contracts, Params {
     rewardedActions = new RewardedActions();
   }
 
-  function _deployUniV3Pool() internal {
-    address _uniV3Pool = IUniswapV3Factory(UNISWAP_V3_FACTORY).createPool({
-      tokenA: address(systemCoin),
-      tokenB: address(collateral[WETH]),
-      fee: HAI_POOL_FEE_TIER
-    });
+  function _deployUniV3Pool(
+    address _uniV3Factory,
+    address _tokenA,
+    address _tokenB,
+    uint24 _fee,
+    uint16 _cardinality,
+    int24 _initialTick
+  ) internal {
+    address _uniV3Pool = IUniswapV3Factory(_uniV3Factory).createPool({tokenA: _tokenA, tokenB: _tokenB, fee: _fee});
 
     address _token0 = IUniswapV3Pool(_uniV3Pool).token0();
-    uint160 _sqrtPriceX96 =
-      _token0 == address(systemCoin) ? HAI_INITIAL_SQRT_PRICE_X96 : HAI_INITIAL_SQRT_PRICE_X96_INVERSE;
+    uint160 _sqrtPriceX96 = _token0 == address(_tokenA)
+      ? TickMath.getSqrtRatioAtTick(_initialTick)
+      : TickMath.getSqrtRatioAtTick(-_initialTick);
 
     IUniswapV3Pool(_uniV3Pool).initialize(_sqrtPriceX96);
 
-    for (uint256 _i; _i < HAI_POOL_OBSERVATION_CARDINALITY;) {
+    for (uint256 _i; _i < _cardinality;) {
       IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(500);
       _i += 500;
     }

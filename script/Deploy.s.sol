@@ -21,6 +21,9 @@ abstract contract Deploy is Common, Script {
     // Deploy tokens used to setup the environment
     deployTokens();
 
+    // Deploy governance contracts
+    deployGovernance();
+
     // Environment may be different for each network
     setupEnvironment();
 
@@ -54,6 +57,9 @@ abstract contract Deploy is Common, Script {
     // Deploy and setup contracts that rely on deployed environment
     setupPostEnvironment();
 
+    // Deploy Merkle tree claim contract and mint protocol tokens to it
+    deployTokenDistributor();
+
     if (delegate == address(0)) {
       _revokeAllTo(governor);
     } else if (delegate == deployer) {
@@ -76,7 +82,7 @@ contract DeployMainnet is MainnetParams, Deploy {
   function setupEnvironment() public virtual override updateParams {
     // Deploy oracle factories
     chainlinkRelayerFactory = new ChainlinkRelayerFactory(OP_CHAINLINK_SEQUENCER_UPTIME_FEED);
-    uniV3RelayerFactory = new UniV3RelayerFactory();
+    uniV3RelayerFactory = new UniV3RelayerFactory(UNISWAP_V3_FACTORY);
     denominatedOracleFactory = new DenominatedOracleFactory();
     delayedOracleFactory = new DelayedOracleFactory();
 
@@ -84,6 +90,7 @@ contract DeployMainnet is MainnetParams, Deploy {
     IBaseOracle _ethUSDPriceFeed = chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_ETH_USD_FEED, 1 hours);
     IBaseOracle _wstethETHPriceFeed =
       chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_WSTETH_ETH_FEED, 1 hours);
+    IBaseOracle _opUSDPriceFeed = chainlinkRelayerFactory.deployChainlinkRelayer(OP_CHAINLINK_OP_USD_FEED, 1 hours);
 
     IBaseOracle _wstethUSDPriceFeed = denominatedOracleFactory.deployDenominatedOracle({
       _priceSource: _wstethETHPriceFeed,
@@ -93,23 +100,18 @@ contract DeployMainnet is MainnetParams, Deploy {
 
     delayedOracle[WETH] = delayedOracleFactory.deployDelayedOracle(_ethUSDPriceFeed, 1 hours);
     delayedOracle[WSTETH] = delayedOracleFactory.deployDelayedOracle(_wstethUSDPriceFeed, 1 hours);
+    delayedOracle[OP] = delayedOracleFactory.deployDelayedOracle(_opUSDPriceFeed, 1 hours);
 
     collateral[WETH] = IERC20Metadata(OP_WETH);
     collateral[WSTETH] = IERC20Metadata(OP_WSTETH);
+    collateral[OP] = IERC20Metadata(OP_OPTIMISM);
 
     collateralTypes.push(WETH);
     collateralTypes.push(WSTETH);
+    collateralTypes.push(OP);
 
-    // Deploy HAI/WETH UniV3 pool
-    _deployUniV3Pool();
-
-    // Setup HAI oracle feed
-    systemCoinOracle = uniV3RelayerFactory.deployUniV3Relayer({
-      _baseToken: address(systemCoin),
-      _quoteToken: address(collateral[WETH]),
-      _feeTier: HAI_POOL_FEE_TIER,
-      _quotePeriod: 1 days
-    });
+    // NOTE: Deploying the PID Controller turned off until governance action
+    systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
   }
 
   function setupPostEnvironment() public virtual override updateParams {}
@@ -122,16 +124,18 @@ contract DeployGoerli is GoerliParams, Deploy {
   }
 
   function setupEnvironment() public virtual override updateParams {
+    delegate = 0x8125aAa8F7912aEb500553a5b1710BB16f7A6C65; // EOA
+
     // Deploy oracle factories
     chainlinkRelayerFactory = new ChainlinkRelayerFactory(OP_GOERLI_CHAINLINK_SEQUENCER_UPTIME_FEED);
-    uniV3RelayerFactory = new UniV3RelayerFactory();
+    uniV3RelayerFactory = new UniV3RelayerFactory(OP_GOERLI_UNISWAP_V3_FACTORY);
     denominatedOracleFactory = new DenominatedOracleFactory();
     delayedOracleFactory = new DelayedOracleFactory();
 
     // Setup oracle feeds
 
     // HAI
-    systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_INITIAL_PRICE); // 1 HAI = 1 USD
+    systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
 
     // WETH
     collateral[WETH] = IERC20Metadata(OP_WETH);
@@ -152,13 +156,30 @@ contract DeployGoerli is GoerliParams, Deploy {
     collateral[STONES] = new MintableERC20('Stones', 'STN', 3);
     collateral[TOTEM] = new MintableERC20('Totem', 'TTM', 0);
 
+    // Deploy STN / WBTC UniV3 pool
+    _deployUniV3Pool(
+      OP_GOERLI_UNISWAP_V3_FACTORY,
+      address(collateral[STONES]),
+      address(collateral[WBTC]),
+      HAI_POOL_FEE_TIER,
+      HAI_POOL_OBSERVATION_CARDINALITY,
+      46_054 // 1000.000 STN = 1.00000000 wBTC
+    );
+
     // BTC: live feed
     IBaseOracle _wbtcUsdOracle =
       chainlinkRelayerFactory.deployChainlinkRelayer(OP_GOERLI_CHAINLINK_BTC_USD_FEED, 1 hours);
-    // STN: denominated feed (1000 STN = 1 wBTC)
-    IBaseOracle _stonesWbtcOracle = new HardcodedOracle('STN / BTC', 0.001e18);
+
+    // STN: uniswap denominated feed
+    IBaseOracle _stonesWbtcOracle = uniV3RelayerFactory.deployUniV3Relayer({
+      _baseToken: address(collateral[STONES]),
+      _quoteToken: address(collateral[WBTC]),
+      _feeTier: HAI_POOL_FEE_TIER,
+      _quotePeriod: 1 hours
+    });
     IBaseOracle _stonesOracle =
       denominatedOracleFactory.deployDenominatedOracle(_stonesWbtcOracle, _wbtcUsdOracle, false);
+
     // TTM: hardcoded feed (TTM price is 1)
     IBaseOracle _totemOracle = new HardcodedOracle('TTM', 1e18);
 
@@ -179,7 +200,7 @@ contract DeployGoerli is GoerliParams, Deploy {
   function setupPostEnvironment() public virtual override updateParams {
     // Setup deviated oracle
     systemCoinOracle = new DeviatedOracle({
-      _symbol: 'HAI/USD',
+      _symbol: 'HAI / USD',
       _oracleRelayer: address(oracleRelayer),
       _deviation: OP_GOERLI_HAI_PRICE_DEVIATION
     });

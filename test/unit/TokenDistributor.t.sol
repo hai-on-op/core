@@ -64,7 +64,8 @@ abstract contract Base is HaiTest {
 
     _mockERC20VotesDelegate(deployer);
     vm.prank(deployer);
-    tokenDistributor = new TokenDistributor(merkleRoot, token, totalClaimable, claimPeriodStart, claimPeriodEnd);
+    tokenDistributor =
+    new TokenDistributor(token, ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd));
 
     uint256 _index = merkleTreeGenerator.getIndex(merkleTree, leaves[4]);
     validEveProofs = merkleTreeGenerator.getProof(merkleTree, _index);
@@ -139,13 +140,13 @@ contract Unit_TokenDistributor_Constructor is Base {
   function test_Revert_Token_IsNull() public {
     vm.expectRevert(Assertions.NullAddress.selector);
 
-    new TokenDistributor(merkleRoot, ERC20Votes(address(0)), totalClaimable, claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(ERC20Votes(address(0)), ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd));
   }
 
   function test_Revert_TotalClaimable_IsNull() public {
     vm.expectRevert(Assertions.NullAmount.selector);
 
-    new TokenDistributor(merkleRoot, token, 0, claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(token, ITokenDistributor.TokenDistributorParams(merkleRoot, 0, claimPeriodStart, claimPeriodEnd));
   }
 
   function test_Revert_ClaimPeriodStart_LtEqTimeStamp(uint256 _claimPeriodStart) public {
@@ -153,7 +154,7 @@ contract Unit_TokenDistributor_Constructor is Base {
 
     vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterThan.selector, _claimPeriodStart, block.timestamp));
 
-    new TokenDistributor(merkleRoot, token, totalClaimable, _claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(token, ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, _claimPeriodStart, claimPeriodEnd));
   }
 
   function test_Revert_ClaimPeriodEnd_LtEqClaimPeriodStart(uint256 _claimPeriodStart, uint256 _claimPeriodEnd) public {
@@ -162,7 +163,7 @@ contract Unit_TokenDistributor_Constructor is Base {
 
     vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterThan.selector, _claimPeriodEnd, _claimPeriodStart));
 
-    new TokenDistributor(merkleRoot, token, totalClaimable, _claimPeriodStart, _claimPeriodEnd);
+    new TokenDistributor(token, ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, _claimPeriodStart, _claimPeriodEnd));
   }
 }
 
@@ -249,7 +250,8 @@ contract Unit_CanClaim_ExternalScript is Base {
   function setUp() public override {
     super.setUp();
     bytes32 _root = 0x30e48fd8bee18a1728bfd9f536125c5a352b778d5b07a92de684b14cb7bb92ad; // Root generated with OZ js library
-    tokenDistributor = new TokenDistributor(_root, token, totalClaimable, claimPeriodStart, claimPeriodEnd);
+    tokenDistributor =
+    new TokenDistributor(token, ITokenDistributor.TokenDistributorParams(_root, totalClaimable, claimPeriodStart, claimPeriodEnd));
     vm.warp(claimPeriodStart); // going ahead in time for claim period start
   }
 

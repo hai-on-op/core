@@ -6,6 +6,9 @@ import '@script/Params.s.sol';
 abstract contract MainnetParams is Contracts, Params {
   // --- Mainnet Params ---
   function _getEnvironmentParams() internal override {
+    // Setup delegated collateral joins
+    delegatee[OP] = address(haiDelegatee);
+
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
       safeDebtCeiling: 10_000_000 * WAD, // WAD
       globalDebtCeiling: 10_000_000_000 * RAD // RAD
@@ -129,5 +132,26 @@ abstract contract MainnetParams is Contracts, Params {
     _taxCollectorCParams[WSTETH].stabilityFee = RAY + 11.11926e18; // + 42%/yr
     _safeEngineCParams[WSTETH].debtFloor = 5000 * RAD; // 5_000 COINs
     _liquidationEngineCParams[WSTETH].liquidationPenalty = 1.15e18; // WAD
+
+    _taxCollectorCParams[OP].stabilityFee = RAY + 11.11926e18; // + 42%/yr
+    _safeEngineCParams[OP].debtFloor = 10_000 * RAD; // 10_000 COINs
+    _liquidationEngineCParams[OP].liquidationPenalty = 1.5e18; // WAD
+
+    // --- Governance Params ---
+    _governorParams = IHaiGovernor.HaiGovernorParams({
+      votingDelay: 43_200, // 12 hours
+      votingPeriod: 129_600, // 36 hours
+      proposalThreshold: 5000e18, // 5k
+      quorumNumeratorValue: 1, // 1%
+      quorumVoteExtension: 86_400, // 1 day
+      timelockMinDelay: 86_400 // 1 day
+    });
+
+    _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
+      root: bytes32(keccak256('420')),
+      totalClaimable: 1_000_000e18,
+      claimPeriodStart: 1_704_063_600, // 1/1/24
+      claimPeriodEnd: 1_706_742_000 // 1/2/24
+    });
   }
 }
