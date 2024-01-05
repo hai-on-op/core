@@ -65,14 +65,8 @@ contract SingleTokenDistributorTest is HaiTest {
 
     vm.prank(deployer);
     tokenDistributor = new TokenDistributor(
-            token,
-            ITokenDistributor.TokenDistributorParams(
-              merkleRoot,
-              totalClaimable,
-              claimPeriodStart,
-              claimPeriodEnd
-              )
-        );
+      token, ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd)
+    );
 
     vm.prank(deployer);
     token.mint(address(tokenDistributor), totalClaimable);
