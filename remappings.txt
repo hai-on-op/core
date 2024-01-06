@@ -1,6 +1,7 @@
 @defi-wonderland/solidity-utils/=node_modules/@defi-wonderland/solidity-utils/solidity/
 @openzeppelin/=node_modules/@openzeppelin/
 @uniswap/=node_modules/@uniswap/
+forge-std/=node_modules/forge-std/src/
 
 @contracts/=src/contracts/
 @interfaces/=src/interfaces/
