@@ -546,7 +546,8 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
   }
 }
 
-contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTest {
+// rm "abstract" to reactivate after Deployment
+abstract contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTest {
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), MAINNET_DEPLOYMENT_BLOCK);
     _getEnvironmentParams();
