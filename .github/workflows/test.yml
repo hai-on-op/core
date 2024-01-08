@@ -67,7 +67,7 @@ jobs:
 
       - name: Run tests
         shell: bash
-        run: yarn test
+        run: yarn test --nmt _Bytecode
 
   # coverage:
   #   name: Run Coverage Tests

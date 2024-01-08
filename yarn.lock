@@ -249,10 +249,10 @@
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.8.1.tgz#709cfc4bbb3ca9f4460d60101f15dac6b7a2d5e4"
   integrity sha512-xQ6eUZl+RDyb/FiZe1h+U7qr/f4p/SrTSQcTPH2bjur3C5DbuW/zFgCU/b1P/xcIaEqJep+9ju4xDRi3rmChdQ==
 
-"@openzeppelin/contracts@5.0.0":
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.0.0.tgz#ee0e4b4564f101a5c4ee398cd4d73c0bd92b289c"
-  integrity sha512-bv2sdS6LKqVVMLI5+zqnNrNU/CA+6z6CmwFXm/MzmOPBRSO5reEJN7z0Gbzvs0/bv/MZZXNklubpwy3v2+azsw==
+"@openzeppelin/contracts@5.0.1":
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-5.0.1.tgz#93da90fc209a0a4ff09c1deb037fbb35e4020890"
+  integrity sha512-yQJaT5HDp9hYOOp4jTYxMsR02gdFZFXhewX5HW9Jo4fsqSVqqyIO/xTHdWDaKX5a3pv1txmf076Lziz+sO7L1w==
 
 "@solidity-parser/parser@^0.14.1":
   version "0.14.5"
@@ -887,6 +887,11 @@ dot-prop@^5.1.0:
   version "1.0.0"
   resolved "https://github.com/dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0"
 
+"ds-test@https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0":
+  version "1.0.0"
+  uid e282159d5170298eb2455a6c05280ab5a73a4ef0
+  resolved "https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0"
+
 eastasianwidth@^0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/eastasianwidth/-/eastasianwidth-0.2.0.tgz#696ce2ec0aa0e6ea93a397ffcf24aa7840c827cb"
@@ -1161,9 +1166,9 @@ flatted@^2.0.0:
   version "1.5.2"
   resolved "https://github.com/foundry-rs/forge-std#46264e9788017fc74f9f58b7efa0bc6e1df6d410"
 
-"forge-std@https://github.com/foundry-rs/forge-std.git#f73c73d2018eb6a111f35e4dae7b4f27401e9421":
-  version "1.7.1"
-  resolved "https://github.com/foundry-rs/forge-std.git#f73c73d2018eb6a111f35e4dae7b4f27401e9421"
+"forge-std@https://github.com/foundry-rs/forge-std.git#155d547c449afa8715f538d69454b83944117811":
+  version "1.7.4"
+  resolved "https://github.com/foundry-rs/forge-std.git#155d547c449afa8715f538d69454b83944117811"
 
 fs-extra@^11.0.0:
   version "11.1.0"

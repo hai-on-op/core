@@ -51,7 +51,6 @@ contract ProtocolToken is ERC20, ERC20Permit, ERC20Votes, Authorizable, IProtoco
   /**
    * Set the clock to block timestamp, as opposed to the default block number.
    */
-
   function clock() public view override returns (uint48 _timestamp) {
     return Time.timestamp();
   }

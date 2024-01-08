@@ -397,10 +397,12 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
     assertEq(address(haiGovernor.timelock()), address(timelock));
   }
 
-  // TokenDistributor
-  function test_TokenDistributor() public {
+  function test_TokenDistributor_Bytecode() public {
     assertEq(address(tokenDistributor).code, type(TokenDistributor).runtimeCode);
+  }
 
+  // TokenDistributor
+  function test_TokenDistributor_Params() public {
     assertEq(protocolToken.balanceOf(address(tokenDistributor)), _tokenDistributorParams.totalClaimable);
     assertEq(protocolToken.totalSupply(), _tokenDistributorParams.totalClaimable);
 
@@ -546,7 +548,8 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
   }
 }
 
-contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTest {
+// rm "abstract" to reactivate after Deployment
+abstract contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTest {
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), MAINNET_DEPLOYMENT_BLOCK);
     _getEnvironmentParams();
