@@ -4,9 +4,12 @@ pragma solidity 0.8.20;
 import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {IERC20Permit} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
 import {IVotes} from '@openzeppelin/contracts/governance/utils/IVotes.sol';
+
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
 
 interface IProtocolToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
+  // --- Methods ---
+
   /**
    * @notice Mint an amount of tokens to an account
    * @param _account Address of the account to mint tokens to
@@ -20,4 +23,10 @@ interface IProtocolToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable 
    * @param _amount Amount of tokens to burn [wad]
    */
   function burn(uint256 _amount) external;
+
+  /**
+   * @notice Unpause the token transfers, minting and burning
+   * @dev    Only authorized addresses can unpause the token
+   */
+  function unpause() external;
 }

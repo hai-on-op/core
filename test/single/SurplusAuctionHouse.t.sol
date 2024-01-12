@@ -152,7 +152,10 @@ contract SingleBurningSurplusAuctionHouseTest is DSTest {
 
     safeEngine.createUnbackedDebt(address(this), address(this), 1000 ether);
 
+    protocolToken.unpause();
+
     protocolToken.mint(address(this), 1000 ether);
+
     protocolToken.transfer(ali, 200 ether);
     protocolToken.transfer(bob, 200 ether);
   }
@@ -311,6 +314,8 @@ contract SingleRecyclingSurplusAuctionHouseTest is DSTest {
 
     safeEngine.createUnbackedDebt(address(this), address(this), 1000 ether);
 
+    protocolToken.unpause();
+
     protocolToken.mint(address(this), 1000 ether);
 
     protocolToken.transfer(ali, 200 ether);
@@ -446,6 +451,8 @@ contract SingleMixedStratSurplusAuctionHouseTest is DSTest {
 
     safeEngine.createUnbackedDebt(address(this), address(this), 1000 ether);
 
+    protocolToken.unpause();
+
     protocolToken.mint(address(this), 1000 ether);
 
     protocolToken.transfer(ali, 200 ether);
@@ -579,6 +586,8 @@ contract SinglePostSettlementSurplusAuctionHouseTest is DSTest {
     safeEngine.approveSAFEModification(address(surplusAuctionHouse));
 
     safeEngine.createUnbackedDebt(address(this), address(this), 1000 ether);
+
+    protocolToken.unpause();
 
     protocolToken.mint(address(this), 1000 ether);
 

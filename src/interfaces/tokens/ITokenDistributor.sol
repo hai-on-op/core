@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IProtocolToken} from '@interfaces/tokens/IProtocolToken.sol';
+
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
-import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 
 interface ITokenDistributor is IAuthorizable {
   // --- Events ---
@@ -41,10 +42,10 @@ interface ITokenDistributor is IAuthorizable {
     uint256 /* UNIX */ claimPeriodEnd;
   }
 
+  /// @notice Address of the ERC20 token to be distributed
+  function token() external view returns (IProtocolToken _token);
   /// @notice The merkle root of the token distribution
   function root() external view returns (bytes32 _root);
-  /// @notice Address of the ERC20 token to be distributed
-  function token() external view returns (ERC20Votes _token);
   /// @notice Total amount of tokens to be distributed
   function totalClaimable() external view returns (uint256 _totalClaimable);
   /// @notice Timestamp when the claim period starts

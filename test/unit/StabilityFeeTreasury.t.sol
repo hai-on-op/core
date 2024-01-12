@@ -270,8 +270,9 @@ contract Unit_StabilityFeeTreasury_DisableContract is Base {
   }
 
   modifier happyPath(DisableContractScenario memory _disableContractScenario) {
-    _mockValues(_disableContractScenario);
     vm.startPrank(authorizedAccount);
+
+    _mockValues(_disableContractScenario);
     _;
   }
 
@@ -438,8 +439,9 @@ contract Unit_StabilityFeeTreasury_SetTotalAllowance is Base {
   }
 
   modifier happyPath(address _account) {
-    _assumeHappyPath(_account);
     vm.startPrank(authorizedAccount);
+
+    _assumeHappyPath(_account);
     _;
   }
 
@@ -492,8 +494,9 @@ contract Unit_StabilityFeeTreasury_SetPerHourAllowance is Base {
   }
 
   modifier happyPath(address _account) {
-    _assumeHappyPath(_account);
     vm.startPrank(authorizedAccount);
+
+    _assumeHappyPath(_account);
     _;
   }
 
@@ -699,8 +702,9 @@ contract Unit_StabilityFeeTreasury_TakeFunds is Base {
   }
 
   modifier happyPath(address _account) {
-    _assumeHappyPath(_account);
     vm.startPrank(authorizedAccount);
+
+    _assumeHappyPath(_account);
     _;
   }
 
@@ -828,9 +832,10 @@ contract Unit_StabilityFeeTreasury_PullFunds is Base {
   }
 
   modifier happyPath(PullFundsScenario memory _pullFundsScenario) {
+    vm.startPrank(user);
+
     _assumeHappyPath(_pullFundsScenario);
     _mockValues(_pullFundsScenario);
-    vm.startPrank(user);
     _;
   }
 

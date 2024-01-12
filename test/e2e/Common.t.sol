@@ -58,6 +58,13 @@ contract DeployForTest is TestParams, Deploy {
     collateralTypes.push('TKN-C');
     collateralTypes.push('TKN-8D');
   }
+
+  function setupPostEnvironment() public virtual override updateParams {
+    for (uint256 i = 0; i < collateralTypes.length; i++) {
+      bytes32 _cType = collateralTypes[i];
+      taxCollector.taxSingle(_cType);
+    }
+  }
 }
 
 /**
@@ -71,15 +78,11 @@ abstract contract Common is DeployForTest, HaiTest {
   address carol = address(0x422);
   address dave = address(0x423);
 
-  uint256 auctionId;
-
   function setUp() public virtual {
     run();
 
-    for (uint256 i = 0; i < collateralTypes.length; i++) {
-      bytes32 _cType = collateralTypes[i];
-      taxCollector.taxSingle(_cType);
-    }
+    vm.prank(deployer);
+    protocolToken.unpause();
 
     vm.label(deployer, 'Deployer');
     vm.label(alice, 'Alice');

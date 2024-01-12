@@ -49,7 +49,6 @@ abstract contract Base is HaiTest {
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
     );
-    label(address(globalSettlement), 'GlobalSettlement');
 
     globalSettlement.addAuthorization(authorizedAccount);
 
@@ -385,7 +384,6 @@ contract Unit_GlobalSettlement_ShutdownSystem is Base {
 
   modifier happyPath() {
     vm.startPrank(authorizedAccount);
-
     _;
   }
 

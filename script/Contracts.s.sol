@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 // --- Base Contracts ---
 import {SystemCoin, ISystemCoin} from '@contracts/tokens/SystemCoin.sol';
-import {ProtocolToken, IProtocolToken, ERC20Votes} from '@contracts/tokens/ProtocolToken.sol';
+import {ProtocolToken, IProtocolToken, ERC20Votes, Pausable} from '@contracts/tokens/ProtocolToken.sol';
 import {SAFEEngine, ISAFEEngine} from '@contracts/SAFEEngine.sol';
 import {TaxCollector, ITaxCollector} from '@contracts/TaxCollector.sol';
 import {AccountingEngine, IAccountingEngine} from '@contracts/AccountingEngine.sol';

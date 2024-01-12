@@ -114,6 +114,8 @@ contract SingleDebtAuctionHouseTest is DSTest {
 
     safeEngine.transferInternalCoins(address(this), ali, 200 ether);
     safeEngine.transferInternalCoins(address(this), bob, 200 ether);
+
+    protocolToken.unpause();
   }
 
   function test_startAuction() public {
