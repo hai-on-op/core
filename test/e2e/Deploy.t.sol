@@ -24,8 +24,6 @@ import {GoerliDeployment} from '@script/GoerliDeployment.s.sol';
 import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 
 abstract contract CommonDeploymentTest is HaiTest, Deploy {
-  event Transfer(address indexed _from, address indexed _to, uint256 _value);
-
   uint256 _governorAccounts;
 
   // SAFEEngine
