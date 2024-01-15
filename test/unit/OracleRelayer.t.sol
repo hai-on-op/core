@@ -750,6 +750,8 @@ contract Unit_OracleRelayer_UpdateCollateralPrice is Base {
 contract Unit_OracleRelayer_UpdateRedemptionRate is Base {
   using Math for uint256;
 
+  event UpdateRedemptionRate(uint256 _redemptionRate);
+
   function _mockValues(uint256 _redemptionRateUpperBound, uint256 _redemptionRateLowerBound) internal {
     _mockRedemptionRateUpperBound(_redemptionRateUpperBound);
     _mockRedemptionRateLowerBound(_redemptionRateLowerBound);
@@ -797,6 +799,23 @@ contract Unit_OracleRelayer_UpdateRedemptionRate is Base {
     oracleRelayer.updateRedemptionRate(_redemptionRate);
 
     assertEq(oracleRelayer.redemptionRate(), _redemptionRateLowerBound);
+  }
+
+  function test_Emit_UpdateRedemptionRate(
+    uint256 _redemptionRate,
+    uint256 _redemptionRateUpperBound,
+    uint256 _redemptionRateLowerBound
+  ) public authorized happyPath(_redemptionRate, _redemptionRateUpperBound, _redemptionRateLowerBound) {
+    vm.expectEmit();
+    if (_redemptionRate > _redemptionRateUpperBound) {
+      emit UpdateRedemptionRate(_redemptionRateUpperBound);
+    } else if (_redemptionRate < _redemptionRateLowerBound) {
+      emit UpdateRedemptionRate(_redemptionRateLowerBound);
+    } else {
+      emit UpdateRedemptionRate(_redemptionRate);
+    }
+
+    oracleRelayer.updateRedemptionRate(_redemptionRate);
   }
 
   function test_Revert_WithoutUpdateRedemptionPrice(
