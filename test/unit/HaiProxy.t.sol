@@ -18,7 +18,6 @@ abstract contract Base is HaiTest {
     vm.startPrank(deployer);
 
     proxy = new HaiProxy(owner);
-    label(address(proxy), 'HaiProxy');
 
     vm.stopPrank();
   }

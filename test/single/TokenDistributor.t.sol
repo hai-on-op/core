@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {HaiTest} from '@test/utils/HaiTest.t.sol';
-import {ERC20VotesForTest} from '@test/mocks/ERC20VotesForTest.sol';
 import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {ProtocolToken} from '@contracts/tokens/ProtocolToken.sol';
 import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
+import {HaiTest} from '@test/utils/HaiTest.t.sol';
 
 abstract contract Hevm {
   function warp(uint256) public virtual;
@@ -14,7 +14,7 @@ contract SingleTokenDistributorTest is HaiTest {
   Hevm hevm;
 
   TokenDistributor tokenDistributor;
-  ERC20VotesForTest token;
+  ProtocolToken token;
   MerkleTreeGenerator merkleTreeGenerator;
   bytes32[] merkleTree;
   bytes32[] leaves;
@@ -29,8 +29,6 @@ contract SingleTokenDistributorTest is HaiTest {
   uint256 totalClaimable = 500_000;
   uint256 claimPeriodStart = block.timestamp + 10 days;
   uint256 claimPeriodEnd = block.timestamp + 20 days;
-
-  address deployer = label('deployer');
 
   address eve = label('eve');
   bytes32[] validEveProofs;
@@ -55,27 +53,18 @@ contract SingleTokenDistributorTest is HaiTest {
       leaves.push(keccak256(bytes.concat(keccak256(abi.encode(airdropRecipients[i], airdropAmounts[i])))));
     }
 
-    vm.prank(deployer);
     merkleTreeGenerator = new MerkleTreeGenerator();
     merkleTree = merkleTreeGenerator.generateMerkleTree(leaves);
     merkleRoot = merkleTree[0];
 
-    vm.prank(deployer);
-    token = new ERC20VotesForTest();
+    token = new ProtocolToken('', '');
 
-    vm.prank(deployer);
     tokenDistributor = new TokenDistributor(
-            token,
-            ITokenDistributor.TokenDistributorParams(
-              merkleRoot,
-              totalClaimable,
-              claimPeriodStart,
-              claimPeriodEnd
-              )
-        );
+      address(token),
+      ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd)
+    );
 
-    vm.prank(deployer);
-    token.mint(address(tokenDistributor), totalClaimable);
+    token.addAuthorization(address(tokenDistributor));
 
     uint256 _index = merkleTreeGenerator.getIndex(merkleTree, leaves[4]);
     validEveProofs = merkleTreeGenerator.getProof(merkleTree, _index);

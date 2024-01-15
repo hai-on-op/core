@@ -14,7 +14,10 @@ abstract contract Base is HaiTest {
 
   function setUp() public virtual {
     vm.startPrank(deployer);
+
     safeManager = new HaiSafeManagerForTest(address(safeEngine));
+    label(address(safeManager), 'HaiSafeManager');
+
     vm.stopPrank();
   }
 

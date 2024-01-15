@@ -52,7 +52,6 @@ contract HaiGovernor is
   /**
    * Set the clock to block timestamp, as opposed to the default block number
    */
-
   function clock() public view override(Governor, GovernorVotes) returns (uint48 _timestamp) {
     return Time.timestamp();
   }
@@ -65,7 +64,6 @@ contract HaiGovernor is
   /**
    * The following functions are overrides required by Solidity
    */
-
   function _cancel(
     address[] memory _targets,
     uint256[] memory _values,

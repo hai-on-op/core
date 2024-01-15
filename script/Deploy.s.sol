@@ -61,12 +61,12 @@ abstract contract Deploy is Common, Script {
     deployTokenDistributor();
 
     if (delegate == address(0)) {
-      _revokeAllTo(governor);
+      _revokeDeployerToAll(governor);
     } else if (delegate == deployer) {
-      _delegateAllTo(governor);
+      _delegateToAll(governor);
     } else {
-      _delegateAllTo(delegate);
-      _revokeAllTo(governor);
+      _delegateToAll(delegate);
+      _revokeDeployerToAll(governor);
     }
 
     vm.stopBroadcast();

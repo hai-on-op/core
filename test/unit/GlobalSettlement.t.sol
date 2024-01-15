@@ -39,17 +39,16 @@ abstract contract Base is HaiTest {
     vm.startPrank(deployer);
 
     globalSettlement = new GlobalSettlement(
-      address (mockSafeEngine),
-      address (mockLiquidationEngine),
-      address (mockOracleRelayer),
-      address (mockCoinJoin),
-      address (mockCollateralJoinFactory),
-      address (mockCollateralAuctionHouseFactory),
-      address (mockStabilityFeeTreasury),
-      address (mockAccountingEngine),
+      address(mockSafeEngine),
+      address(mockLiquidationEngine),
+      address(mockOracleRelayer),
+      address(mockCoinJoin),
+      address(mockCollateralJoinFactory),
+      address(mockCollateralAuctionHouseFactory),
+      address(mockStabilityFeeTreasury),
+      address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
     );
-    label(address(globalSettlement), 'GlobalSettlement');
 
     globalSettlement.addAuthorization(authorizedAccount);
 
@@ -219,7 +218,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
   }
 
   function test_Set_ContractEnabled() public happyPath {
@@ -237,7 +236,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.safeEngine()), _safeEngine);
   }
 
@@ -252,7 +251,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.liquidationEngine()), _liquidationEngine);
   }
 
@@ -267,7 +266,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.oracleRelayer()), _oracleRelayer);
   }
 
@@ -282,7 +281,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.coinJoin()), _coinJoin);
   }
 
@@ -301,7 +300,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.collateralJoinFactory()), _collateralJoinFactory);
   }
 
@@ -320,7 +319,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.collateralAuctionHouseFactory()), _collateralAuctionHouseFactory);
   }
 
@@ -335,7 +334,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(_sfTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.stabilityFeeTreasury()), _sfTreasury);
   }
 
@@ -350,7 +349,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(_accountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 0})
-      );
+    );
     assertEq(address(globalSettlement.accountingEngine()), _accountingEngine);
   }
 
@@ -365,7 +364,7 @@ contract Unit_GlobalSettlement_Constructor is Base {
       address(mockStabilityFeeTreasury),
       address(mockAccountingEngine),
       IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: _cooldown})
-      );
+    );
     assertEq(globalSettlement.params().shutdownCooldown, _cooldown);
   }
 }
@@ -385,7 +384,6 @@ contract Unit_GlobalSettlement_ShutdownSystem is Base {
 
   modifier happyPath() {
     vm.startPrank(authorizedAccount);
-
     _;
   }
 
