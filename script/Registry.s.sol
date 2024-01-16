@@ -72,7 +72,7 @@ uint256 constant MAINNET_INIT_PROP_THRESHOLD = 0;
 
 // Deployment params
 address constant MAINNET_DEPLOYER = 0xF78dA2A37049627636546E0cFAaB2aD664950917;
-address constant MAINNET_SAFE = 0x8516B2319b0541E0253b866557929FF7B76027ba; // set this before mainnet deployment
+address constant MAINNET_SAFE = 0x6274d27c00310780C8407D043A3cCADf1505D7F1; // set this before mainnet deployment
 uint256 constant AIRDROP_AMOUNT = 10_000e18; // 10k tokens
 uint256 constant MIN_DELAY = 3 days; // timelock for governor
 uint256 constant ORACLE_INTERVAL_PROD = 1 hours;

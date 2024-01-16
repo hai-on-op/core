@@ -46,7 +46,7 @@ contract DeployProtocolTokenMainnet is Script, Test {
     emit log_named_address('ODG deployment', _protocolToken);
 
     IProtocolToken(_protocolToken).initialize('Open Dollar Governance', 'ODG');
-    IProtocolToken(_protocolToken).mint(MAINNET_SAFE, 10_000_000 * 1e18);
+    IProtocolToken(_protocolToken).mint(MAINNET_DEPLOYER, 10_000_000 * 1e18);
 
     vm.stopBroadcast();
   }
