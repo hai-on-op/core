@@ -178,8 +178,9 @@ abstract contract Common is Contracts, Params {
     liquidationEngine.initializeCollateralType(_cType, abi.encode(_liquidationEngineCParams[_cType]));
 
     taxCollector.initializeCollateralType(_cType, abi.encode(_taxCollectorCParams[_cType]));
-    if (_taxCollectorSecondaryTaxReceiver.receiver != address(0)) {
-      taxCollector.modifyParameters(_cType, 'secondaryTaxReceiver', abi.encode(_taxCollectorSecondaryTaxReceiver));
+
+    for (uint256 _i; _i < _taxCollectorSecondaryTaxReceiver.length; _i++) {
+      taxCollector.modifyParameters(_cType, 'secondaryTaxReceiver', abi.encode(_taxCollectorSecondaryTaxReceiver[_i]));
     }
 
     // setup initial price

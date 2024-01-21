@@ -90,7 +90,7 @@ abstract contract Params {
   IStabilityFeeTreasury.StabilityFeeTreasuryParams _stabilityFeeTreasuryParams;
   ITaxCollector.TaxCollectorParams _taxCollectorParams;
   mapping(bytes32 => ITaxCollector.TaxCollectorCollateralParams) _taxCollectorCParams;
-  ITaxCollector.TaxReceiver _taxCollectorSecondaryTaxReceiver;
+  ITaxCollector.TaxReceiver[] _taxCollectorSecondaryTaxReceiver;
 
   IGlobalSettlement.GlobalSettlementParams _globalSettlementParams;
   IPostSettlementSurplusAuctionHouse.PostSettlementSAHParams _postSettlementSAHParams;

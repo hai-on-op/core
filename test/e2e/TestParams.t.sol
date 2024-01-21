@@ -66,11 +66,15 @@ abstract contract TestParams is Contracts, Params {
       maxSecondaryReceivers: 1 // stabilityFeeTreasury
     });
 
-    _taxCollectorSecondaryTaxReceiver = ITaxCollector.TaxReceiver({
-      receiver: address(stabilityFeeTreasury),
-      canTakeBackTax: true, // [bool]
-      taxPercentage: 0.5e18 // [wad%]
-    });
+    delete _taxCollectorSecondaryTaxReceiver; // avoid stacking old data on each push
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: address(stabilityFeeTreasury),
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.5e18 // [wad%]
+      })
+    );
 
     // --- PID Params ---
 

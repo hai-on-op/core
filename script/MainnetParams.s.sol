@@ -58,12 +58,23 @@ abstract contract MainnetParams is Contracts, Params {
       maxSecondaryReceivers: 5 // stabilityFeeTreasury
     });
 
-    // TODO: set multiple secondary receivers
-    _taxCollectorSecondaryTaxReceiver = ITaxCollector.TaxReceiver({
-      receiver: address(stabilityFeeTreasury),
-      canTakeBackTax: true, // [bool]
-      taxPercentage: 0.5e18 // [wad%]
-    });
+    delete _taxCollectorSecondaryTaxReceiver; // avoid stacking old data on each push
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: address(stabilityFeeTreasury),
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.2e18 // 20%
+      })
+    );
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: address(69_420), // TODO: set to `adminSafe`
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.21e18 // 21%
+      })
+    );
 
     // --- PID Params ---
 
