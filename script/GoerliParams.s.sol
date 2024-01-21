@@ -10,7 +10,6 @@ abstract contract GoerliParams is Contracts, Params {
   address constant OP_GOERLI_ADMIN_SAFE = 0xCAFd432b7EcAfff352D92fcB81c60380d437E99D;
 
   function _getEnvironmentParams() internal override {
-
     // Setup delegated collateral joins
     delegatee[OP] = address(haiDelegatee);
 
