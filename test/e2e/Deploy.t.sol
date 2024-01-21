@@ -476,6 +476,10 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
     // token distributor
     assertEq(tokenDistributor.authorizedAccounts(_target), _permission);
   }
+
+  function test_Delegated_OP() public {
+    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
+  }
 }
 
 contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
@@ -529,10 +533,6 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
     super.setupPostEnvironment();
   }
 
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
-  }
-
   function test_pid_update_rate() public {
     _refreshChainlinkFeed(OP_CHAINLINK_ETH_USD_FEED, 2000e8);
 
@@ -581,10 +581,6 @@ abstract contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTe
     // there is 1 governor accounts (timelock)
     _governorAccounts = 1;
   }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
-  }
 }
 
 contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
@@ -605,10 +601,6 @@ contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
 
   function setupPostEnvironment() public override(DeployGoerli, Deploy) {
     super.setupPostEnvironment();
-  }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), governor);
   }
 
   function test_stones_wbtc_oracle() public {
@@ -635,9 +627,5 @@ abstract contract GoerliDeploymentTest is GoerliDeployment, CommonDeploymentTest
 
     // if there is a delegate, there are 2 governor accounts
     _governorAccounts = 2;
-  }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), governor);
   }
 }

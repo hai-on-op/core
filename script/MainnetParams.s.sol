@@ -4,6 +4,8 @@ pragma solidity 0.8.20;
 import '@script/Params.s.sol';
 
 abstract contract MainnetParams is Contracts, Params {
+  address constant OP_ADMIN_SAFE = 0x468c572c41DB8B206B3919AC9a41ad8dE2eAc822;
+
   // --- Mainnet Params ---
   function _getEnvironmentParams() internal override {
     // Setup delegated collateral joins
@@ -55,7 +57,7 @@ abstract contract MainnetParams is Contracts, Params {
       primaryTaxReceiver: address(accountingEngine),
       globalStabilityFee: RAY, // no global SF
       maxStabilityFeeRange: RAY - MINUS_0_5_PERCENT_PER_HOUR, // +- 0.5% per hour
-      maxSecondaryReceivers: 5 // stabilityFeeTreasury
+      maxSecondaryReceivers: 5
     });
 
     delete _taxCollectorSecondaryTaxReceiver; // avoid stacking old data on each push
@@ -70,7 +72,7 @@ abstract contract MainnetParams is Contracts, Params {
 
     _taxCollectorSecondaryTaxReceiver.push(
       ITaxCollector.TaxReceiver({
-        receiver: address(69_420), // TODO: set to `adminSafe`
+        receiver: OP_ADMIN_SAFE,
         canTakeBackTax: true, // [bool]
         taxPercentage: 0.21e18 // 21%
       })
@@ -79,8 +81,8 @@ abstract contract MainnetParams is Contracts, Params {
     // --- PID Params ---
 
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
-      redemptionRateUpperBound: 1_000_000_074_561_623_060_142_516_377, // +950%/yr
-      redemptionRateLowerBound: 99_999_999_999_997_789_272_222_624 // -90%/yr
+      redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
+      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
@@ -199,9 +201,9 @@ abstract contract MainnetParams is Contracts, Params {
     });
 
     _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
-      root: bytes32(keccak256('420')), // TODO: set root
+      root: 0x6fc714df6371f577a195c2bfc47da41aa0ea15bba2651df126f3713a232244be,
       totalClaimable: 1_000_000 * WAD, // 1M HAI
-      claimPeriodStart: 1_707_782_400, // 13/2/24 (GMT)
+      claimPeriodStart: block.timestamp + 1 days,
       claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT) - 1s
     });
   }
