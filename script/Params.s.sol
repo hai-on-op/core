@@ -59,7 +59,7 @@ uint256 constant PROPORTIONAL_GAIN = 111_001_102_931; // 50% of RAI's
 uint256 constant INTEGRAL_GAIN = 32_884; // 200% of RAI's
 
 // Job Params
-uint256 constant JOB_REWARD = 5e18; // 5 HAI
+uint256 constant JOB_REWARD = 1e18; // 1 HAI
 
 /**
  * @title Params
