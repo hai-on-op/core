@@ -466,10 +466,7 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
     super.setUp();
     run();
 
-    // NOTE: deploy [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
-    vm.startPrank(governor);
-
-    // Deploy HAI/WETH UniV3 pool
+    // Initialize HAI/WETH UniV3 pool (already deployed in _setupPostEnvironment)
     _deployUniV3Pool(
       UNISWAP_V3_FACTORY,
       address(collateral[WETH]),
@@ -479,20 +476,13 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
       HAI_ETH_INITIAL_TICK // 2000 HAI = 1 ETH
     );
 
-    // Setup HAI/WETH oracle feed
-    IBaseOracle _haiWethOracle = uniV3RelayerFactory.deployUniV3Relayer({
-      _baseToken: address(systemCoin),
-      _quoteToken: address(collateral[WETH]),
-      _feeTier: HAI_POOL_FEE_TIER,
-      _quotePeriod: 1 days
-    });
-
-    // Setup HAI/USD oracle feed
-    systemCoinOracle = denominatedOracleFactory.deployDenominatedOracle({
-      _priceSource: _haiWethOracle,
-      _denominationPriceSource: delayedOracle[WETH].priceSource(),
-      _inverted: false
-    });
+    // NOTE: deploy [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
+    vm.startPrank(governor);
+    // grab the last denominated oracle deployed (in _setupPostEnvironment)
+    address[] memory _denominatedOracles = denominatedOracleFactory.denominatedOraclesList();
+    systemCoinOracle = IBaseOracle(_denominatedOracles[_denominatedOracles.length - 1]);
+    // assert we grabbed the correct oracle
+    assertEq(systemCoinOracle.symbol(), '(HAI / WETH) * (ETH / USD)');
 
     oracleRelayer.modifyParameters('systemCoinOracle', abi.encode(systemCoinOracle));
 

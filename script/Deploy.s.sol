@@ -114,7 +114,29 @@ contract DeployMainnet is MainnetParams, Deploy {
     systemCoinOracle = new HardcodedOracle('HAI / USD', HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
   }
 
-  function setupPostEnvironment() public virtual override updateParams {}
+  function setupPostEnvironment() public virtual override updateParams {
+    // Deploy HAI/WETH UniV3 pool (uninitialized)
+    IUniswapV3Factory(UNISWAP_V3_FACTORY).createPool({
+      tokenA: address(systemCoin),
+      tokenB: address(collateral[WETH]),
+      fee: HAI_POOL_FEE_TIER
+    });
+
+    // Setup HAI/WETH oracle feed
+    IBaseOracle _haiWethOracle = uniV3RelayerFactory.deployUniV3Relayer({
+      _baseToken: address(systemCoin),
+      _quoteToken: address(collateral[WETH]),
+      _feeTier: HAI_POOL_FEE_TIER,
+      _quotePeriod: 1 days
+    });
+
+    // Setup HAI/USD oracle feed
+    denominatedOracleFactory.deployDenominatedOracle({
+      _priceSource: _haiWethOracle,
+      _denominationPriceSource: delayedOracle[WETH].priceSource(),
+      _inverted: false
+    });
+  }
 }
 
 contract DeployTestnet is TestnetParams, Deploy {
