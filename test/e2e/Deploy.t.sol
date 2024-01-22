@@ -441,7 +441,7 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
   }
 
   function _test_Authorizations(address _target, bool _permission) internal {
-    if(_permission){
+    if (_permission) {
       _toAllAuthorizableContracts(_fn_HasAuthorizations, _target);
     } else {
       _toAllAuthorizableContracts(_fn_NoAuthorizations, _target);

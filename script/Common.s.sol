@@ -289,8 +289,8 @@ abstract contract Common is Contracts, Params {
 
     // factories or children
     // NOTE: not deployable on Sepolia testnet
-    if(address(chainlinkRelayerFactory) != address(0)) _function(chainlinkRelayerFactory, _target);
-    if(address(uniV3RelayerFactory) != address(0)) _function(uniV3RelayerFactory, _target);
+    if (address(chainlinkRelayerFactory) != address(0)) _function(chainlinkRelayerFactory, _target);
+    if (address(uniV3RelayerFactory) != address(0)) _function(uniV3RelayerFactory, _target);
     _function(denominatedOracleFactory, _target);
     _function(delayedOracleFactory, _target);
 

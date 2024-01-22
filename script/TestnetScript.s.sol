@@ -15,7 +15,7 @@ import '@script/Registry.s.sol';
  */
 contract TestnetScript is TestnetDeployment, Common, Script {
   function setUp() public virtual {
-    chainId = 11155420;
+    chainId = 11_155_420;
   }
 
   /**

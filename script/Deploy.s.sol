@@ -120,7 +120,7 @@ contract DeployMainnet is MainnetParams, Deploy {
 contract DeployTestnet is TestnetParams, Deploy {
   function setUp() public virtual {
     _deployerPk = uint256(vm.envBytes32('OP_SEPOLIA_DEPLOYER_PK'));
-    chainId = 11155420;
+    chainId = 11_155_420;
   }
 
   function setupEnvironment() public virtual override updateParams {
@@ -143,8 +143,8 @@ contract DeployTestnet is TestnetParams, Deploy {
     collateral[TOTEM] = new MintableERC20('Totem', 'TTM', 0);
 
     // Hardcoded feeds
-    IBaseOracle _ethUSDPriceFeed = new HardcodedOracle('ETH / USD', 2_000e18);
-    IBaseOracle _opUSDPriceFeed = new HardcodedOracle('OP / USD', 4.20e18);
+    IBaseOracle _ethUSDPriceFeed = new HardcodedOracle('ETH / USD', 2000e18);
+    IBaseOracle _opUSDPriceFeed = new HardcodedOracle('OP / USD', 4.2e18);
     IBaseOracle _wbtcUsdOracle = new HardcodedOracle('WBTC / USD', 45_000e18);
     IBaseOracle _stonesOracle = new HardcodedOracle('STN / USD', 1e18);
     IBaseOracle _totemOracle = new HardcodedOracle('TTM / USD', 100e18);
