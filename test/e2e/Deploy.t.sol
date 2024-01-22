@@ -432,7 +432,8 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
   function test_TokenDistributor_Params() public {
     assertEq(tokenDistributor.root(), _tokenDistributorParams.root);
     assertEq(tokenDistributor.totalClaimable(), _tokenDistributorParams.totalClaimable);
-    assertEq(tokenDistributor.claimPeriodStart(), _tokenDistributorParams.claimPeriodStart);
+    // NOTE: (deployment)block.timestamp + 1 days (cannot be tested)
+    // assertEq(tokenDistributor.claimPeriodStart(), _tokenDistributorParams.claimPeriodStart);
     assertEq(tokenDistributor.claimPeriodEnd(), _tokenDistributorParams.claimPeriodEnd);
   }
 
@@ -559,10 +560,10 @@ abstract contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTe
 }
 
 contract E2EDeploymentTestnetTest is DeployTestnet, CommonDeploymentTest {
-  uint256 FORK_BLOCK = 17_400_000;
+  uint256 FORK_BLOCK = 7_000_000;
 
   function setUp() public override {
-    vm.createSelectFork(vm.rpcUrl('sepolia'), FORK_BLOCK);
+    vm.createSelectFork(vm.rpcUrl('testnet'), FORK_BLOCK);
     super.setUp();
     run();
 
@@ -579,11 +580,11 @@ contract E2EDeploymentTestnetTest is DeployTestnet, CommonDeploymentTest {
   }
 }
 
-// rm "abstract" to reactivate after Deployment
-abstract contract TestnetDeploymentTest is TestnetDeployment, CommonDeploymentTest {
+contract TestnetDeploymentTest is TestnetDeployment, CommonDeploymentTest {
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('sepolia'), SEPOLIA_DEPLOYMENT_BLOCK);
+    vm.createSelectFork(vm.rpcUrl('testnet'), SEPOLIA_DEPLOYMENT_BLOCK);
     _getEnvironmentParams();
+    deployer = address(420);
 
     // if there is a delegate, there are 2 governor accounts
     _governorAccounts = 2;
