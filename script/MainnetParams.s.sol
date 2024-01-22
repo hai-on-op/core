@@ -24,7 +24,7 @@ abstract contract MainnetParams is Contracts, Params {
       surplusAmount: 42_000 * RAD, // 42k HAI
       surplusBuffer: 100_000 * RAD, // 100k HAI
       debtAuctionMintedTokens: 10_000 * WAD, // 10k KITE
-      debtAuctionBidSize: 1000 * RAD // 1k HAI
+      debtAuctionBidSize: 10_000 * RAD // 10k HAI
     });
 
     _debtAuctionHouseParams = IDebtAuctionHouse.DebtAuctionHouseParams({
