@@ -5,7 +5,6 @@ import '@script/Params.s.sol';
 
 abstract contract TestnetParams is Contracts, Params {
   // --- Testnet Params ---
-  uint256 constant OP_SEPOLIA_OP_ETH_PRICE_FEED = 0.001e18; // 1000 OP = 1 ETH
   uint256 constant OP_SEPOLIA_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
   address constant OP_SEPOLIA_ADMIN_SAFE = 0xCAFd432b7EcAfff352D92fcB81c60380d437E99D;
 
