@@ -2,15 +2,15 @@
 pragma solidity 0.8.20;
 
 import '@script/Contracts.s.sol';
-import {GoerliParams, WETH, OP, WBTC, STONES, TOTEM} from '@script/GoerliParams.s.sol';
+import {TestnetParams, WETH, OP, WBTC, STONES, TOTEM} from '@script/TestnetParams.s.sol';
 import {OP_WETH, OP_OPTIMISM} from '@script/Registry.s.sol';
 
-abstract contract GoerliDeployment is Contracts, GoerliParams {
-  // NOTE: The last significant change in the Goerli deployment, to be used in the test scenarios
-  uint256 constant GOERLI_DEPLOYMENT_BLOCK = 17_538_871;
+abstract contract TestnetDeployment is Contracts, TestnetParams {
+  // NOTE: The last significant change in the Testnet deployment, to be used in the test scenarios
+  uint256 constant SEPOLIA_DEPLOYMENT_BLOCK = 17_538_871;
 
   /**
-   * @notice All the addresses that were deployed in the Goerli deployment, in order of creation
+   * @notice All the addresses that were deployed in the Testnet deployment, in order of creation
    * @dev    This is used to import the deployed contracts to the test scripts
    */
   constructor() {

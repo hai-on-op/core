@@ -3,11 +3,11 @@ pragma solidity 0.8.20;
 
 import '@script/Params.s.sol';
 
-abstract contract GoerliParams is Contracts, Params {
+abstract contract TestnetParams is Contracts, Params {
   // --- Testnet Params ---
-  uint256 constant OP_GOERLI_OP_ETH_PRICE_FEED = 0.001e18; // 1000 OP = 1 ETH
-  uint256 constant OP_GOERLI_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
-  address constant OP_GOERLI_ADMIN_SAFE = 0xCAFd432b7EcAfff352D92fcB81c60380d437E99D;
+  uint256 constant OP_SEPOLIA_OP_ETH_PRICE_FEED = 0.001e18; // 1000 OP = 1 ETH
+  uint256 constant OP_SEPOLIA_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
+  address constant OP_SEPOLIA_ADMIN_SAFE = 0xCAFd432b7EcAfff352D92fcB81c60380d437E99D;
 
   function _getEnvironmentParams() internal override {
     // Setup delegated collateral joins
@@ -74,7 +74,7 @@ abstract contract GoerliParams is Contracts, Params {
 
     _taxCollectorSecondaryTaxReceiver.push(
       ITaxCollector.TaxReceiver({
-        receiver: OP_GOERLI_ADMIN_SAFE,
+        receiver: OP_SEPOLIA_ADMIN_SAFE,
         canTakeBackTax: true, // [bool]
         taxPercentage: 0.21e18 // 21%
       })
