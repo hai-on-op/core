@@ -166,7 +166,7 @@ abstract contract TestnetParams is Contracts, Params {
       root: 0x6fc714df6371f577a195c2bfc47da41aa0ea15bba2651df126f3713a232244be,
       totalClaimable: 1_000_000 * WAD, // 1M HAI
       claimPeriodStart: block.timestamp + 1 days,
-      claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT) - 1s
+      claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT+0) - 1s
     });
   }
 }
