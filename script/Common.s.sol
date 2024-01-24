@@ -235,11 +235,11 @@ abstract contract Common is Contracts, Params {
 
     IUniswapV3Pool(_uniV3Pool).initialize(_sqrtPriceX96);
 
-    for (uint256 _i = 500; _i < _cardinality; _i += 500) {
+    for (uint256 _i = 500; _i <= _cardinality; _i += 500) {
       IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(uint16(_i));
     }
     if (_cardinality % 500 != 0) {
-      IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(uint16(_cardinality));
+      IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(_cardinality);
     }
   }
 
