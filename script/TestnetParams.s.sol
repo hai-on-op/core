@@ -125,18 +125,18 @@ abstract contract TestnetParams is Contracts, Params {
       });
 
       _safeEngineCParams[_cType] = ISAFEEngine.SAFEEngineCollateralParams({
-        debtCeiling: 10_000_000 * RAD, // 10M COINs
-        debtFloor: 1 * RAD // 1 COINs
+        debtCeiling: 10_000_000 * RAD, // 10M HAI
+        debtFloor: 1 * RAD // 1 HAI
       });
 
       _liquidationEngineCParams[_cType] = ILiquidationEngine.LiquidationEngineCollateralParams({
         collateralAuctionHouse: address(collateralAuctionHouse[_cType]),
         liquidationPenalty: 1.1e18, // 10%
-        liquidationQuantity: 1000 * RAD // 1000 COINs
+        liquidationQuantity: 1000 * RAD // 1000 HAI
       });
 
       _collateralAuctionHouseParams[_cType] = ICollateralAuctionHouse.CollateralAuctionHouseParams({
-        minimumBid: WAD, // 1 COINs
+        minimumBid: WAD, // 1 HAI
         minDiscount: WAD, // no discount
         maxDiscount: 0.9e18, // -10%
         perSecondDiscountUpdateRate: MINUS_0_5_PERCENT_PER_HOUR // RAY
@@ -147,19 +147,19 @@ abstract contract TestnetParams is Contracts, Params {
     _oracleRelayerCParams[WETH].safetyCRatio = 1.35e27; // 135%
     _oracleRelayerCParams[WETH].liquidationCRatio = 1.35e27; // 135%
     _taxCollectorCParams[WETH].stabilityFee = RAY + 1.54713e18; // + 5%/yr
-    _safeEngineCParams[WETH].debtCeiling = 100_000_000 * RAD; // 100M COINs
+    _safeEngineCParams[WETH].debtCeiling = 100_000_000 * RAD; // 100M HAI
 
     _liquidationEngineCParams[OP].liquidationPenalty = 1.2e18; // 20%
     _collateralAuctionHouseParams[OP].maxDiscount = 0.5e18; // -50%
 
     // --- Governance Params ---
     _governorParams = IHaiGovernor.HaiGovernorParams({
-      votingDelay: 43_200, // 12 hours
-      votingPeriod: 129_600, // 36 hours
-      proposalThreshold: 5000 * WAD, // 5k
+      votingDelay: 12 hours, // 43_200
+      votingPeriod: 36 hours, // 129_600
+      proposalThreshold: 5000 * WAD, // 5k KITE
       quorumNumeratorValue: 1, // 1%
-      quorumVoteExtension: 86_400, // 1 day
-      timelockMinDelay: 86_400 // 1 day
+      quorumVoteExtension: 1 days, // 86_400
+      timelockMinDelay: 1 days // 86_400
     });
 
     _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({

@@ -476,7 +476,7 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
       HAI_ETH_INITIAL_TICK // 2000 HAI = 1 ETH
     );
 
-    // NOTE: deploy [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
+    // NOTE: setup [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
     vm.startPrank(governor);
     // grab the last denominated oracle deployed (in _setupPostEnvironment)
     address[] memory _denominatedOracles = denominatedOracleFactory.denominatedOraclesList();

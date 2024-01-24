@@ -133,7 +133,7 @@ abstract contract MainnetParams is Contracts, Params {
       minimumBid: 100 * WAD, // 100 HAI
       minDiscount: 1e18, // no discount
       maxDiscount: 0.9e18, // -10%
-      perSecondDiscountUpdateRate: 999_985_366_702_115_272_120_527_460 // -10% / 2hs
+      perSecondDiscountUpdateRate: MINUS_10_PERCENT_IN_2_HOURS // -10% / 2hs
     });
 
     // ------------ WSTETH ------------
@@ -160,7 +160,7 @@ abstract contract MainnetParams is Contracts, Params {
       minimumBid: 100 * WAD, // 100 HAI
       minDiscount: 1e18, // no discount
       maxDiscount: 0.9e18, // -10%
-      perSecondDiscountUpdateRate: 999_985_366_702_115_272_120_527_460 // -10% / 2hs
+      perSecondDiscountUpdateRate: MINUS_10_PERCENT_IN_2_HOURS // -10% / 2hs
     });
 
     // ------------ OP ------------
@@ -186,24 +186,24 @@ abstract contract MainnetParams is Contracts, Params {
     _collateralAuctionHouseParams[OP] = ICollateralAuctionHouse.CollateralAuctionHouseParams({
       minimumBid: 100 * WAD, // 100 HAI
       minDiscount: 1e18, // no discount
-      maxDiscount: 0.85e18, // -10%
-      perSecondDiscountUpdateRate: 999_977_428_181_205_977_622_596_568 // -15% / 2hs
+      maxDiscount: 0.85e18, // -15%
+      perSecondDiscountUpdateRate: MINUS_15_PERCENT_IN_2_HOURS // -15% / 2hs
     });
 
     // --- Governance Params ---
     _governorParams = IHaiGovernor.HaiGovernorParams({
-      votingDelay: 43_200, // 12 hours
-      votingPeriod: 129_600, // 36 hours
-      proposalThreshold: 5000 * WAD, // 5k
+      votingDelay: 12 hours, // 43_200
+      votingPeriod: 36 hours, // 129_600
+      proposalThreshold: 5000 * WAD, // 5k KITE
       quorumNumeratorValue: 1, // 1%
-      quorumVoteExtension: 86_400, // 1 day
-      timelockMinDelay: 86_400 // 1 day
+      quorumVoteExtension: 1 days, // 86_400
+      timelockMinDelay: 1 days // 86_400
     });
 
     _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
       root: 0x6fc714df6371f577a195c2bfc47da41aa0ea15bba2651df126f3713a232244be,
       totalClaimable: 1_000_000 * WAD, // 1M HAI
-      claimPeriodStart: 1_707_696_000, // 12/2/2024 (GMT+0)
+      claimPeriodStart: 1_707_782_400, // 13/2/2024 (GMT+0)
       claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT+0) - 1s
     });
   }
