@@ -87,7 +87,7 @@ abstract contract TestnetParams is Contracts, Params {
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
-      perSecondCumulativeLeak: HALF_LIFE_30_DAYS, // 0.999998e27
+      perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
       noiseBarrier: 0.995e18, // 0.5%
       feedbackOutputLowerBound: -int256(RAY - 1), // unbounded
       feedbackOutputUpperBound: RAD, // unbounded
