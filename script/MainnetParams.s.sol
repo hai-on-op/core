@@ -117,8 +117,8 @@ abstract contract MainnetParams is Contracts, Params {
 
     _oracleRelayerCParams[WETH] = IOracleRelayer.OracleRelayerCollateralParams({
       oracle: delayedOracle[WETH],
-      safetyCRatio: 1.35e27, // 135%
-      liquidationCRatio: 1.3e27 // 130%
+      safetyCRatio: 1.3e27, // 130%
+      liquidationCRatio: 1.25e27 // 125%
     });
 
     _taxCollectorCParams[WETH].stabilityFee = PLUS_1_5_PERCENT_PER_YEAR; // 1.5%/yr
@@ -144,8 +144,8 @@ abstract contract MainnetParams is Contracts, Params {
 
     _oracleRelayerCParams[WSTETH] = IOracleRelayer.OracleRelayerCollateralParams({
       oracle: delayedOracle[WSTETH],
-      safetyCRatio: 1.4e27, // 140%
-      liquidationCRatio: 1.35e27 // 135%
+      safetyCRatio: 1.35e27, // 135%
+      liquidationCRatio: 1.3e27 // 130%
     });
 
     _taxCollectorCParams[WSTETH].stabilityFee = PLUS_2_PERCENT_PER_YEAR; // 2%/yr
@@ -171,8 +171,8 @@ abstract contract MainnetParams is Contracts, Params {
 
     _oracleRelayerCParams[OP] = IOracleRelayer.OracleRelayerCollateralParams({
       oracle: delayedOracle[OP],
-      safetyCRatio: 1.65e27, // 165%
-      liquidationCRatio: 1.6e27 // 160%
+      safetyCRatio: 1.8e27, // 180%
+      liquidationCRatio: 1.75e27 // 175%
     });
 
     _taxCollectorCParams[OP].stabilityFee = PLUS_5_PERCENT_PER_YEAR; // 5%/yr
