@@ -45,7 +45,11 @@ contract ChainlinkRelayerFactory is Authorizable, IChainlinkRelayerFactory {
     address _priceFeed,
     uint256 _staleThreshold
   ) external isAuthorized returns (IBaseOracle _chainlinkRelayer) {
-    _chainlinkRelayer = new ChainlinkRelayerChild(_priceFeed, address(sequencerUptimeFeed), _staleThreshold);
+    _chainlinkRelayer = new ChainlinkRelayerChild({
+      _priceFeed: _priceFeed,
+      __sequencerUptimeFeed: address(0), // read from factory
+      _staleThreshold: _staleThreshold
+    });
     _chainlinkRelayers.add(address(_chainlinkRelayer));
     emit NewChainlinkRelayer(address(_chainlinkRelayer), _priceFeed, address(sequencerUptimeFeed), _staleThreshold);
   }
