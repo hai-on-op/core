@@ -177,4 +177,15 @@ contract Unit_ChainlinkRelayerFactory_SetSequencerUptimeFeed is Base {
 
     assertEq(address(chainlinkRelayerFactory.sequencerUptimeFeed()), _sequencerUptimeFeed);
   }
+
+  function test_Propagate_SequencerUptimeFeed(address _sequencerUptimeFeed) public happyPath(_sequencerUptimeFeed) {
+    _mockDecimals(18);
+    _mockDescription('ChainlinkPriceFeed');
+
+    chainlinkRelayerFactory.deployChainlinkRelayer(address(mockPriceFeed), 1);
+
+    chainlinkRelayerFactory.setSequencerUptimeFeed(_sequencerUptimeFeed);
+
+    assertEq(address(chainlinkRelayerChild.sequencerUptimeFeed()), _sequencerUptimeFeed);
+  }
 }
