@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
-import {Deploy, DeployMainnet, DeployGoerli} from '@script/Deploy.s.sol';
+import {Deploy, DeployMainnet, DeployTestnet} from '@script/Deploy.s.sol';
 
 import {
   ParamChecker,
@@ -20,7 +20,7 @@ import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Vo
 import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 
 import '@script/Contracts.s.sol';
-import {GoerliDeployment} from '@script/GoerliDeployment.s.sol';
+import {TestnetDeployment} from '@script/TestnetDeployment.s.sol';
 import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 
 abstract contract CommonDeploymentTest is HaiTest, Deploy {
@@ -432,49 +432,29 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
   function test_TokenDistributor_Params() public {
     assertEq(tokenDistributor.root(), _tokenDistributorParams.root);
     assertEq(tokenDistributor.totalClaimable(), _tokenDistributorParams.totalClaimable);
-    assertEq(tokenDistributor.claimPeriodStart(), _tokenDistributorParams.claimPeriodStart);
+    // NOTE: (deployment)block.timestamp + 1 days (cannot be tested)
+    // assertEq(tokenDistributor.claimPeriodStart(), _tokenDistributorParams.claimPeriodStart);
     assertEq(tokenDistributor.claimPeriodEnd(), _tokenDistributorParams.claimPeriodEnd);
   }
 
+  function test_Delegated_OP() public {
+    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
+  }
+
   function _test_Authorizations(address _target, bool _permission) internal {
-    // base contracts
-    assertEq(safeEngine.authorizedAccounts(_target), _permission);
-    assertEq(oracleRelayer.authorizedAccounts(_target), _permission);
-    assertEq(taxCollector.authorizedAccounts(_target), _permission);
-    assertEq(stabilityFeeTreasury.authorizedAccounts(_target), _permission);
-    assertEq(liquidationEngine.authorizedAccounts(_target), _permission);
-    assertEq(accountingEngine.authorizedAccounts(_target), _permission);
-    assertEq(surplusAuctionHouse.authorizedAccounts(_target), _permission);
-    assertEq(debtAuctionHouse.authorizedAccounts(_target), _permission);
+    if (_permission) {
+      _toAllAuthorizableContracts(_fn_HasAuthorizations, _target);
+    } else {
+      _toAllAuthorizableContracts(_fn_NoAuthorizations, _target);
+    }
+  }
 
-    // settlement
-    assertEq(globalSettlement.authorizedAccounts(_target), _permission);
-    assertEq(postSettlementSurplusAuctionHouse.authorizedAccounts(_target), _permission);
-    assertEq(settlementSurplusAuctioneer.authorizedAccounts(_target), _permission);
+  function _fn_NoAuthorizations(IAuthorizable _contract, address _target) internal {
+    assertEq(_contract.authorizedAccounts(_target), false);
+  }
 
-    // factories
-    assertEq(chainlinkRelayerFactory.authorizedAccounts(_target), _permission);
-    assertEq(uniV3RelayerFactory.authorizedAccounts(_target), _permission);
-    assertEq(denominatedOracleFactory.authorizedAccounts(_target), _permission);
-    assertEq(delayedOracleFactory.authorizedAccounts(_target), _permission);
-
-    assertEq(collateralJoinFactory.authorizedAccounts(_target), _permission);
-    assertEq(collateralAuctionHouseFactory.authorizedAccounts(_target), _permission);
-
-    // tokens
-    assertEq(systemCoin.authorizedAccounts(_target), _permission);
-    assertEq(protocolToken.authorizedAccounts(_target), _permission);
-
-    // token adapters
-    assertEq(coinJoin.authorizedAccounts(_target), _permission);
-
-    // jobs
-    assertEq(accountingJob.authorizedAccounts(_target), _permission);
-    assertEq(liquidationJob.authorizedAccounts(_target), _permission);
-    assertEq(oracleJob.authorizedAccounts(_target), _permission);
-
-    // token distributor
-    assertEq(tokenDistributor.authorizedAccounts(_target), _permission);
+  function _fn_HasAuthorizations(IAuthorizable _contract, address _target) internal {
+    assertEq(_contract.authorizedAccounts(_target), true);
   }
 }
 
@@ -486,10 +466,7 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
     super.setUp();
     run();
 
-    // NOTE: deploy [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
-    vm.startPrank(governor);
-
-    // Deploy HAI/WETH UniV3 pool
+    // Initialize HAI/WETH UniV3 pool (already deployed in _setupPostEnvironment)
     _deployUniV3Pool(
       UNISWAP_V3_FACTORY,
       address(collateral[WETH]),
@@ -499,20 +476,13 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
       HAI_ETH_INITIAL_TICK // 2000 HAI = 1 ETH
     );
 
-    // Setup HAI/WETH oracle feed
-    IBaseOracle _haiWethOracle = uniV3RelayerFactory.deployUniV3Relayer({
-      _baseToken: address(systemCoin),
-      _quoteToken: address(collateral[WETH]),
-      _feeTier: HAI_POOL_FEE_TIER,
-      _quotePeriod: 1 days
-    });
-
-    // Setup HAI/USD oracle feed
-    systemCoinOracle = denominatedOracleFactory.deployDenominatedOracle({
-      _priceSource: _haiWethOracle,
-      _denominationPriceSource: delayedOracle[WETH].priceSource(),
-      _inverted: false
-    });
+    // NOTE: setup [ UniV3 HAI/WETH + Chainlink ETH/USD ] oracle through governance actions
+    vm.startPrank(governor);
+    // grab the last denominated oracle deployed (in _setupPostEnvironment)
+    address[] memory _denominatedOracles = denominatedOracleFactory.denominatedOraclesList();
+    systemCoinOracle = IBaseOracle(_denominatedOracles[_denominatedOracles.length - 1]);
+    // assert we grabbed the correct oracle
+    assertEq(systemCoinOracle.symbol(), '(HAI / WETH) * (ETH / USD)');
 
     oracleRelayer.modifyParameters('systemCoinOracle', abi.encode(systemCoinOracle));
 
@@ -527,10 +497,6 @@ contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
 
   function setupPostEnvironment() public override(DeployMainnet, Deploy) {
     super.setupPostEnvironment();
-  }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
   }
 
   function test_pid_update_rate() public {
@@ -581,17 +547,13 @@ abstract contract MainnetDeploymentTest is MainnetDeployment, CommonDeploymentTe
     // there is 1 governor accounts (timelock)
     _governorAccounts = 1;
   }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), address(haiDelegatee));
-  }
 }
 
-contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
-  uint256 FORK_BLOCK = 17_400_000;
+contract E2EDeploymentTestnetTest is DeployTestnet, CommonDeploymentTest {
+  uint256 FORK_BLOCK = 7_000_000;
 
   function setUp() public override {
-    vm.createSelectFork(vm.rpcUrl('goerli'), FORK_BLOCK);
+    vm.createSelectFork(vm.rpcUrl('testnet'), FORK_BLOCK);
     super.setUp();
     run();
 
@@ -599,45 +561,22 @@ contract E2EDeploymentGoerliTest is DeployGoerli, CommonDeploymentTest {
     _governorAccounts = delegate == address(0) ? 1 : 2;
   }
 
-  function setupEnvironment() public override(DeployGoerli, Deploy) {
+  function setupEnvironment() public override(DeployTestnet, Deploy) {
     super.setupEnvironment();
   }
 
-  function setupPostEnvironment() public override(DeployGoerli, Deploy) {
+  function setupPostEnvironment() public override(DeployTestnet, Deploy) {
     super.setupPostEnvironment();
-  }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), governor);
-  }
-
-  function test_stones_wbtc_oracle() public {
-    vm.warp(block.timestamp + 1 hours);
-    delayedOracle[WBTC].updateResult();
-    delayedOracle[STONES].updateResult();
-    vm.warp(block.timestamp + 1 hours);
-    delayedOracle[WBTC].updateResult();
-    delayedOracle[STONES].updateResult();
-
-    (uint256 _quoteStn,) = delayedOracle[STONES].getResultWithValidity(); // STN / USD
-    (uint256 _quoteBtc,) = delayedOracle[WBTC].getResultWithValidity(); // BTC / USD
-
-    assertEq(delayedOracle[STONES].symbol(), '(STN / wBTC) * (BTC / USD)');
-    assertEq(_quoteBtc / _quoteStn, 1000); // 1000 STN = BTC
   }
 }
 
-// rm "abstract" to reactivate after Deployment
-abstract contract GoerliDeploymentTest is GoerliDeployment, CommonDeploymentTest {
+contract TestnetDeploymentTest is TestnetDeployment, CommonDeploymentTest {
   function setUp() public {
-    vm.createSelectFork(vm.rpcUrl('goerli'), GOERLI_DEPLOYMENT_BLOCK);
+    vm.createSelectFork(vm.rpcUrl('testnet'), SEPOLIA_DEPLOYMENT_BLOCK);
     _getEnvironmentParams();
+    deployer = address(420);
 
     // if there is a delegate, there are 2 governor accounts
     _governorAccounts = 2;
-  }
-
-  function test_Delegated_OP() public {
-    assertEq(ERC20Votes(OP_OPTIMISM).delegates(address(collateralJoin[OP])), governor);
   }
 }

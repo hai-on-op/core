@@ -178,8 +178,9 @@ abstract contract Common is Contracts, Params {
     liquidationEngine.initializeCollateralType(_cType, abi.encode(_liquidationEngineCParams[_cType]));
 
     taxCollector.initializeCollateralType(_cType, abi.encode(_taxCollectorCParams[_cType]));
-    if (_taxCollectorSecondaryTaxReceiver.receiver != address(0)) {
-      taxCollector.modifyParameters(_cType, 'secondaryTaxReceiver', abi.encode(_taxCollectorSecondaryTaxReceiver));
+
+    for (uint256 _i; _i < _taxCollectorSecondaryTaxReceiver.length; _i++) {
+      taxCollector.modifyParameters(_cType, 'secondaryTaxReceiver', abi.encode(_taxCollectorSecondaryTaxReceiver[_i]));
     }
 
     // setup initial price
@@ -222,7 +223,10 @@ abstract contract Common is Contracts, Params {
     uint16 _cardinality,
     int24 _initialTick
   ) internal {
-    address _uniV3Pool = IUniswapV3Factory(_uniV3Factory).createPool({tokenA: _tokenA, tokenB: _tokenB, fee: _fee});
+    address _uniV3Pool = IUniswapV3Factory(_uniV3Factory).getPool(_tokenA, _tokenB, _fee);
+    if (_uniV3Pool == address(0)) {
+      _uniV3Pool = IUniswapV3Factory(_uniV3Factory).createPool({tokenA: _tokenA, tokenB: _tokenB, fee: _fee});
+    }
 
     address _token0 = IUniswapV3Pool(_uniV3Pool).token0();
     uint160 _sqrtPriceX96 = _token0 == address(_tokenA)
@@ -231,9 +235,11 @@ abstract contract Common is Contracts, Params {
 
     IUniswapV3Pool(_uniV3Pool).initialize(_sqrtPriceX96);
 
-    for (uint256 _i; _i < _cardinality;) {
-      IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(500);
-      _i += 500;
+    for (uint256 _i = 500; _i <= _cardinality; _i += 500) {
+      IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(uint16(_i));
+    }
+    if (_cardinality % 500 != 0) {
+      IUniswapV3Pool(_uniV3Pool).increaseObservationCardinalityNext(_cardinality);
     }
   }
 
@@ -287,8 +293,9 @@ abstract contract Common is Contracts, Params {
     _function(coinJoin, _target);
 
     // factories or children
-    _function(chainlinkRelayerFactory, _target);
-    _function(uniV3RelayerFactory, _target);
+    // NOTE: not deployable on Sepolia testnet
+    if (address(chainlinkRelayerFactory) != address(0)) _function(chainlinkRelayerFactory, _target);
+    if (address(uniV3RelayerFactory) != address(0)) _function(uniV3RelayerFactory, _target);
     _function(denominatedOracleFactory, _target);
     _function(delayedOracleFactory, _target);
 

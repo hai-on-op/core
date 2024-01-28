@@ -19,9 +19,6 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     collateralTypes.push(WSTETH);
     collateralTypes.push(OP);
 
-    // --- utils ---
-    governor = 0x43404E093C234463Fcf40dBA803ACa4FD95dFE63;
-
     // --- ERC20s ---
     collateral[WETH] = IERC20Metadata(OP_WETH);
     collateral[WSTETH] = IERC20Metadata(OP_WSTETH);
@@ -73,28 +70,32 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     oracleJob = OracleJob(0x0be8fC16A5d0a40ABD8Aa3F3F2BF3ba872a5E377);
 
     // --- proxies ---
-    proxyFactory = HaiProxyFactory(0x60437Fec25e379039479432FeD8d924C06CB8662);
-    safeManager = HaiSafeManager(0x74f2cEd0EAD90400c2d96Fb60dd0eebEbC3aC3DE);
+    proxyFactory = HaiProxyFactory(0xe8d5A5f3191735FcDf7adC33DEd20b0EF6E6d975);
+    safeManager = HaiSafeManager(0x1615062482fa2426C651e42e4656a64e2738A875);
 
-    basicActions = BasicActions(0xA6a6224f82921f178eF3f7796ecF538Cf80304B7);
-    debtBidActions = DebtBidActions(0xe8d5A5f3191735FcDf7adC33DEd20b0EF6E6d975);
-    surplusBidActions = SurplusBidActions(0x1615062482fa2426C651e42e4656a64e2738A875);
-    collateralBidActions = CollateralBidActions(0xBEdA825f517E8ef74F571bf3Ae47d004Fd4BB9DE);
-    postSettlementSurplusBidActions = PostSettlementSurplusBidActions(0x3408D78C69F9654C04087a412b0315663919E3a5);
-    globalSettlementActions = GlobalSettlementActions(0xa935428b62b13bFCBcd2F7b0F78C5FBfE96788DF);
-    rewardedActions = RewardedActions(0xf7d33E181F478C708c59D7a37066cDc273746904);
+    basicActions = BasicActions(0xBEdA825f517E8ef74F571bf3Ae47d004Fd4BB9DE);
+    debtBidActions = DebtBidActions(0x3408D78C69F9654C04087a412b0315663919E3a5);
+    surplusBidActions = SurplusBidActions(0xa935428b62b13bFCBcd2F7b0F78C5FBfE96788DF);
+    collateralBidActions = CollateralBidActions(0xf7d33E181F478C708c59D7a37066cDc273746904);
+    postSettlementSurplusBidActions = PostSettlementSurplusBidActions(0x2d346E3cB40ca1858Bdc137Fd82f801168113799);
+    globalSettlementActions = GlobalSettlementActions(0x67e919F00723C735e6233276D418E7C593484065);
+    rewardedActions = RewardedActions(0x3e7413CdE1Ba6443b8707AeE2b99d1bb99BBf8fd);
 
     // --- oracles ---
+    // NOTE: HAI/USD(UniV3+Chainlink)@0x7d42BfcbbDE65bA4FB236F3435fC9985D68240DB
     systemCoinOracle = IBaseOracle(0x4F80557Cf288A535Cf04c436fEa897e5EB1f329d);
     delayedOracle[WETH] = IDelayedOracle(0xF03Db2c15127Fa96374b11eef9CbAC6C56898d35);
     delayedOracle[WSTETH] = IDelayedOracle(0x5B09578387c9FbcFc8a8817514af0407b4917122);
     delayedOracle[OP] = IDelayedOracle(0x2A9Bd515c3378e4c17067f8DDA2d384fAadC8A31);
 
     // --- governance ---
-    timelock = TimelockController(payable(0x43404E093C234463Fcf40dBA803ACa4FD95dFE63));
     haiGovernor = HaiGovernor(payable(0x44d13EA297942a49E2A0b0112D21FD132A65a06a));
+    timelock = TimelockController(payable(0x43404E093C234463Fcf40dBA803ACa4FD95dFE63));
     haiDelegatee = HaiDelegatee(0xF56F8273a85Ce0D866B648632832F95F1B438726);
 
-    tokenDistributor = TokenDistributor(0x2d346E3cB40ca1858Bdc137Fd82f801168113799);
+    tokenDistributor = TokenDistributor(0xe6F457652364a126276847Df6B75426D1B2AeADa);
+
+    // --- utils ---
+    governor = address(timelock);
   }
 }

@@ -36,7 +36,8 @@ contract SimulationPIDController is TestParams, Deploy, HaiTest {
   int256 _integralGain = int256(INTEGRAL_GAIN);
   uint256 _alphaDecay = HALF_LIFE_30_DAYS;
   uint256 _error = 1.01e27; // +1%
-  uint256 _days = 31;
+  uint256 _steps = 12;
+  uint256 _stepDuration = 30 days;
 
   // --- vars to log ---
   int256 _proportionalTerm;
@@ -114,8 +115,8 @@ contract SimulationPIDController is TestParams, Deploy, HaiTest {
     marketOracle.setPriceAndValidity(_redemptionPrice.rmul(_error) / 1e9, true);
     pidRateSetter.updateRate();
 
-    for (uint256 _i; _i < _days; _i++) {
-      vm.warp(block.timestamp + 1 days);
+    for (uint256 _i; _i < _steps; _i++) {
+      vm.warp(block.timestamp + _stepDuration);
       // no error after the first day
       _redemptionPrice = oracleRelayer.redemptionPrice();
       marketOracle.setPriceAndValidity(_redemptionPrice / 1e9, true);
@@ -126,8 +127,8 @@ contract SimulationPIDController is TestParams, Deploy, HaiTest {
   }
 
   function _runSimulationWithStep() internal {
-    for (uint256 _i; _i < _days; _i++) {
-      vm.warp(block.timestamp + 1 days);
+    for (uint256 _i; _i < _steps; _i++) {
+      vm.warp(block.timestamp + _stepDuration);
       _redemptionPrice = oracleRelayer.redemptionPrice();
       marketOracle.setPriceAndValidity(_redemptionPrice.rmul(_error) / 1e9, true);
       pidRateSetter.updateRate();

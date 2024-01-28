@@ -27,10 +27,10 @@ abstract contract TestParams is Contracts, Params {
       surplusDelay: 0, // no delay
       popDebtDelay: 0, // no delay
       disableCooldown: 0, // no cooldown
-      surplusAmount: ONE_HUNDRED_COINS, // 100 COINs
+      surplusAmount: ONE_HUNDRED_COINS, // 100 HAI
       surplusBuffer: 0, // no buffer
-      debtAuctionMintedTokens: INITIAL_DEBT_AUCTION_MINTED_TOKENS, // 1 PROTOCOL TOKEN
-      debtAuctionBidSize: ONE_HUNDRED_COINS // 100 COINs
+      debtAuctionMintedTokens: INITIAL_DEBT_AUCTION_MINTED_TOKENS, // 1 KITE
+      debtAuctionBidSize: ONE_HUNDRED_COINS // 100 HAI
     });
 
     _debtAuctionHouseParams = IDebtAuctionHouse.DebtAuctionHouseParams({
@@ -49,12 +49,12 @@ abstract contract TestParams is Contracts, Params {
     });
 
     _liquidationEngineParams = ILiquidationEngine.LiquidationEngineParams({
-      onAuctionSystemCoinLimit: 10_000 * RAD, // 10_000 COINs
+      onAuctionSystemCoinLimit: 10_000 * RAD, // 10_000 HAI
       saviourGasLimit: 10_000_000 // 10M gas
     });
 
     _stabilityFeeTreasuryParams = IStabilityFeeTreasury.StabilityFeeTreasuryParams({
-      treasuryCapacity: 1000e45, // 1_000 COINs
+      treasuryCapacity: 1000e45, // 1_000 HAI
       pullFundsMinThreshold: 0, // no threshold
       surplusTransferDelay: 1 days
     });
@@ -66,11 +66,15 @@ abstract contract TestParams is Contracts, Params {
       maxSecondaryReceivers: 1 // stabilityFeeTreasury
     });
 
-    _taxCollectorSecondaryTaxReceiver = ITaxCollector.TaxReceiver({
-      receiver: address(stabilityFeeTreasury),
-      canTakeBackTax: true, // [bool]
-      taxPercentage: 0.5e18 // [wad%]
-    });
+    delete _taxCollectorSecondaryTaxReceiver; // avoid stacking old data on each push
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: address(stabilityFeeTreasury),
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.5e18 // [wad%]
+      })
+    );
 
     // --- PID Params ---
 
