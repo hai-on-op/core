@@ -14,9 +14,7 @@ import '@script/Registry.s.sol';
  * @dev    This contract imports deployed addresses from `TestnetDeployment.s.sol`
  */
 contract TestnetScript is TestnetDeployment, Common, Script {
-  function setUp() public virtual {
-    chainId = 11_155_420;
-  }
+  function setUp() public virtual {}
 
   /**
    * @notice This script is left as an example on how to use TestnetScript contract

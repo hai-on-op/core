@@ -14,9 +14,7 @@ import '@script/Registry.s.sol';
  * @dev    This contract imports deployed addresses from `MainnetDeployment.s.sol`
  */
 contract MainnetScript is MainnetDeployment, Common, Script {
-  function setUp() public virtual {
-    chainId = 10;
-  }
+  function setUp() public virtual {}
 
   /**
    * @notice This script is left as an example on how to use MainnetScript contract

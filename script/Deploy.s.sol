@@ -76,7 +76,6 @@ abstract contract Deploy is Common, Script {
 contract DeployMainnet is MainnetParams, Deploy {
   function setUp() public virtual {
     _deployerPk = uint256(vm.envBytes32('OP_MAINNET_DEPLOYER_PK'));
-    chainId = 10;
   }
 
   function setupEnvironment() public virtual override updateParams {
@@ -142,7 +141,6 @@ contract DeployMainnet is MainnetParams, Deploy {
 contract DeployTestnet is TestnetParams, Deploy {
   function setUp() public virtual {
     _deployerPk = uint256(vm.envBytes32('OP_SEPOLIA_DEPLOYER_PK'));
-    chainId = 11_155_420;
   }
 
   function setupEnvironment() public virtual override updateParams {
