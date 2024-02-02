@@ -91,7 +91,6 @@ import {HaiDelegatee} from '@contracts/governance/HaiDelegatee.sol';
  */
 abstract contract Contracts {
   // --- Helpers ---
-  uint256 public chainId;
   address public deployer;
   address public governor;
   address public delegate;

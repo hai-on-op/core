@@ -45,16 +45,23 @@ bytes32 constant WBTC = bytes32('WBTC'); // 0x5742544300000000000000000000000000
 bytes32 constant STONES = bytes32('STONES'); // 0x53544f4e45530000000000000000000000000000000000000000000000000000
 bytes32 constant TOTEM = bytes32('TOTEM'); // 0x544f54454d000000000000000000000000000000000000000000000000000000
 
+uint256 constant MINUS_10_PERCENT_IN_2_HOURS = 999_985_366_702_115_272_120_527_460;
+uint256 constant MINUS_15_PERCENT_IN_2_HOURS = 999_977_428_181_205_977_622_596_568;
 uint256 constant MINUS_0_5_PERCENT_PER_HOUR = 999_998_607_628_240_588_157_433_861;
 uint256 constant MINUS_1_PERCENT_PER_HOUR = 999_997_208_243_937_652_252_849_536;
-uint256 constant HALF_LIFE_30_DAYS = 999_999_711_200_000_000_000_000_000;
+uint256 constant MINUS_90_PERCENT_PER_YEAR = 99_999_999_999_997_789_272_222_624;
+uint256 constant HALF_LIFE_30_DAYS = 999_999_732_582_142_021_614_955_959;
+uint256 constant PLUS_1_5_PERCENT_PER_YEAR = 1_000_000_000_472_114_805_215_157_978;
+uint256 constant PLUS_2_PERCENT_PER_YEAR = 1_000_000_000_627_937_192_491_029_810;
+uint256 constant PLUS_5_PERCENT_PER_YEAR = 1_000_000_001_547_125_957_863_212_448;
+uint256 constant PLUS_950_PERCENT_PER_YEAR = 1_000_000_074_561_623_060_142_516_377;
 
-// NOTE: imported from https://etherscan.io/address/0x5CC4878eA3E6323FdA34b3D28551E1543DEe54C6
-uint256 constant PROPORTIONAL_GAIN = 222_002_205_862;
-uint256 constant INTEGRAL_GAIN = 16_442;
+// NOTE: RAI values are imported from https://etherscan.io/address/0x5CC4878eA3E6323FdA34b3D28551E1543DEe54C6
+uint256 constant PROPORTIONAL_GAIN = 111_001_102_931; // 50% of RAI's
+uint256 constant INTEGRAL_GAIN = 32_884; // 200% of RAI's
 
 // Job Params
-uint256 constant JOB_REWARD = 5e18; // 5 HAI
+uint256 constant JOB_REWARD = 1 * WAD; // 1 HAI
 
 /**
  * @title Params
@@ -87,7 +94,7 @@ abstract contract Params {
   IStabilityFeeTreasury.StabilityFeeTreasuryParams _stabilityFeeTreasuryParams;
   ITaxCollector.TaxCollectorParams _taxCollectorParams;
   mapping(bytes32 => ITaxCollector.TaxCollectorCollateralParams) _taxCollectorCParams;
-  ITaxCollector.TaxReceiver _taxCollectorSecondaryTaxReceiver;
+  ITaxCollector.TaxReceiver[] _taxCollectorSecondaryTaxReceiver;
 
   IGlobalSettlement.GlobalSettlementParams _globalSettlementParams;
   IPostSettlementSurplusAuctionHouse.PostSettlementSAHParams _postSettlementSAHParams;

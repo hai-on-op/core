@@ -45,8 +45,7 @@ contract HaiGovernor is
     TimelockController _timelock = TimelockController(payable(timelock()));
     _timelock.grantRole(keccak256('PROPOSER_ROLE'), address(this));
     _timelock.grantRole(keccak256('CANCELLER_ROLE'), address(this));
-
-    _timelock.grantRole(keccak256('EXECUTOR_ROLE'), address(0));
+    _timelock.grantRole(keccak256('EXECUTOR_ROLE'), address(this));
   }
 
   /**

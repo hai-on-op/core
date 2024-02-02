@@ -2,9 +2,10 @@
 pragma solidity 0.8.20;
 
 import {IChainlinkRelayerChild} from '@interfaces/factories/IChainlinkRelayerChild.sol';
+import {IChainlinkRelayerFactory} from '@interfaces/factories/IChainlinkRelayerFactory.sol';
 import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 
-import {ChainlinkRelayer} from '@contracts/oracles/ChainlinkRelayer.sol';
+import {ChainlinkRelayer, IChainlinkRelayer} from '@contracts/oracles/ChainlinkRelayer.sol';
 
 import {FactoryChild} from '@contracts/factories/FactoryChild.sol';
 
@@ -17,20 +18,30 @@ contract ChainlinkRelayerChild is ChainlinkRelayer, FactoryChild, IChainlinkRela
 
   /**
    * @param  _priceFeed The address of the price feed to relay
-   * @param  _sequencerUptimeFeed The address of the sequencer uptime feed to relay
+   * @param  __sequencerUptimeFeed The address of the sequencer uptime feed to relay
    * @param  _staleThreshold The threshold in seconds to consider the aggregator stale
    */
   constructor(
     address _priceFeed,
-    address _sequencerUptimeFeed,
+    address __sequencerUptimeFeed,
     uint256 _staleThreshold
-  ) ChainlinkRelayer(_priceFeed, _sequencerUptimeFeed, _staleThreshold) {}
+  ) ChainlinkRelayer(_priceFeed, __sequencerUptimeFeed, _staleThreshold) {}
+
+  // --- Overrides ---
+
+  function sequencerUptimeFeed()
+    public
+    view
+    override(ChainlinkRelayer, IChainlinkRelayer)
+    returns (IChainlinkOracle __sequencerUptimeFeed)
+  {
+    return IChainlinkRelayerFactory(factory).sequencerUptimeFeed();
+  }
 
   /**
-   * @dev Overriding method bypasses the null address check, already performed by the factory
+   * @dev    Modifying sequencerUptimeFeed's address results in a no-operation (is read from factory)
+   * @param  __sequencerUptimeFeed Ignored parameter (read from factory)
    * @inheritdoc ChainlinkRelayer
    */
-  function _setSequencerUptimeFeed(address _sequencerUptimeFeed) internal override {
-    sequencerUptimeFeed = IChainlinkOracle(_sequencerUptimeFeed);
-  }
+  function _setSequencerUptimeFeed(address __sequencerUptimeFeed) internal override {}
 }
