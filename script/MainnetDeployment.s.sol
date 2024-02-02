@@ -7,7 +7,7 @@ import {OP_WETH, OP_WSTETH, OP_OPTIMISM} from '@script/Registry.s.sol';
 
 abstract contract MainnetDeployment is Contracts, MainnetParams {
   // NOTE: The last significant change in the Mainnet deployment, to be used in the test scenarios
-  uint256 constant MAINNET_DEPLOYMENT_BLOCK = 112_709_963; // TODO: update this when deployed
+  uint256 constant MAINNET_DEPLOYMENT_BLOCK = 115_649_653;
 
   /**
    * @notice All the addresses that were deployed in the Mainnet deployment, in order of creation
