@@ -37,4 +37,4 @@ src = 'test'
 
 [rpc_endpoints]
 mainnet = "${OP_MAINNET_RPC}"
-goerli = "${OP_GOERLI_RPC}"
+testnet = "${OP_SEPOLIA_RPC}"

@@ -3,56 +3,53 @@ pragma solidity 0.8.20;
 
 import '@script/Params.s.sol';
 
-abstract contract GoerliParams is Contracts, Params {
+abstract contract TestnetParams is Contracts, Params {
   // --- Testnet Params ---
-  uint256 constant OP_GOERLI_OP_ETH_PRICE_FEED = 0.001e18; // 1000 OP = 1 ETH
-  uint256 constant OP_GOERLI_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
+  uint256 constant OP_SEPOLIA_HAI_PRICE_DEVIATION = 0.995e18; // -0.5%
+  address constant OP_SEPOLIA_ADMIN_SAFE = 0xCAFd432b7EcAfff352D92fcB81c60380d437E99D;
 
   function _getEnvironmentParams() internal override {
-    governor = 0xA6A772CCaa47eA3A6f267d31D782e8Ac5a5Ed743;
-    delegate = 0x8125aAa8F7912aEb500553a5b1710BB16f7A6C65;
-
     // Setup delegated collateral joins
-    delegatee[OP] = governor;
+    delegatee[OP] = address(haiDelegatee);
 
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
-      safeDebtCeiling: 2_000_000 * WAD, // 2M COINs
-      globalDebtCeiling: 25_000_000 * RAD // 25M COINs
+      safeDebtCeiling: 1_000_000 * WAD, // WAD
+      globalDebtCeiling: 0 // initially disabled
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
       surplusIsTransferred: 0, // surplus is auctioned
-      surplusDelay: 1800, // 30 minutes
-      popDebtDelay: 1800, // 30 minutes
+      surplusDelay: 1 days,
+      popDebtDelay: 14 days,
       disableCooldown: 3 days,
-      surplusAmount: 100 * RAD, // 100 COINs
-      surplusBuffer: 1000 * RAD, // 1000 COINs
-      debtAuctionMintedTokens: 1e18, // 1 PROTOCOL TOKEN
-      debtAuctionBidSize: 100 * RAD // 100 COINs
+      surplusAmount: 42_000 * RAD, // 42k HAI
+      surplusBuffer: 100_000 * RAD, // 100k HAI
+      debtAuctionMintedTokens: 10_000 * WAD, // 10k KITE
+      debtAuctionBidSize: 1000 * RAD // 1k HAI
     });
 
     _debtAuctionHouseParams = IDebtAuctionHouse.DebtAuctionHouseParams({
-      bidDecrease: 1.05e18, // - 5%
-      amountSoldIncrease: 1.05e18, // + 5%
-      bidDuration: 900, // 15 minutes
-      totalAuctionLength: 1800 // 30 minutes
+      bidDecrease: 1.025e18, // -2.5 %
+      amountSoldIncrease: 1.5e18, // +50 %
+      bidDuration: 3 hours,
+      totalAuctionLength: 2 days
     });
 
     _surplusAuctionHouseParams = ISurplusAuctionHouse.SurplusAuctionHouseParams({
       bidIncrease: 1.01e18, // +1 %
-      bidDuration: 900, // 15 minutes
-      totalAuctionLength: 1800, // 30 minutes
+      bidDuration: 6 hours,
+      totalAuctionLength: 1 days,
       bidReceiver: governor,
       recyclingPercentage: 0 // 100% is burned
     });
 
     _liquidationEngineParams = ILiquidationEngine.LiquidationEngineParams({
-      onAuctionSystemCoinLimit: 500_000 * RAD, // 500k COINs
+      onAuctionSystemCoinLimit: 10_000_000 * RAD, // 10M HAI
       saviourGasLimit: 10_000_000 // 10M gas
     });
 
     _stabilityFeeTreasuryParams = IStabilityFeeTreasury.StabilityFeeTreasuryParams({
-      treasuryCapacity: 1_000_000e45, // 1M COINs
+      treasuryCapacity: 1_000_000 * RAD, // 1M HAI
       pullFundsMinThreshold: 0, // no threshold
       surplusTransferDelay: 1 days
     });
@@ -61,25 +58,37 @@ abstract contract GoerliParams is Contracts, Params {
       primaryTaxReceiver: address(accountingEngine),
       globalStabilityFee: RAY, // no global SF
       maxStabilityFeeRange: RAY - MINUS_0_5_PERCENT_PER_HOUR, // +- 0.5% per hour
-      maxSecondaryReceivers: 1
+      maxSecondaryReceivers: 5
     });
 
-    _taxCollectorSecondaryTaxReceiver = ITaxCollector.TaxReceiver({
-      receiver: address(stabilityFeeTreasury),
-      canTakeBackTax: true, // can take back tax
-      taxPercentage: 0.5e18 // 50%
-    });
+    delete _taxCollectorSecondaryTaxReceiver; // avoid stacking old data on each push
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: address(stabilityFeeTreasury),
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.2e18 // 20%
+      })
+    );
+
+    _taxCollectorSecondaryTaxReceiver.push(
+      ITaxCollector.TaxReceiver({
+        receiver: OP_SEPOLIA_ADMIN_SAFE,
+        canTakeBackTax: true, // [bool]
+        taxPercentage: 0.21e18 // 21%
+      })
+    );
 
     // --- PID Params ---
 
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
-      redemptionRateUpperBound: RAY * WAD, // unbounded
-      redemptionRateLowerBound: 1 // unbounded
+      redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
+      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
-      perSecondCumulativeLeak: HALF_LIFE_30_DAYS, // 0.999998e27
-      noiseBarrier: WAD, // no noise barrier
+      perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
+      noiseBarrier: 0.995e18, // 0.5%
       feedbackOutputLowerBound: -int256(RAY - 1), // unbounded
       feedbackOutputUpperBound: RAD, // unbounded
       integralPeriodSize: 1 hours
@@ -96,8 +105,8 @@ abstract contract GoerliParams is Contracts, Params {
     _globalSettlementParams = IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 3 days});
     _postSettlementSAHParams = IPostSettlementSurplusAuctionHouse.PostSettlementSAHParams({
       bidIncrease: 1.01e18, // +1 %
-      bidDuration: 900, // 15 minutes
-      totalAuctionLength: 1800 // 30 minutes
+      bidDuration: 3 hours,
+      totalAuctionLength: 1 days
     });
 
     // --- Collateral Default Params ---
@@ -116,18 +125,18 @@ abstract contract GoerliParams is Contracts, Params {
       });
 
       _safeEngineCParams[_cType] = ISAFEEngine.SAFEEngineCollateralParams({
-        debtCeiling: 10_000_000 * RAD, // 10M COINs
-        debtFloor: 1 * RAD // 1 COINs
+        debtCeiling: 10_000_000 * RAD, // 10M HAI
+        debtFloor: 1 * RAD // 1 HAI
       });
 
       _liquidationEngineCParams[_cType] = ILiquidationEngine.LiquidationEngineCollateralParams({
         collateralAuctionHouse: address(collateralAuctionHouse[_cType]),
         liquidationPenalty: 1.1e18, // 10%
-        liquidationQuantity: 1000 * RAD // 1000 COINs
+        liquidationQuantity: 1000 * RAD // 1000 HAI
       });
 
       _collateralAuctionHouseParams[_cType] = ICollateralAuctionHouse.CollateralAuctionHouseParams({
-        minimumBid: WAD, // 1 COINs
+        minimumBid: WAD, // 1 HAI
         minDiscount: WAD, // no discount
         maxDiscount: 0.9e18, // -10%
         perSecondDiscountUpdateRate: MINUS_0_5_PERCENT_PER_HOUR // RAY
@@ -138,9 +147,26 @@ abstract contract GoerliParams is Contracts, Params {
     _oracleRelayerCParams[WETH].safetyCRatio = 1.35e27; // 135%
     _oracleRelayerCParams[WETH].liquidationCRatio = 1.35e27; // 135%
     _taxCollectorCParams[WETH].stabilityFee = RAY + 1.54713e18; // + 5%/yr
-    _safeEngineCParams[WETH].debtCeiling = 100_000_000 * RAD; // 100M COINs
+    _safeEngineCParams[WETH].debtCeiling = 100_000_000 * RAD; // 100M HAI
 
     _liquidationEngineCParams[OP].liquidationPenalty = 1.2e18; // 20%
     _collateralAuctionHouseParams[OP].maxDiscount = 0.5e18; // -50%
+
+    // --- Governance Params ---
+    _governorParams = IHaiGovernor.HaiGovernorParams({
+      votingDelay: 12 hours, // 43_200
+      votingPeriod: 36 hours, // 129_600
+      proposalThreshold: 5000 * WAD, // 5k KITE
+      quorumNumeratorValue: 1, // 1%
+      quorumVoteExtension: 1 days, // 86_400
+      timelockMinDelay: 1 days // 86_400
+    });
+
+    _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
+      root: 0x6fc714df6371f577a195c2bfc47da41aa0ea15bba2651df126f3713a232244be,
+      totalClaimable: 1_000_000 * WAD, // 1M HAI
+      claimPeriodStart: block.timestamp + 1 days,
+      claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT+0) - 1s
+    });
   }
 }

@@ -48,8 +48,9 @@ abstract contract Base is HaiTest {
       perSecondDiscountUpdateRate: 1
     });
 
-    collateralAuctionHouseFactory =
-    new CollateralAuctionHouseFactoryForTest(address(mockSafeEngine), address(mockLiquidationEngine), address(mockOracleRelayer));
+    collateralAuctionHouseFactory = new CollateralAuctionHouseFactoryForTest(
+      address(mockSafeEngine), address(mockLiquidationEngine), address(mockOracleRelayer)
+    );
     label(address(collateralAuctionHouseFactory), 'CollateralAuctionHouseFactory');
 
     collateralAuctionHouseFactory.addAuthorization(authorizedAccount);
@@ -108,8 +109,9 @@ contract Unit_CollateralAuctionHouseFactory_Constructor is Base {
     vm.expectEmit();
     emit AddAuthorization(user);
 
-    collateralAuctionHouseFactory =
-    new CollateralAuctionHouseFactoryForTest(address(mockSafeEngine), address(mockLiquidationEngine), address(mockOracleRelayer));
+    collateralAuctionHouseFactory = new CollateralAuctionHouseFactoryForTest(
+      address(mockSafeEngine), address(mockLiquidationEngine), address(mockOracleRelayer)
+    );
   }
 
   function test_Set_ContractEnabled() public happyPath {

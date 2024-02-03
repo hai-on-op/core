@@ -34,8 +34,8 @@ abstract contract Base is HaiTest {
 
   function setUp() public virtual {
     vm.prank(deployer);
-
     safeEngine = new SAFEEngineForTest(safeEngineParams);
+    label(address(safeEngine), 'SAFEEngine');
   }
 
   modifier authorized() {

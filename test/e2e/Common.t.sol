@@ -2,7 +2,7 @@
 pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
-import {HAI, HAI_INITIAL_PRICE, WETH} from '@script/Params.s.sol';
+import {HAI, HAI_USD_INITIAL_PRICE, WETH} from '@script/Params.s.sol';
 import {Deploy} from '@script/Deploy.s.sol';
 import {TestParams, TKN, TEST_ETH_PRICE, TEST_TKN_PRICE} from '@test/e2e/TestParams.t.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
@@ -34,7 +34,7 @@ contract DeployForTest is TestParams, Deploy {
   function setupEnvironment() public virtual override updateParams {
     WETH9 _weth = WETH9(payable(0x4200000000000000000000000000000000000006));
 
-    systemCoinOracle = new OracleForTest(HAI_INITIAL_PRICE); // 1 HAI = 1 USD
+    systemCoinOracle = new OracleForTest(HAI_USD_INITIAL_PRICE); // 1 HAI = 1 USD
     delayedOracle[WETH] = new DelayedOracleForTest(TEST_ETH_PRICE, address(0)); // 1 ETH = 2000 USD
     delayedOracle[TKN] = new DelayedOracleForTest(TEST_TKN_PRICE, address(0)); // 1 TKN = 1 USD
 
@@ -58,6 +58,13 @@ contract DeployForTest is TestParams, Deploy {
     collateralTypes.push('TKN-C');
     collateralTypes.push('TKN-8D');
   }
+
+  function setupPostEnvironment() public virtual override updateParams {
+    for (uint256 i = 0; i < collateralTypes.length; i++) {
+      bytes32 _cType = collateralTypes[i];
+      taxCollector.taxSingle(_cType);
+    }
+  }
 }
 
 /**
@@ -71,15 +78,11 @@ abstract contract Common is DeployForTest, HaiTest {
   address carol = address(0x422);
   address dave = address(0x423);
 
-  uint256 auctionId;
-
   function setUp() public virtual {
     run();
 
-    for (uint256 i = 0; i < collateralTypes.length; i++) {
-      bytes32 _cType = collateralTypes[i];
-      taxCollector.taxSingle(_cType);
-    }
+    vm.prank(deployer);
+    protocolToken.unpause();
 
     vm.label(deployer, 'Deployer');
     vm.label(alice, 'Alice');

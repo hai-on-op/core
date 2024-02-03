@@ -15,7 +15,8 @@ import {
   OP_CHAINLINK_WSTETH_ETH_FEED,
   OP_CHAINLINK_SEQUENCER_UPTIME_FEED,
   OP_WETH,
-  OP_WBTC
+  OP_WBTC,
+  UNISWAP_V3_FACTORY
 } from '@script/Registry.s.sol';
 
 import {Math, WAD} from '@libraries/Math.sol';
@@ -57,7 +58,7 @@ contract E2EOracleSetup is HaiTest {
       new ChainlinkRelayer(OP_CHAINLINK_WSTETH_ETH_FEED, OP_CHAINLINK_SEQUENCER_UPTIME_FEED, 1 days);
 
     // --- UniV3 ---
-    wbtcWethPriceSource = new UniV3Relayer(OP_WBTC, OP_WETH, FEE_TIER, 1 days);
+    wbtcWethPriceSource = new UniV3Relayer(UNISWAP_V3_FACTORY, OP_WBTC, OP_WETH, FEE_TIER, 1 days);
 
     // --- Denominated ---
     wstethUsdPriceSource = new DenominatedOracle(wstethEthPriceSource, wethUsdPriceSource, false);
@@ -136,7 +137,7 @@ contract E2EOracleSetup is HaiTest {
   function test_DenominatedOracleInvertedSymbol() public {
     IDenominatedOracle usdPriceSource = new DenominatedOracle(wethUsdPriceSource, wethUsdPriceSource, true);
 
-    assertEq(usdPriceSource.symbol(), '(ETH / USD)^-1 / (ETH / USD)');
+    assertEq(usdPriceSource.symbol(), '(ETH / USD)^-1 * (ETH / USD)'); // USD / USD
   }
 
   // --- Delayed ---

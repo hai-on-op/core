@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {HaiTest, stdStorage, StdStorage} from '@test/utils/HaiTest.t.sol';
-import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
-import {ITokenDistributor, TokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {IProtocolToken} from '@interfaces/tokens/IProtocolToken.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
-import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 import {Assertions} from '@libraries/Assertions.sol';
+import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
+import {HaiTest, stdStorage, StdStorage} from '@test/utils/HaiTest.t.sol';
 
 abstract contract Base is HaiTest {
   using stdStorage for StdStorage;
@@ -29,7 +29,7 @@ abstract contract Base is HaiTest {
   uint256 claimPeriodStart = block.timestamp + 10 days;
   uint256 claimPeriodEnd = block.timestamp + 20 days;
 
-  ERC20Votes token = ERC20Votes(label('ERC20Votes'));
+  IProtocolToken token = IProtocolToken(label('Token'));
 
   address deployer = label('deployer');
   address delegatee;
@@ -64,7 +64,10 @@ abstract contract Base is HaiTest {
 
     _mockERC20VotesDelegate(deployer);
     vm.prank(deployer);
-    tokenDistributor = new TokenDistributor(merkleRoot, token, totalClaimable, claimPeriodStart, claimPeriodEnd);
+    tokenDistributor = new TokenDistributor(
+      address(token),
+      ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd)
+    );
 
     uint256 _index = merkleTreeGenerator.getIndex(merkleTree, leaves[4]);
     validEveProofs = merkleTreeGenerator.getProof(merkleTree, _index);
@@ -72,22 +75,6 @@ abstract contract Base is HaiTest {
 
   function _mockERC20VotesDelegate(address _delegatee) internal {
     vm.mockCall(address(token), abi.encodeCall(token.delegate, (_delegatee)), abi.encode(0));
-  }
-
-  function _mockERC20VotesTransfer(address _to, uint256 _amount) internal {
-    vm.mockCall(address(token), abi.encodeCall(token.transfer, (_to, _amount)), abi.encode(true));
-  }
-
-  function _mockERC20VotesTransferFail(address _to, uint256 _amount) internal {
-    vm.mockCall(address(token), abi.encodeCall(token.transfer, (_to, _amount)), abi.encode(false));
-  }
-
-  function _mockERC20VotesBalanceOf(address _user, uint256 _balance) internal {
-    vm.mockCall(address(token), abi.encodeCall(token.balanceOf, (_user)), abi.encode(_balance));
-  }
-
-  function _mockERC20Nonces(address _user, uint256 _nonce) internal {
-    vm.mockCall(address(token), abi.encodeCall(token.nonces, address(_user)), abi.encode(_nonce));
   }
 
   function _mockERC20VotesDelegateBySig(
@@ -100,6 +87,16 @@ abstract contract Base is HaiTest {
   ) internal {
     vm.mockCall(
       address(token), abi.encodeCall(token.delegateBySig, (_delegatee, _nonce, _expiry, _v, _r, _s)), abi.encode(0)
+    );
+  }
+
+  function _mockERC20Nonces(address _user, uint256 _nonce) internal {
+    vm.mockCall(address(token), abi.encodeCall(token.nonces, address(_user)), abi.encode(_nonce));
+  }
+
+  function _mockTotalClaimable(uint256 _totalClaimable) internal {
+    stdstore.target(address(tokenDistributor)).sig(ITokenDistributor.totalClaimable.selector).checked_write(
+      _totalClaimable
     );
   }
 
@@ -116,12 +113,12 @@ abstract contract Base is HaiTest {
 }
 
 contract Unit_TokenDistributor_Constructor is Base {
-  function test_Set_Root() public {
-    assertEq(tokenDistributor.root(), merkleRoot);
-  }
-
   function test_Set_Token() public {
     assertEq(address(tokenDistributor.token()), address(token));
+  }
+
+  function test_Set_Root() public {
+    assertEq(tokenDistributor.root(), merkleRoot);
   }
 
   function test_Set_TotalClaimable() public {
@@ -136,16 +133,20 @@ contract Unit_TokenDistributor_Constructor is Base {
     assertEq(tokenDistributor.claimPeriodEnd(), claimPeriodEnd);
   }
 
-  function test_Revert_Token_IsNull() public {
-    vm.expectRevert(Assertions.NullAddress.selector);
+  function test_Revert_Token_NoCode() public {
+    vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
 
-    new TokenDistributor(merkleRoot, ERC20Votes(address(0)), totalClaimable, claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(
+      address(0), ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd)
+    );
   }
 
   function test_Revert_TotalClaimable_IsNull() public {
     vm.expectRevert(Assertions.NullAmount.selector);
 
-    new TokenDistributor(merkleRoot, token, 0, claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(
+      address(token), ITokenDistributor.TokenDistributorParams(merkleRoot, 0, claimPeriodStart, claimPeriodEnd)
+    );
   }
 
   function test_Revert_ClaimPeriodStart_LtEqTimeStamp(uint256 _claimPeriodStart) public {
@@ -153,7 +154,10 @@ contract Unit_TokenDistributor_Constructor is Base {
 
     vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterThan.selector, _claimPeriodStart, block.timestamp));
 
-    new TokenDistributor(merkleRoot, token, totalClaimable, _claimPeriodStart, claimPeriodEnd);
+    new TokenDistributor(
+      address(token),
+      ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, _claimPeriodStart, claimPeriodEnd)
+    );
   }
 
   function test_Revert_ClaimPeriodEnd_LtEqClaimPeriodStart(uint256 _claimPeriodStart, uint256 _claimPeriodEnd) public {
@@ -162,7 +166,10 @@ contract Unit_TokenDistributor_Constructor is Base {
 
     vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterThan.selector, _claimPeriodEnd, _claimPeriodStart));
 
-    new TokenDistributor(merkleRoot, token, totalClaimable, _claimPeriodStart, _claimPeriodEnd);
+    new TokenDistributor(
+      address(token),
+      ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, _claimPeriodStart, _claimPeriodEnd)
+    );
   }
 }
 
@@ -249,7 +256,9 @@ contract Unit_CanClaim_ExternalScript is Base {
   function setUp() public override {
     super.setUp();
     bytes32 _root = 0x30e48fd8bee18a1728bfd9f536125c5a352b778d5b07a92de684b14cb7bb92ad; // Root generated with OZ js library
-    tokenDistributor = new TokenDistributor(_root, token, totalClaimable, claimPeriodStart, claimPeriodEnd);
+    tokenDistributor = new TokenDistributor(
+      address(token), ITokenDistributor.TokenDistributorParams(_root, totalClaimable, claimPeriodStart, claimPeriodEnd)
+    );
     vm.warp(claimPeriodStart); // going ahead in time for claim period start
   }
 
@@ -280,7 +289,6 @@ contract Unit_TokenDistributor_Claim is Base {
   function setUp() public override {
     super.setUp();
     vm.warp(claimPeriodStart); // going ahead in time for claim period start
-    _mockERC20VotesTransfer(airdropRecipients[4], airdropAmounts[4]);
     vm.startPrank(airdropRecipients[4]);
   }
 
@@ -296,8 +304,8 @@ contract Unit_TokenDistributor_Claim is Base {
     assertEq(tokenDistributor.totalClaimable(), totalClaimable - airdropAmounts[4]);
   }
 
-  function test_Call_ERC20Votes_Transfer() public {
-    vm.expectCall(address(token), abi.encodeCall(token.transfer, (airdropRecipients[4], airdropAmounts[4])));
+  function test_Call_Token_Mint() public {
+    vm.expectCall(address(token), abi.encodeCall(token.mint, (airdropRecipients[4], airdropAmounts[4])));
 
     tokenDistributor.claim(validEveProofs, airdropAmounts[4]);
   }
@@ -358,20 +366,12 @@ contract Unit_TokenDistributor_Claim is Base {
     vm.expectRevert(ITokenDistributor.TokenDistributor_ClaimInvalid.selector);
     tokenDistributor.claim(validEveProofs, 499_999);
   }
-
-  function testFail_ERC20Votes_Transfer(uint256 _amount) public authorized {
-    vm.assume(_amount > 0);
-    _mockERC20VotesTransferFail(airdropRecipients[4], _amount);
-
-    tokenDistributor.claim(validEveProofs, airdropAmounts[4]);
-  }
 }
 
 contract Unit_TokenDistributor_ClaimAndDelegate is Base {
   function setUp() public override {
     super.setUp();
     vm.warp(claimPeriodStart); // going ahead in time for claim period start
-    _mockERC20VotesTransfer(airdropRecipients[4], airdropAmounts[4]);
     vm.startPrank(airdropRecipients[4]);
   }
 
@@ -391,15 +391,15 @@ contract Unit_TokenDistributor_ClaimAndDelegate is Base {
     assertEq(tokenDistributor.totalClaimable(), totalClaimable - airdropAmounts[4]);
   }
 
-  function test_Call_ERC20Votes_Transfer(uint256 _nonce, uint256 _expiry, uint8 _v, bytes32 _r, bytes32 _s) public {
+  function test_Call_Token_Mint(uint256 _nonce, uint256 _expiry, uint8 _v, bytes32 _r, bytes32 _s) public {
     _mockERC20Nonces(airdropRecipients[4], _nonce);
     _mockERC20VotesDelegateBySig(delegatee, 0, _expiry, _v, _r, _s);
 
-    vm.expectCall(address(token), abi.encodeCall(token.transfer, (airdropRecipients[4], airdropAmounts[4])));
+    vm.expectCall(address(token), abi.encodeCall(token.mint, (airdropRecipients[4], airdropAmounts[4])));
     tokenDistributor.claimAndDelegate(validEveProofs, airdropAmounts[4], delegatee, _expiry, _v, _r, _s);
   }
 
-  function test_Call_ERC20Votes_DelegateBySig(uint256 _nonce, uint256 _expiry, uint8 _v, bytes32 _r, bytes32 _s) public {
+  function test_Call_Token_DelegateBySig(uint256 _nonce, uint256 _expiry, uint8 _v, bytes32 _r, bytes32 _s) public {
     _mockERC20Nonces(airdropRecipients[4], _nonce);
     vm.expectCall(address(token), abi.encodeCall(token.delegateBySig, (delegatee, _nonce, _expiry, _v, _r, _s)));
 
@@ -467,18 +467,12 @@ contract Unit_TokenDistributor_ClaimAndDelegate is Base {
     vm.expectRevert(ITokenDistributor.TokenDistributor_ClaimInvalid.selector);
     tokenDistributor.claimAndDelegate(validEveProofs, 499_999, delegatee, _expiry, _v, _r, _s);
   }
-
-  function testFail_ERC20Votes_Transfer(uint256 _expiry, uint8 _v, bytes32 _r, bytes32 _s) public authorized {
-    _mockERC20VotesTransferFail(airdropRecipients[4], airdropAmounts[4]);
-
-    tokenDistributor.claimAndDelegate(validEveProofs, airdropAmounts[4], delegatee, _expiry, _v, _r, _s);
-  }
 }
 
 contract Unit_TokenDistributor_Sweep is Base {
-  address sweepReceiver = label('sweepReceiver');
-
   event Swept(address _sweepReceiver, uint256 _amount);
+
+  address sweepReceiver = label('sweepReceiver');
 
   function setUp() public override {
     super.setUp();
@@ -486,36 +480,34 @@ contract Unit_TokenDistributor_Sweep is Base {
     vm.warp(claimPeriodEnd + 1);
   }
 
-  function test_Sweep_Call_ERC20Votes_BalanceOf(uint256 _balance) public authorized {
-    vm.assume(_balance > 0);
-    _mockERC20VotesBalanceOf(address(tokenDistributor), _balance);
-    _mockERC20VotesTransfer(sweepReceiver, _balance);
+  function test_Set_TotalClaimable(uint256 _totalClaimable) public authorized {
+    vm.assume(_totalClaimable > 0);
+    _mockTotalClaimable(_totalClaimable);
 
-    vm.expectCall(address(token), abi.encodeCall(token.balanceOf, (address(tokenDistributor))));
+    tokenDistributor.sweep(sweepReceiver);
+
+    assertEq(tokenDistributor.totalClaimable(), 0);
+  }
+
+  function test_Call_Token_Mint(uint256 _totalClaimable) public authorized {
+    vm.assume(_totalClaimable > 0);
+    _mockTotalClaimable(_totalClaimable);
+
+    vm.expectCall(address(token), abi.encodeCall(token.mint, (sweepReceiver, _totalClaimable)));
     tokenDistributor.sweep(sweepReceiver);
   }
 
-  function test_Sweep_Call_ERC20Votes_Transfer(uint256 _balance) public authorized {
-    vm.assume(_balance > 0);
-    _mockERC20VotesBalanceOf(address(tokenDistributor), _balance);
-    _mockERC20VotesTransfer(sweepReceiver, _balance);
-
-    vm.expectCall(address(token), abi.encodeCall(token.transfer, (sweepReceiver, _balance)));
-    tokenDistributor.sweep(sweepReceiver);
-  }
-
-  function test_Sweep_Emit_Swept(uint256 _balance) public authorized {
-    vm.assume(_balance > 0);
-    _mockERC20VotesBalanceOf(address(tokenDistributor), _balance);
-    _mockERC20VotesTransfer(sweepReceiver, _balance);
+  function test_Emit_Swept(uint256 _totalClaimable) public authorized {
+    vm.assume(_totalClaimable > 0);
+    _mockTotalClaimable(_totalClaimable);
 
     vm.expectEmit();
-    emit Swept(sweepReceiver, _balance);
+    emit Swept(sweepReceiver, _totalClaimable);
 
     tokenDistributor.sweep(sweepReceiver);
   }
 
-  function test_Revert_Sweep_Unauthorized() public {
+  function test_Revert_Unauthorized() public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
 
     tokenDistributor.sweep(sweepReceiver);
@@ -529,9 +521,10 @@ contract Unit_TokenDistributor_Sweep is Base {
     tokenDistributor.sweep(sweepReceiver);
   }
 
-  function test_Revert_ZeroBalance() public authorized {
-    _mockERC20VotesBalanceOf(address(tokenDistributor), 0);
-    vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterThan.selector, 0, 0));
+  function test_Revert_NullTotalClaimable() public authorized {
+    _mockTotalClaimable(0);
+
+    vm.expectRevert(Assertions.NullAmount.selector);
 
     tokenDistributor.sweep(sweepReceiver);
   }

@@ -321,13 +321,13 @@ contract Unit_LiquidationEngine_Constructor is Base {
   function test_Revert_Null_SafeEngine() public {
     vm.expectRevert(Assertions.NullAddress.selector);
 
-    new LiquidationEngine(address(0),  address(mockAccountingEngine), liquidationEngineParams);
+    new LiquidationEngine(address(0), address(mockAccountingEngine), liquidationEngineParams);
   }
 
   function test_Revert_Null_AccountingEngine() public {
     vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
 
-    new LiquidationEngine(address(mockSafeEngine),  address(0), liquidationEngineParams);
+    new LiquidationEngine(address(mockSafeEngine), address(0), liquidationEngineParams);
   }
 }
 
@@ -1327,8 +1327,9 @@ contract Unit_LiquidationEngine_LiquidateSafe is Base {
   {
     vm.assume(_liquidation.safeDebt < type(uint256).max);
 
-    ISAFESaviour _testSaveSaviour =
-    new SAFESaviourIncreaseGeneratedDebtOrDecreaseCollateral(_liquidation.safeCollateral, _liquidation.safeDebt, false, true);
+    ISAFESaviour _testSaveSaviour = new SAFESaviourIncreaseGeneratedDebtOrDecreaseCollateral(
+      _liquidation.safeCollateral, _liquidation.safeDebt, false, true
+    );
     _mockChosenSafeSaviour(collateralType, safe, address(_testSaveSaviour));
     _mockSafeSaviours(address(_testSaveSaviour), 1);
 
@@ -1344,8 +1345,9 @@ contract Unit_LiquidationEngine_LiquidateSafe is Base {
     happyPathFullLiquidation(_liquidation)
   {
     vm.assume(_liquidation.liquidationQuantity > _liquidation.liquidationPenalty);
-    ISAFESaviour _testSaveSaviour =
-    new SAFESaviourIncreaseGeneratedDebtOrDecreaseCollateral(_liquidation.safeCollateral, _liquidation.safeDebt, true, true);
+    ISAFESaviour _testSaveSaviour = new SAFESaviourIncreaseGeneratedDebtOrDecreaseCollateral(
+      _liquidation.safeCollateral, _liquidation.safeDebt, true, true
+    );
     _mockChosenSafeSaviour(collateralType, safe, address(_testSaveSaviour));
     _mockSafeSaviours(address(_testSaveSaviour), 1);
 
@@ -1360,8 +1362,9 @@ contract Unit_LiquidationEngine_LiquidateSafe is Base {
     public
     happyPathFullLiquidation(_liquidation)
   {
-    ISAFESaviour _testSaveSaviour =
-    new SAFESaviourCollateralTypeModifier(_liquidation.accumulatedRate, 0, _liquidation.safeCollateral, _liquidation.safeDebt);
+    ISAFESaviour _testSaveSaviour = new SAFESaviourCollateralTypeModifier(
+      _liquidation.accumulatedRate, 0, _liquidation.safeCollateral, _liquidation.safeDebt
+    );
     _mockChosenSafeSaviour(collateralType, safe, address(_testSaveSaviour));
     _mockSafeSaviours(address(_testSaveSaviour), 1);
 
@@ -1385,8 +1388,9 @@ contract Unit_LiquidationEngine_LiquidateSafe is Base {
       _newSafeCollateral * _initialLiquidation.liquidationPrice >= _newSafeDebt * _initialLiquidation.accumulatedRate
     );
 
-    ISAFESaviour _testSaveSaviour =
-    new SAFESaviourCollateralTypeModifier(_initialLiquidation.accumulatedRate, _initialLiquidation.liquidationPrice, _newSafeCollateral, _newSafeDebt);
+    ISAFESaviour _testSaveSaviour = new SAFESaviourCollateralTypeModifier(
+      _initialLiquidation.accumulatedRate, _initialLiquidation.liquidationPrice, _newSafeCollateral, _newSafeDebt
+    );
     _mockChosenSafeSaviour(collateralType, safe, address(_testSaveSaviour));
     _mockSafeSaviours(address(_testSaveSaviour), 1);
 

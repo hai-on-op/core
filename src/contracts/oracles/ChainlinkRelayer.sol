@@ -15,8 +15,8 @@ contract ChainlinkRelayer is IBaseOracle, IChainlinkRelayer {
 
   /// @inheritdoc IChainlinkRelayer
   IChainlinkOracle public priceFeed;
-  /// @inheritdoc IChainlinkRelayer
-  IChainlinkOracle public sequencerUptimeFeed;
+  /// @dev Internal storage variable to allow overrides in child implementation contract
+  IChainlinkOracle internal _sequencerUptimeFeed;
 
   // --- Data ---
 
@@ -32,19 +32,24 @@ contract ChainlinkRelayer is IBaseOracle, IChainlinkRelayer {
 
   /**
    * @param  _priceFeed The address of the Chainlink price feed
-   * @param  _sequencerUptimeFeed The address of the Chainlink sequencer uptime feed
+   * @param  __sequencerUptimeFeed The address of the Chainlink sequencer uptime feed
    * @param  _staleThreshold The threshold after which the price is considered stale
    */
-  constructor(address _priceFeed, address _sequencerUptimeFeed, uint256 _staleThreshold) {
+  constructor(address _priceFeed, address __sequencerUptimeFeed, uint256 _staleThreshold) {
     if (_priceFeed == address(0)) revert ChainlinkRelayer_NullPriceFeed();
     if (_staleThreshold == 0) revert ChainlinkRelayer_NullStaleThreshold();
 
-    _setSequencerUptimeFeed(_sequencerUptimeFeed);
+    _setSequencerUptimeFeed(__sequencerUptimeFeed);
     priceFeed = IChainlinkOracle(_priceFeed);
     staleThreshold = _staleThreshold;
 
     multiplier = 18 - priceFeed.decimals();
     symbol = priceFeed.description();
+  }
+
+  /// @inheritdoc IChainlinkRelayer
+  function sequencerUptimeFeed() public view virtual returns (IChainlinkOracle __sequencerUptimeFeed) {
+    return _sequencerUptimeFeed;
   }
 
   /// @inheritdoc IBaseOracle
@@ -79,7 +84,7 @@ contract ChainlinkRelayer is IBaseOracle, IChainlinkRelayer {
   /// @notice Checks if the feed is valid, considering the sequencer status, the staleThreshold and the feed timestamp
   function _isValidFeed(uint256 _feedTimestamp) internal view returns (bool _valid) {
     // Check the sequencer status
-    (, int256 _feedStatus,,,) = sequencerUptimeFeed.latestRoundData();
+    (, int256 _feedStatus,,,) = sequencerUptimeFeed().latestRoundData();
 
     // Status == 0: Sequencer is up
     // Status == 1: Sequencer is down
@@ -92,8 +97,8 @@ contract ChainlinkRelayer is IBaseOracle, IChainlinkRelayer {
   }
 
   /// @notice Sets the Chainlink sequencer uptime feed contract address
-  function _setSequencerUptimeFeed(address _sequencerUptimeFeed) internal virtual {
-    if (_sequencerUptimeFeed == address(0)) revert ChainlinkRelayer_NullSequencerUptimeFeed();
-    sequencerUptimeFeed = IChainlinkOracle(_sequencerUptimeFeed);
+  function _setSequencerUptimeFeed(address __sequencerUptimeFeed) internal virtual {
+    if (__sequencerUptimeFeed == address(0)) revert ChainlinkRelayer_NullSequencerUptimeFeed();
+    _sequencerUptimeFeed = IChainlinkOracle(__sequencerUptimeFeed);
   }
 }

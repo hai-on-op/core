@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 // --- Base Contracts ---
 import {SystemCoin, ISystemCoin} from '@contracts/tokens/SystemCoin.sol';
-import {ProtocolToken, IProtocolToken} from '@contracts/tokens/ProtocolToken.sol';
+import {ProtocolToken, IProtocolToken, ERC20Votes, Pausable} from '@contracts/tokens/ProtocolToken.sol';
 import {SAFEEngine, ISAFEEngine} from '@contracts/SAFEEngine.sol';
 import {TaxCollector, ITaxCollector} from '@contracts/TaxCollector.sol';
 import {AccountingEngine, IAccountingEngine} from '@contracts/AccountingEngine.sol';
@@ -78,6 +78,12 @@ import {HaiProxy} from '@contracts/proxies/HaiProxy.sol';
 import {HaiProxyFactory} from '@contracts/proxies/HaiProxyFactory.sol';
 import {HaiSafeManager} from '@contracts/proxies/HaiSafeManager.sol';
 
+// --- Governance Contracts ---
+import {TimelockController} from '@openzeppelin/contracts/governance/TimelockController.sol';
+import {HaiGovernor, IHaiGovernor} from '@contracts/governance/HaiGovernor.sol';
+import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {HaiDelegatee} from '@contracts/governance/HaiDelegatee.sol';
+
 /**
  * @title  Contracts
  * @notice This contract initializes all the contracts, so that they're inherited and available throughout scripts scopes.
@@ -85,7 +91,6 @@ import {HaiSafeManager} from '@contracts/proxies/HaiSafeManager.sol';
  */
 abstract contract Contracts {
   // --- Helpers ---
-  uint256 public chainId;
   address public deployer;
   address public governor;
   address public delegate;
@@ -148,4 +153,10 @@ abstract contract Contracts {
   PostSettlementSurplusBidActions public postSettlementSurplusBidActions;
   GlobalSettlementActions public globalSettlementActions;
   RewardedActions public rewardedActions;
+
+  // --- Governance contracts ---
+  TimelockController public timelock;
+  HaiGovernor public haiGovernor;
+  TokenDistributor public tokenDistributor;
+  HaiDelegatee public haiDelegatee;
 }

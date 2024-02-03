@@ -2,29 +2,27 @@
 pragma solidity 0.8.20;
 
 import {ITokenDistributor} from '@interfaces/tokens/ITokenDistributor.sol';
+import {IProtocolToken} from '@interfaces/tokens/IProtocolToken.sol';
+
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
+
 import {Assertions} from '@libraries/Assertions.sol';
-
-import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 import {MerkleProof} from '@openzeppelin/contracts/utils/cryptography/MerkleProof.sol';
-
-import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 /**
  * @title  TokenDistributor
  * @notice This contract allows users to claim tokens from a merkle tree proof
  */
 contract TokenDistributor is Authorizable, ITokenDistributor {
-  using SafeERC20 for ERC20Votes;
   using Assertions for address;
   using Assertions for uint256;
 
   // --- Data ---
 
   /// @inheritdoc ITokenDistributor
-  bytes32 public root;
+  IProtocolToken public token;
   /// @inheritdoc ITokenDistributor
-  ERC20Votes public token;
+  bytes32 public root;
   /// @inheritdoc ITokenDistributor
   uint256 public totalClaimable;
   /// @inheritdoc ITokenDistributor
@@ -35,24 +33,15 @@ contract TokenDistributor is Authorizable, ITokenDistributor {
   mapping(address _user => bool _hasClaimed) public claimed;
 
   /**
-   * @param  _root Bytes32 representation of the merkle root
    * @param  _token Address of the ERC20 token to be distributed
-   * @param  _totalClaimable Total amount of tokens to be distributed
-   * @param  _claimPeriodStart Timestamp when the claim period starts
-   * @param  _claimPeriodEnd Timestamp when the claim period ends
+   * @param  _tokenDistributorParams TokenDistributor valid parameters struct
    */
-  constructor(
-    bytes32 _root,
-    ERC20Votes _token,
-    uint256 _totalClaimable,
-    uint256 _claimPeriodStart,
-    uint256 _claimPeriodEnd
-  ) Authorizable(msg.sender) {
-    root = _root;
-    token = ERC20Votes(address(_token).assertNonNull());
-    totalClaimable = _totalClaimable.assertNonNull();
-    claimPeriodStart = _claimPeriodStart.assertGt(block.timestamp);
-    claimPeriodEnd = _claimPeriodEnd.assertGt(claimPeriodStart);
+  constructor(address _token, TokenDistributorParams memory _tokenDistributorParams) Authorizable(msg.sender) {
+    token = IProtocolToken(_token.assertHasCode());
+    root = _tokenDistributorParams.root;
+    totalClaimable = _tokenDistributorParams.totalClaimable.assertNonNull();
+    claimPeriodStart = _tokenDistributorParams.claimPeriodStart.assertGt(block.timestamp);
+    claimPeriodEnd = _tokenDistributorParams.claimPeriodEnd.assertGt(claimPeriodStart);
   }
 
   /// @inheritdoc ITokenDistributor
@@ -82,11 +71,13 @@ contract TokenDistributor is Authorizable, ITokenDistributor {
   /// @inheritdoc ITokenDistributor
   function sweep(address _sweepReceiver) external override isAuthorized {
     if (block.timestamp <= claimPeriodEnd) revert TokenDistributor_ClaimPeriodNotEnded();
-    uint256 _balance = token.balanceOf(address(this)).assertGt(0);
 
-    token.safeTransfer(_sweepReceiver, _balance);
+    uint256 _totalClaimable = totalClaimable.assertNonNull();
+    delete totalClaimable;
 
-    emit Swept({_sweepReceiver: _sweepReceiver, _amount: _balance});
+    token.mint(_sweepReceiver, _totalClaimable);
+
+    emit Swept({_sweepReceiver: _sweepReceiver, _amount: _totalClaimable});
   }
 
   function _canClaim(bytes32[] calldata _proof, address _user, uint256 _amount) internal view returns (bool _claimable) {
@@ -104,7 +95,7 @@ contract TokenDistributor is Authorizable, ITokenDistributor {
     claimed[msg.sender] = true;
     totalClaimable -= _amount;
 
-    token.safeTransfer(msg.sender, _amount);
+    token.mint(msg.sender, _amount);
 
     emit Claimed({_user: msg.sender, _amount: _amount});
   }

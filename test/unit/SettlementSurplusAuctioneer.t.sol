@@ -34,7 +34,6 @@ abstract contract Base is HaiTest {
 
     settlementSurplusAuctioneer =
       new SettlementSurplusAuctioneer(address(mockAccountingEngine), address(mockSurplusAuctionHouse));
-    label(address(settlementSurplusAuctioneer), 'SettlementSurplusAuctioneer');
 
     settlementSurplusAuctioneer.addAuthorization(authorizedAccount);
 
