@@ -201,7 +201,7 @@ abstract contract MainnetParams is Contracts, Params {
     });
 
     _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
-      root: 0xb4aeceac8acbbff788e3f6b109f48335d7cae2d8c492ddb81a2de2912ed761f3,
+      root: 0xfb2ccf2133c19008b5bb590df11d243c8bf4ad5c9a8210d86f7f1f78ee46d634,
       totalClaimable: 1_000_000 * WAD, // 1M HAI
       claimPeriodStart: 1_707_782_400, // 13/2/2024 (GMT+0)
       claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT+0) - 1s
