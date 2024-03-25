@@ -13,6 +13,7 @@ import {
 } from '@script/Contracts.s.sol';
 import {IWeth} from '@interfaces/external/IWeth.sol';
 import {OP_WETH} from '@script/Registry.s.sol';
+import {RAY} from '@libraries/Math.sol';
 import {BaseUser} from '@test/scopes/BaseUser.t.sol';
 
 abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
@@ -42,6 +43,26 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
 
   // --- SAFE actions ---
 
+  function _joinCoins(address _user, uint256 _amount) internal override {
+    vm.startPrank(_user);
+    systemCoin.approve(address(coinJoin), _amount);
+    coinJoin.join(_user, _amount);
+    vm.stopPrank();
+  }
+
+  function _exitCoins(address _user, uint256 _amount) internal override {
+    vm.startPrank(_user);
+    safeEngine.approveSAFEModification(address(coinJoin));
+    coinJoin.exit(_user, _amount / RAY);
+    vm.stopPrank();
+  }
+
+  function _exitAllCoins(address _user) internal override {
+    uint256 _systemCoinInternalBalance = safeEngine.coinBalance(_user);
+
+    _exitCoins(_user, _systemCoinInternalBalance);
+  }
+
   function _joinTKN(address _user, address _collateralJoin, uint256 _amount) internal override {
     IERC20Metadata _collateral = ICollateralJoin(_collateralJoin).collateral();
     uint256 _decimals = _collateral.decimals();
@@ -66,20 +87,6 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
 
     vm.prank(_user);
     ICollateralJoin(_collateralJoin).exit(_user, _wei);
-  }
-
-  function _joinCoins(address _user, uint256 _amount) internal override {
-    vm.startPrank(_user);
-    systemCoin.approve(address(coinJoin), _amount);
-    coinJoin.join(_user, _amount);
-    vm.stopPrank();
-  }
-
-  function _exitCoin(address _user, uint256 _amount) internal override {
-    vm.startPrank(_user);
-    safeEngine.approveSAFEModification(address(coinJoin));
-    coinJoin.exit(_user, _amount);
-    vm.stopPrank();
   }
 
   function _liquidateSAFE(bytes32 _cType, address _user) internal override {
@@ -110,7 +117,7 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
     vm.stopPrank();
 
     // already pranked call
-    _exitCoin(_user, uint256(_deltaDebt));
+    _exitCoins(_user, uint256(_deltaDebt) * RAY);
   }
 
   function _repayDebtAndExit(
@@ -139,6 +146,10 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
     _exitCollateral(_user, _collateralJoin, _deltaCollat);
   }
 
+  function _collectTokenCollateral(address _user, address _collateralJoin, uint256 _amount) internal override {
+    _exitCollateral(_user, _collateralJoin, _amount);
+  }
+
   // --- Bidding actions ---
 
   function _buyCollateral(
@@ -148,16 +159,17 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
     uint256 _soldAmount,
     uint256 _amountToBid
   ) internal override {
+    // join coins
+    _joinCoins(_user, _amountToBid);
+
     vm.startPrank(_user);
     safeEngine.approveSAFEModification(_collateralAuctionHouse);
     ICollateralAuctionHouse(_collateralAuctionHouse).buyCollateral(_auctionId, _amountToBid);
+    vm.stopPrank();
 
     // exit collateral
     bytes32 _cType = ICollateralAuctionHouse(_collateralAuctionHouse).collateralType();
-    uint256 _decimals = ICollateralJoin(collateralJoin[_cType]).decimals();
-    uint256 _collateralWei = _soldAmount / 10 ** (18 - _decimals);
-    ICollateralJoin(collateralJoin[_cType]).exit(_user, _collateralWei);
-    vm.stopPrank();
+    _exitCollateral(_user, address(collateralJoin[_cType]), _soldAmount);
   }
 
   function _buyProtocolToken(
@@ -167,8 +179,8 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
     uint256 _amountToBid
   ) internal override {
     vm.startPrank(_user);
-    systemCoin.approve(address(coinJoin), _amountToBid / 1e27);
-    coinJoin.join(_user, _amountToBid / 1e27);
+    systemCoin.approve(address(coinJoin), _amountToBid);
+    coinJoin.join(_user, _amountToBid);
     safeEngine.approveSAFEModification(address(debtAuctionHouse));
     debtAuctionHouse.decreaseSoldAmount(_auctionId, _amountToBuy);
     vm.stopPrank();
@@ -188,13 +200,7 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
   function _settleSurplusAuction(address _user, uint256 _auctionId) internal override {
     surplusAuctionHouse.settleAuction(_auctionId);
 
-    _collectSystemCoins(_user);
-  }
-
-  function _collectSystemCoins(address _user) internal override {
-    uint256 _systemCoinInternalBalance = safeEngine.coinBalance(_user);
-
-    _exitCoin(_user, _systemCoinInternalBalance / 1e27);
+    _exitAllCoins(_user);
   }
 
   // --- Global Settlement actions ---
@@ -222,7 +228,7 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
   }
 
   function _prepareCoinsForRedeeming(address _user, uint256 _amount) internal override {
-    uint256 _internalCoins = safeEngine.coinBalance(_user) / 1e27;
+    uint256 _internalCoins = safeEngine.coinBalance(_user) / RAY;
     uint256 _coinsToJoin = _internalCoins >= _amount ? 0 : _amount - _internalCoins;
 
     _joinCoins(_user, _coinsToJoin); // has prank
@@ -250,48 +256,48 @@ abstract contract DirectUser is BaseUser, Contracts, ScriptBase {
     vm.prank(_user);
     accountingJob.workPopDebtFromQueue(_debtBlockTimestamp);
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workAuctionDebt(address _user) internal override {
     vm.prank(_user);
     accountingJob.workAuctionDebt();
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workAuctionSurplus(address _user) internal override {
     vm.prank(_user);
     accountingJob.workAuctionSurplus();
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workTransferExtraSurplus(address _user) internal override {
     vm.prank(_user);
     accountingJob.workTransferExtraSurplus();
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workLiquidation(address _user, bytes32 _cType, address _safe) internal override {
     vm.prank(_user);
     liquidationJob.workLiquidation(_cType, _safe);
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workUpdateCollateralPrice(address _user, bytes32 _cType) internal override {
     vm.prank(_user);
     oracleJob.workUpdateCollateralPrice(_cType);
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 
   function _workUpdateRate(address _user) internal override {
     vm.prank(_user);
     oracleJob.workUpdateRate();
 
-    _collectSystemCoins(_user);
+    _exitAllCoins(_user);
   }
 }
