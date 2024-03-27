@@ -20,7 +20,7 @@ abstract contract TestnetParams is Contracts, Params {
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
       surplusIsTransferred: 0, // surplus is auctioned
       surplusDelay: 1 days,
-      popDebtDelay: 14 days,
+      popDebtDelay: 30 minutes,
       disableCooldown: 3 days,
       surplusAmount: 42_000 * RAD, // 42k HAI
       surplusBuffer: 100_000 * RAD, // 100k HAI

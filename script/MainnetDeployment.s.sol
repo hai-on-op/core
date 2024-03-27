@@ -7,7 +7,7 @@ import {OP_WETH, OP_WSTETH, OP_OPTIMISM} from '@script/Registry.s.sol';
 
 abstract contract MainnetDeployment is Contracts, MainnetParams {
   // NOTE: The last significant change in the Mainnet deployment, to be used in the test scenarios
-  uint256 constant MAINNET_DEPLOYMENT_BLOCK = 116_055_151;
+  uint256 constant MAINNET_DEPLOYMENT_BLOCK = 117_961_164;
 
   /**
    * @notice All the addresses that were deployed in the Mainnet deployment, in order of creation
@@ -73,7 +73,7 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     proxyFactory = HaiProxyFactory(0xBAfbCDbFbB1569722253ED4D491D2fB3b5E03a27);
     safeManager = HaiSafeManager(0xB0FF82D8322f6Fa9C28Ec46eF0A5C343e95106C3);
 
-    basicActions = BasicActions(0xd36b1bD5445374Ceb7Fe4148a719584234Da7Bb0);
+    basicActions = BasicActions(0x7Bd5fBa59E6FF3ad5c6937CdD83f5cAf7aA49669);
     debtBidActions = DebtBidActions(0xFC55B886a2619bd8645549f7Cb672872479F8117);
     surplusBidActions = SurplusBidActions(0x632229A0A849bde3A1f1200cF23118b33A925cEc);
     collateralBidActions = CollateralBidActions(0xbFAc170711DFE2043f47b34F118E9FCDA8FC694D);
