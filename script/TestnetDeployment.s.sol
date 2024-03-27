@@ -7,7 +7,7 @@ import {OP_WETH, OP_OPTIMISM} from '@script/Registry.s.sol';
 
 abstract contract TestnetDeployment is Contracts, TestnetParams {
   // NOTE: The last significant change in the Testnet deployment, to be used in the test scenarios
-  uint256 constant SEPOLIA_DEPLOYMENT_BLOCK = 7_069_219;
+  uint256 constant SEPOLIA_DEPLOYMENT_BLOCK = 9_855_276;
 
   /**
    * @notice All the addresses that were deployed in the Testnet deployment, in order of creation
@@ -83,7 +83,7 @@ abstract contract TestnetDeployment is Contracts, TestnetParams {
     proxyFactory = HaiProxyFactory(0xc7EfEa8899fe64fC281a6f4DAC4BEF71F62bb3D5);
     safeManager = HaiSafeManager(0xaCfBe6A0321963c4F225142E5066dE520d57e7FF);
 
-    basicActions = BasicActions(0x67f4Bdf7c395843a0f04FB82e88bf52CAB83A6A4);
+    basicActions = BasicActions(0x8131Cf71e652F783D6f7393435F68FC095044E78);
     debtBidActions = DebtBidActions(0xec1B7a4f80EfD8fB00B806Db5d2e7d1715A4D3Db);
     surplusBidActions = SurplusBidActions(0x6DaF29f356B597453b7B14e3e1E27787e732DBB2);
     collateralBidActions = CollateralBidActions(0x03E559F5E319251dd64c90505faF076230B389ce);
