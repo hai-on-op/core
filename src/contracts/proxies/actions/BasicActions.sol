@@ -110,7 +110,7 @@ contract BasicActions is CommonActions, IBasicActions {
       _getGeneratedDeltaDebt(_safeEngine, _safeInfo.collateralType, _safeInfo.safeHandler, _deltaWad)
     );
 
-    // Moves the COIN amount to user's address
+    // Transfers COIN amount to the user's address
     _collectAndExitCoins(_manager, _coinJoin, _safeId, _deltaWad);
   }
 
@@ -191,7 +191,7 @@ contract BasicActions is CommonActions, IBasicActions {
       _getGeneratedDeltaDebt(_safeEngine, _safeInfo.collateralType, _safeInfo.safeHandler, _deltaWad)
     );
 
-    // Exits and transfers COIN amount to the user's address
+    // Transfers COIN amount to the user's address
     _collectAndExitCoins(_manager, _coinJoin, _safeId, _deltaWad);
   }
 
@@ -201,7 +201,7 @@ contract BasicActions is CommonActions, IBasicActions {
   function _collectAndExitCoins(address _manager, address _coinJoin, uint256 _safeId, uint256 _deltaWad) internal {
     // Moves the COIN amount to proxy's address
     _transferInternalCoins(_manager, _safeId, address(this), _deltaWad * RAY);
-    // Exits the COIN amount to the user's address
+    // Exits the COIN amount to user's address
     _exitSystemCoins(_coinJoin, _deltaWad * RAY);
   }
 
@@ -397,5 +397,16 @@ contract BasicActions is CommonActions, IBasicActions {
 
     // Transfers token amount to the user's address
     _collectAndExitCollateral(_manager, _collateralJoin, _safeId, _collateralWad);
+  }
+
+  /// @inheritdoc IBasicActions
+  function collectTokenCollateral(
+    address _manager,
+    address _collateralJoin,
+    uint256 _safeId,
+    uint256 _deltaWad
+  ) external onlyDelegateCall {
+    // Transfers token amount to the user's address
+    _collectAndExitCollateral(_manager, _collateralJoin, _safeId, _deltaWad);
   }
 }

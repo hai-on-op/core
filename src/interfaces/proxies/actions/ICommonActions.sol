@@ -20,7 +20,7 @@ interface ICommonActions {
   /**
    * @notice Exits system coins from the safeEngine
    * @param  _coinJoin Address of the CoinJoin contract
-   * @param  _coinsToExit Amount of coins to exit [wad]
+   * @param  _coinsToExit Amount of coins to exit [rad]
    */
   function exitSystemCoins(address _coinJoin, uint256 _coinsToExit) external;
 
