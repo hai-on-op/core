@@ -16,11 +16,17 @@ contract MerkleDistributorChild is MerkleDistributor, FactoryChild, IMerkleDistr
 
   /**
    *
-   * @param  _token Address of the ERC20 token to be distributed
-   * @param  _merkleDistributorParams MerkleDistributor valid parameters struct
+   * @param _token Address of the ERC20 token to be distributed
+   * @param _root Bytes32 representation of the merkle root
+   * @param _totalClaimable Total amount of tokens to be distributed
+   * @param _claimPeriodStart Timestamp when the claim period starts
+   * @param _claimPeriodEnd Timestamp when the claim period ends
    */
   constructor(
     address _token,
-    MerkleDistributorParams memory _merkleDistributorParams
-  ) MerkleDistributor(_token, _merkleDistributorParams) {}
+    bytes32 _root,
+    uint256 _totalClaimable,
+    uint256 _claimPeriodStart,
+    uint256 _claimPeriodEnd
+  ) MerkleDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {}
 }

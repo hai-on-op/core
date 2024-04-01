@@ -22,16 +22,14 @@ contract MerkleDistributorFactory is Authorizable, IMerkleDistributorFactory {
   /// @inheritdoc IMerkleDistributorFactory
   function deployMerkleDistributor(
     address _token,
-    IMerkleDistributor.MerkleDistributorParams memory _merkleDistributorParams
+    bytes32 _root,
+    uint256 _totalClaimable,
+    uint256 _claimPeriodStart,
+    uint256 _claimPeriodEnd
   ) external isAuthorized returns (IMerkleDistributor _merkleDistributor) {
-    _merkleDistributor = new MerkleDistributorChild(_token, _merkleDistributorParams);
+    _merkleDistributor = new MerkleDistributorChild(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd);
     emit DeployMerkleDistributor(
-      address(_merkleDistributor),
-      _token,
-      _merkleDistributorParams.root,
-      _merkleDistributorParams.totalClaimable,
-      _merkleDistributorParams.claimPeriodStart,
-      _merkleDistributorParams.claimPeriodEnd
+      address(_merkleDistributor), _token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd
     );
   }
 }

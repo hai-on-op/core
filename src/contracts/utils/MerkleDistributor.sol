@@ -35,15 +35,24 @@ contract MerkleDistributor is Authorizable, IMerkleDistributor {
   // --- Init ---
 
   /**
-   * @param  _token Address of the ERC20 token to be distributed
-   * @param  _merkleDistributorParams MerkleDistributor valid parameters struct
+   * @param _token Address of the ERC20 token to be distributed
+   * @param _root Bytes32 representation of the merkle root
+   * @param _totalClaimable Total amount of tokens to be distributed
+   * @param _claimPeriodStart Timestamp when the claim period starts
+   * @param _claimPeriodEnd Timestamp when the claim period ends
    */
-  constructor(address _token, MerkleDistributorParams memory _merkleDistributorParams) Authorizable(msg.sender) {
+  constructor(
+    address _token,
+    bytes32 _root,
+    uint256 _totalClaimable,
+    uint256 _claimPeriodStart,
+    uint256 _claimPeriodEnd
+  ) Authorizable(msg.sender) {
     token = _token.assertHasCode();
-    root = _merkleDistributorParams.root;
-    totalClaimable = _merkleDistributorParams.totalClaimable.assertNonNull();
-    claimPeriodStart = _merkleDistributorParams.claimPeriodStart.assertGt(block.timestamp);
-    claimPeriodEnd = _merkleDistributorParams.claimPeriodEnd.assertGt(claimPeriodStart);
+    root = _root;
+    totalClaimable = _totalClaimable.assertNonNull();
+    claimPeriodStart = _claimPeriodStart.assertGt(block.timestamp);
+    claimPeriodEnd = _claimPeriodEnd.assertGt(claimPeriodStart);
   }
 
   /// @inheritdoc IMerkleDistributor

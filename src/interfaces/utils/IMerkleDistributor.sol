@@ -27,19 +27,6 @@ interface IMerkleDistributor is IAuthorizable {
   /// @notice Throws when trying to claim but the claim is not valid
   error MerkleDistributor_ClaimInvalid();
 
-  // --- Structs ---
-
-  struct MerkleDistributorParams {
-    // Bytes32 representation of the merkle root
-    bytes32 /*      */ root;
-    // Total amount of tokens to be distributed
-    uint256 /*  WAD */ totalClaimable;
-    // Timestamp when the claim period starts
-    uint256 /* UNIX */ claimPeriodStart;
-    // Timestamp when the claim period ends
-    uint256 /* UNIX */ claimPeriodEnd;
-  }
-
   // --- Data ---
 
   /// @notice Address of the ERC20 token to be distributed

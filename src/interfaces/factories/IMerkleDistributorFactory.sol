@@ -31,11 +31,17 @@ interface IMerkleDistributorFactory is IAuthorizable {
   /**
    * @notice Deploys a MerkleDistributorChild contract
    * @param  _token Address of the ERC20 token to be distributed
-   * @param  _merkleDistributorParams MerkleDistributor valid parameters struct
+   * @param  _root Bytes32 representation of the merkle root
+   * @param  _totalClaimable Total amount of tokens to be distributed
+   * @param  _claimPeriodStart Timestamp when the claim period starts
+   * @param  _claimPeriodEnd Timestamp when the claim period ends* @param  _merkleDistributorParams MerkleDistributor valid parameters struct
    * @return _merkleDistributor Address of the deployed MerkleDistributorChild contract
    */
   function deployMerkleDistributor(
     address _token,
-    IMerkleDistributor.MerkleDistributorParams memory _merkleDistributorParams
+    bytes32 _root,
+    uint256 _totalClaimable,
+    uint256 _claimPeriodStart,
+    uint256 _claimPeriodEnd
   ) external returns (IMerkleDistributor _merkleDistributor);
 }
