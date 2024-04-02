@@ -108,19 +108,11 @@ contract Unit_MerkleDistributor_Constructor is Base {
     assertEq(merkleDistributor.claimPeriodEnd(), claimPeriodEnd);
   }
 
-  // function test_Revert_Token_NoCode() public {
-  //     vm.expectRevert(
-  //         abi.encodeWithSelector(Assertions.NoCode.selector, address(0))
-  //     );
+  function test_Revert_Token_NoCode() public {
+    vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
 
-  //     new MerkleDistributor(
-  //         address(0),
-  //         merkleRoot,
-  //         totalClaimable,
-  //         claimPeriodStart,
-  //         claimPeriodEnd
-  //     );
-  // }
+    new MerkleDistributor(address(0), merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd);
+  }
 
   function test_Revert_TotalClaimable_IsNull() public {
     vm.expectRevert(Assertions.NullAmount.selector);

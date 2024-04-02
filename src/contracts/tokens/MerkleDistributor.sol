@@ -48,9 +48,7 @@ contract MerkleDistributor is Authorizable, IMerkleDistributor {
     uint256 _claimPeriodStart,
     uint256 _claimPeriodEnd
   ) Authorizable(msg.sender) {
-    // TODO: fix assertion
-    // token = IERC20(_token.assertHasCode());
-    token = _token;
+    token = _token.assertHasCode();
     root = _root;
     totalClaimable = _totalClaimable.assertNonNull();
     claimPeriodStart = _claimPeriodStart.assertGt(block.timestamp);
