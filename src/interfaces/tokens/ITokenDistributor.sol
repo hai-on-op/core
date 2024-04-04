@@ -42,8 +42,6 @@ interface ITokenDistributor is IAuthorizable {
     uint256 /* UNIX */ claimPeriodEnd;
   }
 
-  /// @notice Address of the ERC20 token to be distributed
-  function token() external view returns (IProtocolToken _token);
   /// @notice The merkle root of the token distribution
   function root() external view returns (bytes32 _root);
   /// @notice Total amount of tokens to be distributed
@@ -68,26 +66,6 @@ interface ITokenDistributor is IAuthorizable {
    * @param  _amount Amount of tokens to claim
    */
   function claim(bytes32[] calldata _proof, uint256 _amount) external;
-
-  /**
-   * @notice Claims tokens from the distributor and delegates them using a signature
-   * @param  _proof Array of bytes32 merkle proof hashes
-   * @param  _amount Amount of tokens to claim
-   * @param  _delegatee Address to delegate the token votes to
-   * @param  _expiry Expiration timestamp of the signature
-   * @param  _v Recovery byte of the signature
-   * @param  _r ECDSA signature r value
-   * @param  _s ECDSA signature s value
-   */
-  function claimAndDelegate(
-    bytes32[] calldata _proof,
-    uint256 _amount,
-    address _delegatee,
-    uint256 _expiry,
-    uint8 _v,
-    bytes32 _r,
-    bytes32 _s
-  ) external;
 
   /**
    * @notice Mapping containing the users that have already claimed

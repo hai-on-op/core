@@ -208,7 +208,13 @@ abstract contract Common is Contracts, Params {
     // if token distributor params are not empty, deploy token distributor
     if (keccak256(abi.encode(_tokenDistributorParams)) != keccak256(abi.encode(_emptyTokenDistributorParams))) {
       // Deploy aidrop distributor contract
-      tokenDistributor = new TokenDistributor(address(protocolToken), _tokenDistributorParams);
+      tokenDistributor = new TokenDistributorMinter(
+        address(protocolToken),
+        _tokenDistributorParams.root,
+        _tokenDistributorParams.totalClaimable,
+        _tokenDistributorParams.claimPeriodStart,
+        _tokenDistributorParams.claimPeriodEnd
+      );
 
       // auth
       protocolToken.addAuthorization(address(tokenDistributor)); // mint
@@ -266,7 +272,7 @@ abstract contract Common is Contracts, Params {
     _contract.addAuthorization(_delegate);
   }
 
-  function _toAllAuthorizableContracts(function (IAuthorizable, address) internal _function, address _target) internal {
+  function _toAllAuthorizableContracts(function(IAuthorizable, address) internal _function, address _target) internal {
     // base contracts
     _function(safeEngine, _target);
     _function(liquidationEngine, _target);
@@ -294,8 +300,12 @@ abstract contract Common is Contracts, Params {
 
     // factories or children
     // NOTE: not deployable on Sepolia testnet
-    if (address(chainlinkRelayerFactory) != address(0)) _function(chainlinkRelayerFactory, _target);
-    if (address(uniV3RelayerFactory) != address(0)) _function(uniV3RelayerFactory, _target);
+    if (address(chainlinkRelayerFactory) != address(0)) {
+      _function(chainlinkRelayerFactory, _target);
+    }
+    if (address(uniV3RelayerFactory) != address(0)) {
+      _function(uniV3RelayerFactory, _target);
+    }
     _function(denominatedOracleFactory, _target);
     _function(delayedOracleFactory, _target);
 
@@ -313,7 +323,9 @@ abstract contract Common is Contracts, Params {
     _function(oracleJob, _target);
 
     // token distributor
-    if (address(tokenDistributor) != address(0)) _function(tokenDistributor, _target);
+    if (address(tokenDistributor) != address(0)) {
+      _function(tokenDistributor, _target);
+    }
   }
 
   modifier updateParams() {

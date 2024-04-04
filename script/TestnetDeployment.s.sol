@@ -104,7 +104,7 @@ abstract contract TestnetDeployment is Contracts, TestnetParams {
     timelock = TimelockController(payable(0x5bc1c8783b729eaCeEBfe01C220A12A8Dd704C15));
     haiDelegatee = HaiDelegatee(0x6bcccebe4c1C7E7DDB30a6a1415553d008555c5a);
 
-    tokenDistributor = TokenDistributor(0xd582Cb7e38503D584E7872B18B5451AbcA2527Ac);
+    tokenDistributor = TokenDistributorMinter(0xd582Cb7e38503D584E7872B18B5451AbcA2527Ac);
 
     // --- utils ---
     governor = address(timelock);

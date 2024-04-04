@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistributor.sol';
+import {TokenDistributorMinter, ITokenDistributorMinter} from '@contracts/tokens/TokenDistributorMinter.sol';
 import {ProtocolToken} from '@contracts/tokens/ProtocolToken.sol';
 import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
@@ -13,7 +13,7 @@ abstract contract Hevm {
 contract SingleTokenDistributorTest is HaiTest {
   Hevm hevm;
 
-  TokenDistributor tokenDistributor;
+  TokenDistributorMinter tokenDistributor;
   ProtocolToken token;
   MerkleTreeGenerator merkleTreeGenerator;
   bytes32[] merkleTree;
@@ -59,10 +59,8 @@ contract SingleTokenDistributorTest is HaiTest {
 
     token = new ProtocolToken('', '');
 
-    tokenDistributor = new TokenDistributor(
-      address(token),
-      ITokenDistributor.TokenDistributorParams(merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd)
-    );
+    tokenDistributor =
+      new TokenDistributorMinter(address(token), merkleRoot, totalClaimable, claimPeriodStart, claimPeriodEnd);
 
     token.addAuthorization(address(tokenDistributor));
 
