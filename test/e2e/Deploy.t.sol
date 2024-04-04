@@ -426,7 +426,7 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
 
   // TokenDistributor
   function test_TokenDistributor_Bytecode() public {
-    assertEq(address(tokenDistributor).code, type(TokenDistributor).runtimeCode);
+    assertEq(address(tokenDistributor).code, type(TokenDistributorMinter).runtimeCode);
   }
 
   function test_TokenDistributor_Params() public {

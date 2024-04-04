@@ -1,17 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {IMerkleDistributorChild} from '@interfaces/factories/IMerkleDistributorChild.sol';
-
-import {MerkleDistributor} from '@contracts/tokens/MerkleDistributor.sol';
-
+import {ITokenDistributorMinterChild} from '@interfaces/factories/ITokenDistributorMinterChild.sol';
+import {TokenDistributorMinter} from '@contracts/tokens/TokenDistributorMinter.sol';
 import {FactoryChild} from '@contracts/factories/FactoryChild.sol';
 
 /**
- * @title  MerkleDistributorChild
- * @notice This contract inherits all the functionality of MerkleDistributor to be factory deployed
+ * @title  TokenDistributorMinterChild
+ * @notice This contract inherits all the functionality of TokenDistributorMinter to be factory deployed
  */
-contract MerkleDistributorChild is MerkleDistributor, FactoryChild, IMerkleDistributorChild {
+contract TokenDistributorMinterChild is TokenDistributorMinter, FactoryChild, ITokenDistributorMinterChild {
   // --- Init ---
 
   /**
@@ -28,5 +26,5 @@ contract MerkleDistributorChild is MerkleDistributor, FactoryChild, IMerkleDistr
     uint256 _totalClaimable,
     uint256 _claimPeriodStart,
     uint256 _claimPeriodEnd
-  ) MerkleDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {}
+  ) TokenDistributorMinter(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {}
 }
