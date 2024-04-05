@@ -37,8 +37,6 @@ contract TokenDistributorTransfer is TokenDistributor /*, ITokenDistributorTrans
   // NOTE: is already authorized in super.sweep
   function sweep(address _sweepReceiver) public override /* isAuthorized */ {
     totalClaimable = IERC20(token).balanceOf(address(this));
-    IERC20(token).transfer(_sweepReceiver, totalClaimable);
-
     super.sweep(_sweepReceiver);
   }
 
