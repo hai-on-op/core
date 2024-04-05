@@ -8,14 +8,13 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 import {Assertions} from '@libraries/Assertions.sol';
 
-contract TokenDistributorTransfer is TokenDistributor, ITokenDistributorTransfer {
+contract TokenDistributorTransfer is TokenDistributor /*, ITokenDistributorTransfer */ {
   using Assertions for address;
   using Assertions for uint256;
 
   // --- Data ---
 
   /// @inheritdoc ITokenDistributorTransfer
-  IERC20 public token;
 
   // --- Init ---
 
@@ -32,42 +31,18 @@ contract TokenDistributorTransfer is TokenDistributor, ITokenDistributorTransfer
     uint256 _totalClaimable,
     uint256 _claimPeriodStart,
     uint256 _claimPeriodEnd
-  ) TokenDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {
-    token = IERC20(_token.assertHasCode());
-  }
+  ) TokenDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {}
 
   /// @inheritdoc ITokenDistributor
-  function sweep(address _sweepReceiver) external override isAuthorized {
-    if (block.timestamp <= claimPeriodEnd) {
-      revert TokenDistributor_ClaimPeriodNotEnded();
-    }
+  // NOTE: is already authorized in super.sweep
+  function sweep(address _sweepReceiver) public override /* isAuthorized */ {
+    totalClaimable = IERC20(token).balanceOf(address(this));
+    IERC20(token).transfer(_sweepReceiver, totalClaimable);
 
-    uint256 _totalClaimable = totalClaimable.assertNonNull();
-    delete totalClaimable;
-
-    // IERC20(token).transfer(_sweepReceiver, IERC20(token).balanceOf(address(this)));
-    token.transfer(_sweepReceiver, token.balanceOf(address(this)));
-    // token.transfer(_sweepReceiver, _totalClaimable);
-
-    emit Swept({_sweepReceiver: _sweepReceiver, _amount: _totalClaimable});
+    super.sweep(_sweepReceiver);
   }
 
-  /// @inheritdoc ITokenDistributor
-  function claim(bytes32[] calldata _proof, uint256 _amount) external {
-    _claim(_proof, _amount);
-  }
-
-  function _claim(bytes32[] calldata _proof, uint256 _amount) internal {
-    if (!_canClaim(_proof, msg.sender, _amount)) {
-      revert TokenDistributor_ClaimInvalid();
-    }
-
-    claimed[msg.sender] = true;
-    totalClaimable -= _amount;
-
-    // IERC20(token).transfer(msg.sender, _amount);
-    token.transfer(msg.sender, _amount);
-
-    emit Claimed({_user: msg.sender, _amount: _amount});
+  function _distribute(address _user, uint256 _amount) internal override {
+    IERC20(token).transfer(_user, _amount);
   }
 }

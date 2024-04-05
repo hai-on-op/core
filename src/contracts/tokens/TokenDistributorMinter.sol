@@ -8,14 +8,11 @@ import {TokenDistributor, ITokenDistributor} from '@contracts/tokens/TokenDistri
 
 import {Assertions} from '@libraries/Assertions.sol';
 
-contract TokenDistributorMinter is TokenDistributor, ITokenDistributorMinter {
+contract TokenDistributorMinter is TokenDistributor /*, ITokenDistributorMinter */ {
   using Assertions for address;
   using Assertions for uint256;
 
   // --- Data ---
-
-  /// @inheritdoc ITokenDistributorMinter
-  IProtocolToken public token;
 
   // --- Init ---
   /**
@@ -31,11 +28,9 @@ contract TokenDistributorMinter is TokenDistributor, ITokenDistributorMinter {
     uint256 _totalClaimable,
     uint256 _claimPeriodStart,
     uint256 _claimPeriodEnd
-  ) TokenDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {
-    token = IProtocolToken(_token.assertHasCode());
-  }
+  ) TokenDistributor(_token, _root, _totalClaimable, _claimPeriodStart, _claimPeriodEnd) {}
 
-  /// @inheritdoc ITokenDistributorMinter
+  ///// @inheritdoc ITokenDistributorMinter
   function claimAndDelegate(
     bytes32[] calldata _proof,
     uint256 _amount,
@@ -46,38 +41,10 @@ contract TokenDistributorMinter is TokenDistributor, ITokenDistributorMinter {
     bytes32 _s
   ) external {
     _claim(_proof, _amount);
-    token.delegateBySig(_delegatee, token.nonces(msg.sender), _expiry, _v, _r, _s);
+    IProtocolToken(token).delegateBySig(_delegatee, IProtocolToken(token).nonces(msg.sender), _expiry, _v, _r, _s);
   }
 
-  /// @inheritdoc ITokenDistributor
-  function sweep(address _sweepReceiver) external override isAuthorized {
-    if (block.timestamp <= claimPeriodEnd) {
-      revert TokenDistributor_ClaimPeriodNotEnded();
-    }
-
-    uint256 _totalClaimable = totalClaimable.assertNonNull();
-    delete totalClaimable;
-
-    token.mint(_sweepReceiver, _totalClaimable);
-
-    emit Swept({_sweepReceiver: _sweepReceiver, _amount: _totalClaimable});
-  }
-
-  /// @inheritdoc ITokenDistributor
-  function claim(bytes32[] calldata _proof, uint256 _amount) external {
-    _claim(_proof, _amount);
-  }
-
-  function _claim(bytes32[] calldata _proof, uint256 _amount) internal {
-    if (!_canClaim(_proof, msg.sender, _amount)) {
-      revert TokenDistributor_ClaimInvalid();
-    }
-
-    claimed[msg.sender] = true;
-    totalClaimable -= _amount;
-
-    token.mint(msg.sender, _amount);
-
-    emit Claimed({_user: msg.sender, _amount: _amount});
+  function _distribute(address _user, uint256 _amount) internal override {
+    IProtocolToken(token).mint(_user, _amount);
   }
 }

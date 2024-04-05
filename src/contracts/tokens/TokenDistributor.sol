@@ -18,6 +18,7 @@ abstract contract TokenDistributor is Authorizable, ITokenDistributor {
 
   // --- Data ---
 
+  address token;
   /// @inheritdoc ITokenDistributor
   bytes32 public root;
   /// @inheritdoc ITokenDistributor
@@ -43,7 +44,7 @@ abstract contract TokenDistributor is Authorizable, ITokenDistributor {
     uint256 _claimPeriodStart,
     uint256 _claimPeriodEnd
   ) Authorizable(msg.sender) {
-    // token = _token.assertHasCode();
+    token = _token.assertHasCode();
     root = _root;
     totalClaimable = _totalClaimable.assertNonNull();
     claimPeriodStart = _claimPeriodStart.assertGt(block.timestamp);
@@ -63,4 +64,38 @@ abstract contract TokenDistributor is Authorizable, ITokenDistributor {
       _claimable = MerkleProof.verify(_proof, root, keccak256(bytes.concat(keccak256(abi.encode(_user, _amount)))));
     }
   }
+
+  /// @inheritdoc ITokenDistributor
+  function sweep(address _sweepReceiver) public override isAuthorized {
+    if (block.timestamp <= claimPeriodEnd) {
+      revert TokenDistributor_ClaimPeriodNotEnded();
+    }
+
+    uint256 _totalClaimable = totalClaimable.assertNonNull();
+    delete totalClaimable;
+
+    // token.mint(_sweepReceiver, _totalClaimable);
+
+    emit Swept({_sweepReceiver: _sweepReceiver, _amount: _totalClaimable});
+  }
+
+  /// @inheritdoc ITokenDistributor
+  function claim(bytes32[] calldata _proof, uint256 _amount) external {
+    _claim(_proof, _amount);
+  }
+
+  function _claim(bytes32[] calldata _proof, uint256 _amount) internal {
+    if (!_canClaim(_proof, msg.sender, _amount)) {
+      revert TokenDistributor_ClaimInvalid();
+    }
+
+    claimed[msg.sender] = true;
+    totalClaimable -= _amount;
+
+    // token.mint(msg.sender, _amount);
+
+    emit Claimed({_user: msg.sender, _amount: _amount});
+  }
+
+  function _distribute(address _to, uint256 _amount) internal virtual;
 }
