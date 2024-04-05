@@ -74,7 +74,7 @@ abstract contract TokenDistributor is Authorizable, ITokenDistributor {
     uint256 _totalClaimable = totalClaimable.assertNonNull();
     delete totalClaimable;
 
-    // token.mint(_sweepReceiver, _totalClaimable);
+    _distribute(_sweepReceiver, _totalClaimable);
 
     emit Swept({_sweepReceiver: _sweepReceiver, _amount: _totalClaimable});
   }
@@ -92,7 +92,7 @@ abstract contract TokenDistributor is Authorizable, ITokenDistributor {
     claimed[msg.sender] = true;
     totalClaimable -= _amount;
 
-    // token.mint(msg.sender, _amount);
+    _distribute(msg.sender, _amount);
 
     emit Claimed({_user: msg.sender, _amount: _amount});
   }
