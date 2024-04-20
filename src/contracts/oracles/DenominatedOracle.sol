@@ -62,7 +62,7 @@ contract DenominatedOracle is IBaseOracle, IDenominatedOracle {
     (uint256 _denominationPriceSourceValue, bool _denominationPriceSourceValidity) =
       denominationPriceSource.getResultWithValidity();
 
-    if (INVERTED) {
+    if (inverted) {
       if (_priceSourceValue == 0) return (0, false);
       _result = WAD.wmul(_denominationPriceSourceValue).wdiv(_priceSourceValue);
     } else {
