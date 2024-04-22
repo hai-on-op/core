@@ -69,7 +69,6 @@ contract DenominatedOracle is IBaseOracle, IDenominatedOracle {
       _result = _priceSourceValue.wmul(_denominationPriceSourceValue);
     }
 
-    _result = _priceSourceValue.wmul(_denominationPriceSourceValue);
     _validity = _priceSourceValidity && _denominationPriceSourceValidity;
   }
 
