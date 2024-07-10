@@ -33,7 +33,6 @@ abstract contract TestnetDeployment is Contracts, TestnetParams {
 
     // --- base contracts ---
     safeEngine = SAFEEngine(0x916f5FE145f963A517579354C8966e2eCe54Eb10);
-    oracleRelayer = OracleRelayer(0x1c76E151DB66cD6940934E04e6a497764d335600);
     oracleRelayer = OracleRelayer(0x4dfF5A7E7D11Cb44bDAf440c8666a6dbdf48F423);
     surplusAuctionHouse = SurplusAuctionHouse(0xc0b3914534FA2754B5eADdA7Bcbad2EF82a563C2);
     debtAuctionHouse = DebtAuctionHouse(0xCb5b81fF58a86cF433A91315eC08D7f6a980Cf01);
