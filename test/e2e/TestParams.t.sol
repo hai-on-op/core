@@ -13,25 +13,31 @@ uint256 constant PERCENTAGE_OF_STABILITY_FEE_TO_TREASURY = 50e27;
 
 address constant SURPLUS_AUCTION_BID_RECEIVER = address(420);
 
+//  420000 00000000000000000000000000000000000000000000
+
 abstract contract TestParams is Contracts, Params {
   // --- ForTest Params ---
 
   function _getEnvironmentParams() internal override {
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
-      safeDebtCeiling: type(uint256).max, // WAD
-      globalDebtCeiling: type(uint256).max // RAD
+      // safeDebtCeiling: 1_000_000 * WAD, // WAD
+      // globalDebtCeiling: 55_000_000 * RAD // initially disabled
+      safeDebtCeiling: 1_000_000_000_000_000_000_000_000, // WAD
+      globalDebtCeiling: 55_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000 // initially disabled
+        // 55000000000000000000000000000000000000000000000000000
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
       surplusIsTransferred: 0, // surplus is auctioned
-      surplusDelay: 0, // no delay
-      popDebtDelay: 0, // no delay
-      disableCooldown: 0, // no cooldown
-      surplusAmount: ONE_HUNDRED_COINS, // 100 HAI
-      surplusBuffer: 0, // no buffer
-      debtAuctionMintedTokens: INITIAL_DEBT_AUCTION_MINTED_TOKENS, // 1 KITE
-      debtAuctionBidSize: ONE_HUNDRED_COINS // 100 HAI
+      surplusDelay: 86_400, // no delay
+      popDebtDelay: 1800, // no delay
+      disableCooldown: 259_200, // no cooldown
+      surplusAmount: 42_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000, // 100 HAI
+      surplusBuffer: 100_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000, // no buffer
+      debtAuctionMintedTokens: 10_000_000_000_000_000_000_000, // 1 KITE
+      debtAuctionBidSize: 1_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000
     });
+    // 100 HAI
 
     _debtAuctionHouseParams = IDebtAuctionHouse.DebtAuctionHouseParams({
       bidDecrease: 1.05e18, // -5 %

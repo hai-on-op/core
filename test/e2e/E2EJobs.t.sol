@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {Common, COLLAT, DEBT, TKN} from './Common.t.sol';
 import {JOB_REWARD} from '@script/Params.s.sol';
 
+import 'forge-std/console.sol';
 import {AccountingJob, IAccountingJob} from '@contracts/jobs/AccountingJob.sol';
 import {LiquidationJob, ILiquidationJob} from '@contracts/jobs/LiquidationJob.sol';
 import {OracleJob, IOracleJob} from '@contracts/jobs/OracleJob.sol';
@@ -48,6 +49,7 @@ abstract contract E2EJobsTest is BaseUser, Common {
     accountingEngine.popDebtFromQueue(block.timestamp);
 
     uint256 _initialBalance = systemCoin.balanceOf(address(this));
+
     _workAuctionDebt(address(this));
 
     assertEq(systemCoin.balanceOf(address(this)) - _initialBalance, JOB_REWARD);

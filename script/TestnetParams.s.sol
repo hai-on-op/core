@@ -13,8 +13,10 @@ abstract contract TestnetParams is Contracts, Params {
     delegatee[OP] = address(haiDelegatee);
 
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
-      safeDebtCeiling: 1_000_000 * WAD, // WAD
-      globalDebtCeiling: 0 // initially disabled
+      // safeDebtCeiling: 1_000_000 * WAD, // WAD
+      // globalDebtCeiling: 55_000_000 * RAD // initially disabled
+      safeDebtCeiling: 1_000_000_000_000_000_000_000_000, // WAD
+      globalDebtCeiling: 55_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000_000 // initially disabled
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
@@ -41,6 +43,12 @@ abstract contract TestnetParams is Contracts, Params {
       totalAuctionLength: 1 days,
       bidReceiver: governor,
       recyclingPercentage: 0 // 100% is burned
+        // bidIncrease: 1010000000000000000,
+        // bidDuration: 21600,
+        // totalAuctionLength: 86400,
+        // // bidReceiver: 0x06F2bC32144aAbEfb5FaaB498356c9ADc56EEEaa,
+        // bidReceiver: governor,
+        // recyclingPercentage: 0 // 100% is burned
     });
 
     _liquidationEngineParams = ILiquidationEngine.LiquidationEngineParams({
@@ -83,12 +91,12 @@ abstract contract TestnetParams is Contracts, Params {
 
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
       redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
-      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
+      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR_CORRECT // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
-      perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
-      noiseBarrier: 0.995e18, // 0.5%
+      perSecondCumulativeLeak: HALF_LIFE_90_DAYS,
+      noiseBarrier: WAD, // 0.5%
       feedbackOutputLowerBound: -int256(RAY - 1), // unbounded
       feedbackOutputUpperBound: RAD, // unbounded
       integralPeriodSize: 1 hours
@@ -103,6 +111,8 @@ abstract contract TestnetParams is Contracts, Params {
 
     // --- Global Settlement Params ---
     _globalSettlementParams = IGlobalSettlement.GlobalSettlementParams({shutdownCooldown: 3 days});
+    // shutdownCooldown: 1000000000000000000000000
+
     _postSettlementSAHParams = IPostSettlementSurplusAuctionHouse.PostSettlementSAHParams({
       bidIncrease: 1.01e18, // +1 %
       bidDuration: 3 hours,
@@ -165,8 +175,9 @@ abstract contract TestnetParams is Contracts, Params {
     _tokenDistributorParams = ITokenDistributor.TokenDistributorParams({
       root: 0x6fc714df6371f577a195c2bfc47da41aa0ea15bba2651df126f3713a232244be,
       totalClaimable: 1_000_000 * WAD, // 1M HAI
-      claimPeriodStart: block.timestamp + 1 days,
-      claimPeriodEnd: 1_735_689_599 // 1/1/2025 (GMT+0) - 1s
+      // claimPeriodStart: block.timestamp + 1 days,
+      claimPeriodStart: 1_735_689_599, // NOTE: latest deploy period start
+      claimPeriodEnd: 1_720_812_704 // 1/1/2025 (GMT+0) - 1s
     });
   }
 }

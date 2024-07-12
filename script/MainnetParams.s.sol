@@ -13,7 +13,7 @@ abstract contract MainnetParams is Contracts, Params {
 
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
       safeDebtCeiling: 1_000_000 * WAD, // WAD
-      globalDebtCeiling: 0 // initially disabled
+      globalDebtCeiling: 55_000_000 * RAD // initially disabled
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
