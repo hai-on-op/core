@@ -94,10 +94,17 @@ abstract contract TestnetDeployment is Contracts, TestnetParams {
     // --- oracles ---
     systemCoinOracle = IBaseOracle(0x9C4ebFF1D8fD22C111dd062EC059121538305a7d);
     delayedOracle[WETH] = IDelayedOracle(0xe5359c0F0c5A417748fd19501D79405366f6570e);
-    delayedOracle[OP] = IDelayedOracle(0x94700C6f3Ae1bABd85c98255fE22fc72c90E1A47);
-    delayedOracle[WBTC] = IDelayedOracle(0xa69fc9f7D8A495e8E11978a4533b003e30cb0992);
-    delayedOracle[STONES] = IDelayedOracle(0x913EE0530431829a2bF42dd1Dc2E8346b6ca2510);
-    delayedOracle[TOTEM] = IDelayedOracle(0x7A35bC018DF72be5ECfa5146faEAABd5cc6C1A31);
+    // delayedOracle[OP] = IDelayedOracle(0x94700C6f3Ae1bABd85c98255fE22fc72c90E1A47);
+    delayedOracle[OP] = IDelayedOracle(0x8C718e292E082B4d8E80A3760E0ACC3d24D335E1);
+
+    // delayedOracle[WBTC] = IDelayedOracle(0xa69fc9f7D8A495e8E11978a4533b003e30cb0992);
+    delayedOracle[WBTC] = IDelayedOracle(0xD0ab3CAd64B1F7106251C83700b034946995e225);
+
+    // delayedOracle[STONES] = IDelayedOracle(0x913EE0530431829a2bF42dd1Dc2E8346b6ca2510);
+    delayedOracle[STONES] = IDelayedOracle(0x29f887970c113FF62340c1C656F3D8B02e97FdCa);
+
+    // delayedOracle[TOTEM] = IDelayedOracle(0x7A35bC018DF72be5ECfa5146faEAABd5cc6C1A31);
+    delayedOracle[TOTEM] = IDelayedOracle(0xB3Bf1c3FeF782ab9f785cB9c331aA71F215F4C14);
 
     // --- governance ---
     haiGovernor = HaiGovernor(payable(0xDEf4ee3B4Fb0df03517d457d235C4bD067659A18));
