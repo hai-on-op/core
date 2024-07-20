@@ -14,13 +14,13 @@ abstract contract TestnetParams is Contracts, Params {
 
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
       safeDebtCeiling: 1_000_000 * WAD, // WAD
-      globalDebtCeiling: 0 // initially disabled
+      globalDebtCeiling: 55_000_000 * RAD // initially disabled
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
       surplusIsTransferred: 0, // surplus is auctioned
       surplusDelay: 1 days,
-      popDebtDelay: 30 minutes,
+      popDebtDelay: 0,
       disableCooldown: 3 days,
       surplusAmount: 42_000 * RAD, // 42k HAI
       surplusBuffer: 100_000 * RAD, // 100k HAI
@@ -83,12 +83,16 @@ abstract contract TestnetParams is Contracts, Params {
 
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
       redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
-      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
+      // redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
+      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR_CORRECT // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
-      perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
-      noiseBarrier: 0.995e18, // 0.5%
+      // perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
+      perSecondCumulativeLeak: 999_999_910_860_706_061_391_497_541, // HALF_LIFE_30_DAYS
+      // noiseBarrier: 0.995e18, // 0.5%
+      // noiseBarrier: 999_999_999_841_846_100,
+      noiseBarrier: WAD, // no noise barrier
       feedbackOutputLowerBound: -int256(RAY - 1), // unbounded
       feedbackOutputUpperBound: RAD, // unbounded
       integralPeriodSize: 1 hours

@@ -85,7 +85,7 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     // NOTE: HAI/USD(UniV3+Chainlink)@0x2e97fF3AB68D806324c10794f8a75B887C375312
     systemCoinOracle = IBaseOracle(0x8c212bCaE328669c8b045D467CB78b88e0BE0D39);
     delayedOracle[WETH] = IDelayedOracle(0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36);
-    delayedOracle[WSTETH] = IDelayedOracle(0xE88eb523D2C1e66c4682e086Ad4399cBBf0e8212);
+    delayedOracle[WSTETH] = IDelayedOracle(0xB64c0f551C006d932484a6F86Ea7A20D73e4f77C);
     delayedOracle[OP] = IDelayedOracle(0x519011D32806f324364201C5C98579aEC55D9011);
 
     // --- governance ---
