@@ -53,12 +53,6 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
   }
 
   function test_SAFEEngine_Params() public view {
-    // console.logString("-----------------------");
-    // console.logString("-----------------------");
-    // console.logAddress(address(safeEngine));
-    // console.logBytes((abi.encode(_safeEngineParams)));
-    // console.logString("-----------------------");
-    // console.logString("-----------------------");
     ParamChecker._checkParams(address(safeEngine), abi.encode(_safeEngineParams));
   }
 
@@ -512,11 +506,7 @@ abstract contract CommonDeploymentTest is HaiTest, Deploy {
 }
 
 contract E2EDeploymentMainnetTest is DeployMainnet, CommonDeploymentTest {
-  // uint256 FORK_BLOCK = 112_420_000;
   uint256 FORK_BLOCK = 122_704_223;
-  // uint256 FORK_BLOCK = 122_485_854;
-  // uint256 FORK_BLOCK = 121_985_899;
-  // uint256 FORK_BLOCK = 121_735_935;
 
   function setUp() public override {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -607,7 +597,8 @@ contract MainnetOnchainConfigTest is MainnetDeployment, CommonDeploymentTest {
 }
 
 contract E2EDeploymentTestnetTest is DeployTestnet, CommonDeploymentTest {
-  uint256 FORK_BLOCK = 7_000_000;
+  // uint256 FORK_BLOCK = 7_000_000;
+  uint256 FORK_BLOCK = 14_146_392;
 
   function setUp() public override {
     vm.createSelectFork(vm.rpcUrl('testnet'), FORK_BLOCK);

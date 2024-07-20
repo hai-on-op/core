@@ -14,16 +14,16 @@ abstract contract TestnetParams is Contracts, Params {
 
     _safeEngineParams = ISAFEEngine.SAFEEngineParams({
       safeDebtCeiling: 1_000_000 * WAD, // WAD
-      globalDebtCeiling: 100_000_000 * RAD // initially disabled
+      globalDebtCeiling: 55_000_000 * RAD // initially disabled
     });
 
     _accountingEngineParams = IAccountingEngine.AccountingEngineParams({
       surplusIsTransferred: 0, // surplus is auctioned
-      surplusDelay: 2100, // 35 minutes
-      popDebtDelay: 15, // 15 seconds
+      surplusDelay: 1 days,
+      popDebtDelay: 0,
       disableCooldown: 3 days,
-      surplusAmount: 1000 * RAD, // 1k HAI
-      surplusBuffer: 1050 * RAD, // 1050 HAI
+      surplusAmount: 42_000 * RAD, // 42k HAI
+      surplusBuffer: 100_000 * RAD, // 100k HAI
       debtAuctionMintedTokens: 10_000 * WAD, // 10k KITE
       debtAuctionBidSize: 1000 * RAD // 1k HAI
     });
@@ -31,16 +31,14 @@ abstract contract TestnetParams is Contracts, Params {
     _debtAuctionHouseParams = IDebtAuctionHouse.DebtAuctionHouseParams({
       bidDecrease: 1.025e18, // -2.5 %
       amountSoldIncrease: 1.5e18, // +50 %
-      bidDuration: 600, // 10 minutes
-      totalAuctionLength: 1800 // 30 minutes
+      bidDuration: 3 hours,
+      totalAuctionLength: 2 days
     });
 
     _surplusAuctionHouseParams = ISurplusAuctionHouse.SurplusAuctionHouseParams({
       bidIncrease: 1.01e18, // +1 %
-      // bidDuration: 6 hours,
-      bidDuration: 600,
-      // totalAuctionLength: 1 days,
-      totalAuctionLength: 1800,
+      bidDuration: 6 hours,
+      totalAuctionLength: 1 days,
       bidReceiver: governor,
       recyclingPercentage: 0 // 100% is burned
     });
@@ -85,15 +83,16 @@ abstract contract TestnetParams is Contracts, Params {
 
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
       redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
-      // redemptionRateUpperBound: 1000000074561623060142516377, // +950%/yr
-      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
-        // redemptionRateLowerBound: 99999999999997789272222624 // -90%/yr
+      // redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
+      redemptionRateLowerBound: 999_999_926_985_508_341_799_701_018 // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
-      perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
+      // perSecondCumulativeLeak: 999_999_711_200_000_000_000_000_000, // HALF_LIFE_30_DAYS
+      perSecondCumulativeLeak: 999_999_910_860_706_061_391_497_541, // HALF_LIFE_30_DAYS
       // noiseBarrier: 0.995e18, // 0.5%
-      noiseBarrier: 999_999_999_841_846_100,
+      // noiseBarrier: 999_999_999_841_846_100,
+      noiseBarrier: WAD, // no noise barrier
       feedbackOutputLowerBound: -int256(RAY - 1), // unbounded
       feedbackOutputUpperBound: RAD, // unbounded
       integralPeriodSize: 1 hours
@@ -156,8 +155,6 @@ abstract contract TestnetParams is Contracts, Params {
 
     _liquidationEngineCParams[OP].liquidationPenalty = 1.2e18; // 20%
     _collateralAuctionHouseParams[OP].maxDiscount = 0.5e18; // -50%
-
-    _collateralAuctionHouseParams[TOTEM].perSecondDiscountUpdateRate = 999_985_366_702_115_272_120_527_460;
 
     // --- Governance Params ---
     _governorParams = IHaiGovernor.HaiGovernorParams({
