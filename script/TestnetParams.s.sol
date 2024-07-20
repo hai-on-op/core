@@ -84,7 +84,7 @@ abstract contract TestnetParams is Contracts, Params {
     _oracleRelayerParams = IOracleRelayer.OracleRelayerParams({
       redemptionRateUpperBound: PLUS_950_PERCENT_PER_YEAR, // +950%/yr
       // redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR // -90%/yr
-      redemptionRateLowerBound: 999_999_926_985_508_341_799_701_018 // -90%/yr
+      redemptionRateLowerBound: MINUS_90_PERCENT_PER_YEAR_CORRECT // -90%/yr
     });
 
     _pidControllerParams = IPIDController.PIDControllerParams({
