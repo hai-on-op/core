@@ -58,7 +58,7 @@ abstract contract Deploy is Common, Script {
     setupPostEnvironment();
 
     // Deploy Merkle tree claim contract and mint protocol tokens to it
-    deployTokenDistributor();
+    // deployTokenDistributor();
 
     if (delegate == address(0)) {
       _revokeDeployerToAll(governor);

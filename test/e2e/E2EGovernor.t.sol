@@ -47,9 +47,8 @@ abstract contract E2EGovernorTest is HaiTest, Deploy {
     vm.warp(block.timestamp + _governorParams.votingPeriod + 1);
     haiGovernor.queue(targets, values, callDatas, keccak256(bytes(description)));
 
-    vm.expectRevert(
-      // abi.encodeWithSelector(TimelockController.TimelockUnexpectedOperationState.selector, PROPOSAL_HASH, 0x2)
-    );
+    vm.expectRevert();
+    // abi.encodeWithSelector(TimelockController.TimelockUnexpectedOperationState.selector, PROPOSAL_HASH, 0x2)
     haiGovernor.execute(targets, values, callDatas, keccak256(bytes(description)));
 
     vm.warp(block.timestamp + _governorParams.timelockMinDelay + 1);
@@ -82,7 +81,11 @@ abstract contract E2EGovernorTest is HaiTest, Deploy {
 }
 
 contract E2EGovernorMainnetTest is DeployMainnet, E2EGovernorTest {
-  uint256 FORK_BLOCK = 112_420_000;
+  // uint256 FORK_BLOCK = 112_420_000;
+  uint256 FORK_BLOCK = 122_704_223;
+  // uint256 FORK_BLOCK = 122_485_854;
+  // uint256 FORK_BLOCK = 121_985_899;
+  // uint256 FORK_BLOCK = 121_735_935;
 
   function setUp() public override {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
