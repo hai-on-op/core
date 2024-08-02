@@ -110,7 +110,7 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
 
     // # of token0 in velo pool
     uint256 _reserve0 = veloPool.reserve0();
-    // # of token in velo pool
+    // # of token1 in velo pool
     uint256 _reserve1 = veloPool.reserve1();
 
     // # of velo LP tokens in 1 mooToken
