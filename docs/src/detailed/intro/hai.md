@@ -6,7 +6,7 @@ HAI serves as a framework for creating systems capable of issuing stablecoins. T
 
 For a comprehensive understanding of the HAI framework, this documentation aims to detail each of its components. We strongly recommend reviewing Reflexer's original [whitepaper](https://github.com/reflexer-labs/whitepapers/blob/master/English/rai-english.pdf) as a precursor to this documentation.
 
-#### Core Differentiators of HAI from GEB
+### Core Differentiators of HAI from GEB
 
 HAI is an enhanced fork of [GEB](https://github.com/reflexer-labs/geb), but it comes with several key distinctions:
 
@@ -19,3 +19,7 @@ HAI is an enhanced fork of [GEB](https://github.com/reflexer-labs/geb), but it c
 - **Revamped Contract Interactions**: The framework restructures the way contracts communicate with each other, leading to more efficient and reliable operations.
 
 By incorporating these features, HAI aims to provide a more advanced, reliable, and user-friendly stablecoin system.
+
+### RedStone Oracles
+
+HAI uses RedStone Oracles as one of its primary solutions for crypto assets pricing. RedStone is a Modular Oracle that delivers frequently updated, reliable, and diverse data feeds in a few models. HAI utilizes Push model which ensures that data is pushed into on-chain storage via a relayer with set conditions. (heartbeat and deviation threshold)
