@@ -15,13 +15,13 @@ jobs:
       name: ${{ github.ref_name == 'main' && 'Prod' || 'Dev' }}
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
 
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v1
 
       - name: Install node
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'yarn'
