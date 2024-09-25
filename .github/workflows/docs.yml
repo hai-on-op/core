@@ -8,23 +8,23 @@ on:
 
 jobs:
   deploy-docs:
-    # if: github.repository == 'hai-on-op/hai'
+    if: github.repository == 'hai-on-op/hai'
     name: Deploy docs
     runs-on: ubuntu-latest
     environment:
       name: ${{ github.ref_name == 'main' && 'Prod' || 'Dev' }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
 
       - name: Setup mdBook
         uses: peaceiris/actions-mdbook@v2
 
       - name: Install node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v3
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: ${{ matrix.node-version }}
+          cache: "yarn"
 
       - name: Install dependencies
         run: yarn --frozen-lockfile --network-concurrency 1
