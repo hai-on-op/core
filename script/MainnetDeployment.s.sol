@@ -48,6 +48,7 @@ abstract contract MainnetDeployment is Contracts, MainnetParams {
     // --- factories ---
     chainlinkRelayerFactory = ChainlinkRelayerFactory(0xBf81945a08bE132e0a2EAc42662Fcd7661BA23B8);
     uniV3RelayerFactory = UniV3RelayerFactory(0xB6A352636588D833d2795E67EAaFdC5b6F3948c1);
+    slipstreamCLRelayerFactory = SlipstreamCLRelayerFactory(0x692De4aA623B50246Cd75e8D1B702FabcD05471A);
     denominatedOracleFactory = DenominatedOracleFactory(0xC3a0035bcD3fcBB84A4874b19f7170Bfe167fd35);
     delayedOracleFactory = DelayedOracleFactory(0x41A600E03eaa8D208B9230a219e0c4594897b3bB);
 
