@@ -6,6 +6,7 @@ import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 
 import {ChainlinkRelayer, IBaseOracle} from '@contracts/oracles/ChainlinkRelayer.sol';
 import {UniV3Relayer} from '@contracts/oracles/UniV3Relayer.sol';
+import {SlipstreamCLRelayer} from '@contracts/oracles/SlipstreamCLRelayer.sol';
 
 import {DenominatedOracle, IDenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {DelayedOracle, IDelayedOracle} from '@contracts/oracles/DelayedOracle.sol';
@@ -16,7 +17,10 @@ import {
   OP_CHAINLINK_SEQUENCER_UPTIME_FEED,
   OP_WETH,
   OP_WBTC,
-  UNISWAP_V3_FACTORY
+  OP_OPTIMISM,
+  OP_USDC,
+  UNISWAP_V3_FACTORY,
+  SLIPSTREAM_CL_FACTORY
 } from '@script/Registry.s.sol';
 
 import {Math, WAD} from '@libraries/Math.sol';
@@ -24,25 +28,28 @@ import {Math, WAD} from '@libraries/Math.sol';
 contract E2EOracleSetup is HaiTest {
   using Math for uint256;
 
-  uint256 FORK_BLOCK = 99_000_000;
+  uint256 FORK_BLOCK = 126_000_000;
 
-  uint256 CHAINLINK_ETH_USD_PRICE = 181_865_000_000;
-  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 1_818_650_000_000_000_000_000;
+  uint256 CHAINLINK_ETH_USD_PRICE = 263_603_000_000;
+  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 2_636_030_000_000_000_000_000;
 
   uint256 NEW_ETH_USD_PRICE = 200_000_000_000;
   uint256 NEW_ETH_USD_PRICE_18_DECIMALS = 2_000_000_000_000_000_000_000;
 
-  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_124_766_090_043_756_600; // NOTE: 18 decimals
+  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_179_700_000_000_000_000; // NOTE: 18 decimals
   uint256 WSTETH_USD_PRICE = CHAINLINK_WSTETH_ETH_PRICE.wmul(CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
+  uint256 SLIPSTREAM_WETH_USD_PRICE = 2_642_045_442_000_000_000_000;
 
-  uint24 FEE_TIER = 500;
+  uint24 TICK_SPACING_100 = 100;
+  uint24 FEE_TIER_0_5 = 500;
 
-  uint256 WBTC_ETH_PRICE = 14_864_307_223_256_388_569; // 1 BTC = 14.8 ETH
-  uint256 WBTC_USD_PRICE = 27_032_972_331_575_231_071_011; // 1 BTC = 27,032 USD
+  uint256 WBTC_ETH_PRICE = 24_555_546_428_219_269_979; // 1 BTC = 24.55555 ETH
+  uint256 WBTC_USD_PRICE = 64_729_157_051_178_842_242_743; // 1 BTC = 64,729 USD
 
   IBaseOracle public wethUsdPriceSource;
   IBaseOracle public wstethEthPriceSource;
   IBaseOracle public wbtcWethPriceSource;
+  IBaseOracle public wethUsdcVelodromePriceSource;
 
   IDenominatedOracle public wstethUsdPriceSource;
   IDenominatedOracle public wbtcUsdPriceSource;
@@ -58,7 +65,11 @@ contract E2EOracleSetup is HaiTest {
       new ChainlinkRelayer(OP_CHAINLINK_WSTETH_ETH_FEED, OP_CHAINLINK_SEQUENCER_UPTIME_FEED, 1 days);
 
     // --- UniV3 ---
-    wbtcWethPriceSource = new UniV3Relayer(UNISWAP_V3_FACTORY, OP_WBTC, OP_WETH, FEE_TIER, 1 days);
+    wbtcWethPriceSource = new UniV3Relayer(UNISWAP_V3_FACTORY, OP_WBTC, OP_WETH, FEE_TIER_0_5, 1 days);
+
+    // --- Slipstream ---
+    wethUsdcVelodromePriceSource =
+      new SlipstreamCLRelayer(SLIPSTREAM_CL_FACTORY, OP_WETH, OP_USDC, TICK_SPACING_100, 3600);
 
     // --- Denominated ---
     wstethUsdPriceSource = new DenominatedOracle(wstethEthPriceSource, wethUsdPriceSource, false);
@@ -79,7 +90,7 @@ contract E2EOracleSetup is HaiTest {
   }
 
   function test_ChainlinkRelayer() public {
-    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 1818);
+    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 2636);
     assertEq(wethUsdPriceSource.read(), CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
   }
 
@@ -104,6 +115,15 @@ contract E2EOracleSetup is HaiTest {
     assertEq(wbtcWethPriceSource.symbol(), 'WBTC / WETH');
   }
 
+  // --- Slipstream CL ---
+  function test_SlipstreamCLRelayer() public {
+    assertEq(wethUsdcVelodromePriceSource.read(), SLIPSTREAM_WETH_USD_PRICE);
+  }
+
+  function test_SlipstreamCLRelayerSymbol() public {
+    assertEq(wethUsdcVelodromePriceSource.symbol(), 'WETH / USDC');
+  }
+
   // --- Denominated ---
 
   /**
@@ -111,12 +131,12 @@ contract E2EOracleSetup is HaiTest {
    *       concatenate in the right order, e.g WSTETH/ETH - ETH/USD
    */
   function test_DenominatedOracle() public {
-    assertEq(WSTETH_USD_PRICE / 1e18, 2045); // 1818.65 * 1.1247 = 2045
+    assertEq(WSTETH_USD_PRICE / 1e18, 3109); // 2636.03 * 1.1797 = 3109
     assertEq(wstethUsdPriceSource.read(), WSTETH_USD_PRICE);
   }
 
   function test_DenominatedOracleUniV3() public {
-    assertEq(WBTC_USD_PRICE / 1e18, 27_032); // 14.864 * 1818.65 = 27032
+    assertEq(WBTC_USD_PRICE / 1e18, 64_729); // 24.555 * 2636.03 = ~64727
     assertEq(wbtcUsdPriceSource.read(), WBTC_USD_PRICE);
   }
 
