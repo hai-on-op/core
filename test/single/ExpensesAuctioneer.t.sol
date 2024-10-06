@@ -223,7 +223,26 @@ contract SingleExpensesAuctioneerTest is DSTest {
     assertEq(_auction.amountToSell, 10 ether); // the 10% buffer
     assertEq(_auction.amountToRaise, 500e45); // raise 500 HAI (@2 RP)
 
-    // Check that it covered 500 HAI (@2 RP) = $1000 of debt
+    // Check that it covered 500 HAI (@1 MP) = $500 of debt
+    assertEq(_outstandingDebt - expensesAuctioneer.outstandingDebt(), 500e18);
+  }
+
+  function test_buy_auction_with_new_market_price() public {
+    hevm.warp(block.timestamp + 1 days);
+    uint256 _auctionId = expensesAuctioneer.auctionExpenses();
+    uint256 _outstandingDebt = expensesAuctioneer.outstandingDebt();
+
+    systemCoinOracle.setPriceAndValidity(2e18, true);
+
+    hevm.prank(BIDDER);
+    kiteCollateralAuctionHouse.buyCollateral(_auctionId, 500e18);
+
+    // Check that the auction is deleted
+    ICollateralAuctionHouse.Auction memory _auction = kiteCollateralAuctionHouse.auctions(_auctionId);
+    assertEq(_auction.amountToSell, 60 ether); // 50% of initial Kite + the 10% buffer
+    assertEq(_auction.amountToRaise, 500e45); // raise 500 HAI (@1 RP)
+
+    // Check that it covered 500 HAI (@2 MP) = $1000 of debt
     assertEq(_outstandingDebt - expensesAuctioneer.outstandingDebt(), 1000e18);
   }
 

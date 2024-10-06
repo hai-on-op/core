@@ -85,7 +85,7 @@ contract ExpensesAuctioneer is Authorizable, Modifiable, Disableable {
   event RaisedUSDAmount(uint256 amount);
   event CancelledRaisedUSDAmount(uint256 amount);
 
-  uint256 internal _lastRedemptionPrice;
+  uint256 internal _lastMarketPrice;
   uint256 internal _accumulatedExpenses;
   uint256 internal _processedExpenses;
   uint256 internal _lastUpdate;
@@ -170,8 +170,8 @@ contract ExpensesAuctioneer is Authorizable, Modifiable, Disableable {
     // call terminateAuctionPrematurely
     // NOTE: it calls removeCoinsFromAuction(_auction.amountToRaise) so we need to cancel it
     collateralAuctionHouse.terminateAuctionPrematurely(_auctionId);
-    // calculate how much USD that was trying to cover (_lastRedemptionPrice is updated in removeCoinsFromAuction)
-    uint256 _remainingToRaiseUSDAmount = (_auction.amountToRaise / WAD).rmul(_lastRedemptionPrice) / 1e9;
+    // calculate how much USD that was trying to cover (_lastMarketPrice is updated in removeCoinsFromAuction)
+    uint256 _remainingToRaiseUSDAmount = (_auction.amountToRaise / RAY).wmul(_lastMarketPrice);
     // substract the amount to cancel the effect from removeCoinsFromAuction
     _processedExpenses -= _remainingToRaiseUSDAmount;
     emit CancelledRaisedUSDAmount(_remainingToRaiseUSDAmount);
@@ -181,9 +181,9 @@ contract ExpensesAuctioneer is Authorizable, Modifiable, Disableable {
   /// @dev    May also be called by an authorized address to register OTC arrangements
   function removeCoinsFromAuction(uint256 _coinAmount) external isAuthorized updateExpenses {
     // query SAFEEngine for redemption price
-    _lastRedemptionPrice = oracleRelayer.redemptionPrice();
+    _lastMarketPrice = oracleRelayer.marketPrice();
     // calculate how much USD that covers
-    uint256 _raisedUSDAmount = (_coinAmount / WAD).rmul(_lastRedemptionPrice) / 1e9;
+    uint256 _raisedUSDAmount = (_coinAmount / RAY).wmul(_lastMarketPrice);
     // substract the amount of USD from the outstanding debt
     _processedExpenses += _raisedUSDAmount;
     emit RaisedUSDAmount(_raisedUSDAmount);
