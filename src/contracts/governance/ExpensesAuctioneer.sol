@@ -129,13 +129,14 @@ contract ExpensesAuctioneer is Authorizable, Modifiable, Disableable {
     ICollateralJoin(protocolJoin).join(address(this), _balance);
   }
 
-  function exitKiteBalance(uint256 _amount, address _to) external isAuthorized {
-    ICollateralJoin(protocolJoin).exit(_to, _amount);
+  function exitKiteBalance(address _to) external whenDisabled isAuthorized {
+    uint256 _kiteBalance = safeEngine.tokenCollateral(C_TYPE, address(this));
+    ICollateralJoin(protocolJoin).exit(_to, _kiteBalance);
   }
 
   /// @notice Starts an auction of KITE for HAI, with a USD amount
   /// @dev    Checks that time has passed, and that theres enough outstanding debt
-  function auctionExpenses() external updateExpenses returns (uint256 _auctionId) {
+  function auctionExpenses() external updateExpenses whenEnabled returns (uint256 _auctionId) {
     // ensure balance is higher than `USD amount to auction`
     if (outstandingDebt() < _params.usdAmountPerAuction) revert NotEnoughDebt();
     // ensure time has passed since last auction

@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import 'ds-test/test.sol';
 import {ICollateralAuctionHouse, CollateralAuctionHouse} from '@contracts/CollateralAuctionHouse.sol';
 import {ExpensesAuctioneer} from '@contracts/governance/ExpensesAuctioneer.sol';
+import {IDisableable} from '@interfaces/utils/IDisableable.sol';
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
 import {IAccountingEngine, AccountingEngine} from '@contracts/AccountingEngine.sol';
 import {CoinJoin} from '@contracts/utils/CoinJoin.sol';
@@ -309,6 +310,31 @@ contract SingleExpensesAuctioneerTest is DSTest {
 
   function test_not_enough_debt() public {
     hevm.expectRevert(ExpensesAuctioneer.NotEnoughDebt.selector);
+    expensesAuctioneer.auctionExpenses();
+  }
+
+  function test_withdraw_kite() public {
+    address _receiver = address(0x1234);
+
+    expensesAuctioneer.disableContract();
+    expensesAuctioneer.exitKiteBalance(_receiver);
+
+    assertEq(protocolToken.balanceOf(_receiver), 1000e18);
+  }
+
+  function test_cant_withdraw_when_enabled() public {
+    address _receiver = address(0x1234);
+
+    hevm.expectRevert(IDisableable.ContractIsEnabled.selector);
+    expensesAuctioneer.exitKiteBalance(_receiver);
+  }
+
+  function test_cant_auction_when_disabled() public {
+    hevm.warp(block.timestamp + 1 days);
+
+    expensesAuctioneer.disableContract();
+
+    hevm.expectRevert(IDisableable.ContractIsDisabled.selector);
     expensesAuctioneer.auctionExpenses();
   }
 }
