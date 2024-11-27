@@ -7,7 +7,7 @@ import {IStakingToken} from "@interfaces/tokens/IStakingToken.sol";
 import {IStakingManager} from "@interfaces/tokens/IStakingManager.sol";
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
+import {ERC20Permit, IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import {ERC20Votes} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol";
 import {ERC20Burnable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {ERC20Pausable, Pausable} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
@@ -16,6 +16,9 @@ import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 
 import {Authorizable} from "@contracts/utils/Authorizable.sol";
 import {Modifiable} from "@contracts/utils/Modifiable.sol";
+
+import {Encoding} from "@libraries/Encoding.sol";
+import {Assertions} from "@libraries/Assertions.sol";
 
 /**
  * @title  StakingToken
@@ -32,6 +35,9 @@ contract StakingToken is
     Modifiable,
     IStakingToken
 {
+    using Encoding for bytes;
+    using Assertions for address;
+
     // --- Registry ---
 
     /// @inheritdoc IStakingToken
@@ -62,17 +68,21 @@ contract StakingToken is
 
     /// @inheritdoc IStakingToken
     function mint(address _dst, uint256 _wad) external isAuthorized {
-        if (_dst == address(0)) revert StakingToken_MintToZeroAddress();
         _mint(_dst, _wad);
-        emit StakingToken_Mint(_dst, _wad);
     }
 
     /// @inheritdoc IStakingToken
-    function burn(uint256 _wad) external {
-        if (_wad > balanceOf(msg.sender))
-            revert StakingToken_InsufficientBalance();
+    function burn(uint256 _wad) public override(ERC20Burnable, IStakingToken) {
         _burn(msg.sender, _wad);
-        emit StakingToken_Burn(msg.sender, _wad);
+    }
+
+    /// @inheritdoc IStakingToken
+    function burnFrom(
+        address _account,
+        uint256 _wad
+    ) public override(ERC20Burnable, IStakingToken) {
+        _spendAllowance(_account, msg.sender, _wad);
+        _burn(_account, _wad);
     }
 
     /// @inheritdoc IStakingToken
@@ -89,12 +99,8 @@ contract StakingToken is
 
     // --- Overrides ---
 
-    function _beforeTokenTransfer(
-        address _from,
-        address _to,
-        uint256 _wad
-    ) internal override(ERC20, ERC20Pausable) {
-        super._beforeTokenTransfer(_from, _to, _wad);
+    function _beforeTokenTransfer(address _from, address _to) internal {
+        // super._beforeTokenTransfer(_from, _to, _wad);
         if (address(stakingManager) == address(0))
             revert StakingToken_NullStakingManager();
         stakingManager.checkpoint([_from, _to]);
@@ -146,7 +152,8 @@ contract StakingToken is
     ) internal override {
         address _address = _data.toAddress();
         // registry
-        if (_param == "stakingManager") stakingManager = _address;
+        if (_param == "stakingManager")
+            stakingManager = IStakingManager(_address);
         else revert UnrecognizedParam();
     }
 

@@ -19,14 +19,18 @@ import {IAuthorizable} from "@interfaces/utils/IAuthorizable.sol";
 interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
     // --- Events ---
 
-    /// @notice Emitted when tokens are minted
-    /// @param dst The address that received the minted tokens
-    /// @param wad The amount of tokens minted
+    /**
+     * @notice Emitted when tokens are minted
+     * @param dst The address that received the minted tokens
+     * @param wad The amount of tokens minted
+     */
     event StakingToken_Mint(address indexed dst, uint256 wad);
 
-    /// @notice Emitted when tokens are burned
-    /// @param src The address whose tokens were burned
-    /// @param wad The amount of tokens burned
+    /**
+     * @notice Emitted when tokens are burned
+     * @param src The address whose tokens were burned
+     * @param wad The amount of tokens burned
+     */
     event StakingToken_Burn(address indexed src, uint256 wad);
 
     /// @notice Emitted when the contract is paused
@@ -51,15 +55,19 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
 
     // --- Registry ---
 
-    /// @notice Address of the protocol token
-    /// @return _protocolToken The protocol token contract
+    /**
+     * @notice Address of the protocol token
+     * @return _protocolToken The protocol token contract
+     */
     function protocolToken()
         external
         view
         returns (IProtocolToken _protocolToken);
 
-    /// @notice Address of the staking reward manager
-    /// @return _stakingManager The staking manager contract
+    /**
+     * @notice Address of the staking reward manager
+     * @return _stakingManager The staking manager contract
+     */
     function stakingManager()
         external
         view
@@ -67,21 +75,36 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
 
     // --- Methods ---
 
-    /// @notice Mints new tokens to the specified address
-    /// @dev Only callable by authorized addresses
-    /// @param dst The address to mint tokens to
-    /// @param wad The amount of tokens to mint
-    function mint(address dst, uint256 wad) external;
+    /**
+     * @notice Mints new tokens to the specified address
+     * @dev Only callable by authorized addresses
+     * @param _dst The address to mint tokens to
+     * @param _wad The amount of tokens to mint
+     */
+    function mint(address _dst, uint256 _wad) external;
 
-    /// @notice Burns tokens from the caller's address
-    /// @param wad The amount of tokens to burn
-    function burn(uint256 wad) external;
+    /**
+     * @notice Burns tokens from the caller's address
+     * @param _wad The amount of tokens to burn
+     */
+    function burn(uint256 _wad) external;
 
-    /// @notice Pauses all token transfers
-    /// @dev Only callable by authorized addresses
+    /**
+     * @notice Burns tokens from the caller's address
+     * @param _account Address of the account to mint tokens to
+     * @param _wad The amount of tokens to burn
+     */
+    function burnFrom(address _account, uint256 _wad) external;
+
+    /**
+     * @notice Pauses all token transfers
+     * @dev Only callable by authorized addresses
+     */
     function pause() external;
 
-    /// @notice Unpauses token transfers
-    /// @dev Only callable by authorized addresses
+    /**
+     * @notice Unpauses token transfers
+     * @dev Only callable by authorized addresses
+     */
     function unpause() external;
 }

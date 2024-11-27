@@ -4,10 +4,13 @@ pragma solidity 0.8.20;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-import {Authorizable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Authorizable} from "@contracts/utils/Authorizable.sol";
 import {Modifiable} from "@contracts/utils/Modifiable.sol";
 
 import {IRewardPool} from "@interfaces/tokens/IRewardPool.sol";
+
+import {Encoding} from "@libraries/Encoding.sol";
+import {Assertions} from "@libraries/Assertions.sol";
 import {Math, RAY, WAD} from "@libraries/Math.sol";
 
 /**
@@ -15,13 +18,15 @@ import {Math, RAY, WAD} from "@libraries/Math.sol";
  * @notice This contract constitutes a reward pool for a given reward token
  */
 contract RewardPool is Authorizable, Modifiable, IRewardPool {
+    using Encoding for bytes;
+    using Assertions for uint256;
     using Math for uint256;
     using SafeERC20 for IERC20;
 
     // --- Registry ---
 
     /// @inheritdoc IRewardPool
-    IERC20 public immutable rewardToken;
+    IERC20 public rewardToken;
 
     // --- Params ---
 
@@ -30,14 +35,23 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     RewardPoolParams public _params;
 
     /// @inheritdoc IRewardPool
-    function params() external view returns (RewardPoolParams memory _params) {
+    function params()
+        external
+        view
+        returns (RewardPoolParams memory _rewardPoolParams)
+    {
         return _params;
     }
 
     // --- Data ---
 
-    /// @inheritdoc IRewardPool
     uint256 private _totalStaked;
+
+    /// @inheritdoc IRewardPool
+    function totalStaked() external view returns (uint256) {
+        return _totalStaked;
+    }
+
     /// @inheritdoc IRewardPool
     uint256 public rewardPerTokenStored;
     /// @inheritdoc IRewardPool
@@ -62,7 +76,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     /**
      * @param _rewardToken Address of the reward token
      */
-    constructor(address _rewardToken) {
+    constructor(address _rewardToken) Authorizable(msg.sender) validParams {
         if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
         rewardToken = IERC20(_rewardToken);
         _params.duration = 7 days;
@@ -78,11 +92,6 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
         returns (uint256 _lastTime)
     {
         return Math.min(block.timestamp, periodFinish);
-    }
-
-    /// @inheritdoc IRewardPool
-    function totalStaked() public view returns (uint256) {
-        return _totalStaked;
     }
 
     /// @inheritdoc IRewardPool
@@ -129,7 +138,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     }
 
     function _getReward(address _account) internal {
-        uint256 _reward = earned(_account);
+        uint256 _reward = earned();
         if (_reward > 0) {
             rewards = 0;
             rewardToken.safeTransfer(_account, _reward);
@@ -139,11 +148,11 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
     /// @inheritdoc IRewardPool
     function rewardPerToken() public view returns (uint256) {
-        if (totalStaked() == 0) return rewardPerTokenStored;
+        if (_totalStaked == 0) return rewardPerTokenStored;
         uint256 _timeElapsed = lastTimeRewardApplicable() - lastUpdateTime;
         return
             rewardPerTokenStored +
-            ((_timeElapsed * rewardRate * 1e18) / totalStaked());
+            ((_timeElapsed * rewardRate * 1e18) / _totalStaked);
     }
 
     /// @inheritdoc IRewardPool
@@ -181,14 +190,16 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
         uint256 _reward
     ) public updateReward(address(0)) isAuthorized {
         if (_reward == 0) revert RewardPool_InvalidRewardAmount();
+        historicalRewards = historicalRewards + _reward;
         if (block.timestamp >= periodFinish) {
             rewardRate = _reward / _params.duration;
         } else {
             uint256 _remaining = periodFinish - block.timestamp;
             uint256 _leftover = _remaining * rewardRate;
-            rewardRate = (_reward + _leftover) / _params.duration;
+            _reward = _reward + _leftover;
+            rewardRate = _reward / _params.duration;
         }
-
+        currentRewards = _reward;
         lastUpdateTime = block.timestamp;
         periodFinish = block.timestamp + _params.duration;
         emit RewardPool_RewardAdded(_reward);
@@ -222,8 +233,8 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     function _modifyParameters(
         bytes32 _param,
         bytes memory _data
-    ) internal virtual override {
-        uint256 _uint256 = data.toUint256();
+    ) internal override {
+        uint256 _uint256 = _data.toUint256();
         if (_param == "duration") _params.duration = _uint256;
         else if (_param == "newRewardRatio") _params.newRewardRatio = _uint256;
         else revert UnrecognizedParam();

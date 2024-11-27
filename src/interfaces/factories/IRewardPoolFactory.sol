@@ -43,10 +43,10 @@ interface IRewardPoolFactory is IAuthorizable {
 
     /**
      * @notice Returns the list of all deployed RewardPool contracts
-     * @return _rewardPools List of RewardPool contract addresses
+     * @return _rewardPoolsList List of RewardPool contract addresses
      */
-    function rewardPools()
+    function rewardPoolsList()
         external
         view
-        returns (address[] memory _rewardPools);
+        returns (address[] memory _rewardPoolsList);
 }

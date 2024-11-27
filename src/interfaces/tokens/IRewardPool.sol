@@ -3,11 +3,14 @@ pragma solidity 0.8.20;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
+import {IAuthorizable} from "@interfaces/utils/IAuthorizable.sol";
+import {IModifiable} from "@interfaces/utils/IModifiable.sol";
+
 /**
  * @title  IRewardPool
  * @notice Interface for the RewardPool contract which manages reward distribution
  */
-interface IRewardPool {
+interface IRewardPool is IAuthorizable, IModifiable {
     // --- Events ---
 
     /**
@@ -58,8 +61,8 @@ interface IRewardPool {
      * @param _amount Amount withdrawn [wad]
      */
     event RewardPool_EmergencyWithdrawal(
-        address indexed account,
-        uint256 amount
+        address indexed _account,
+        uint256 _amount
     );
 
     // --- Errors ---
@@ -92,13 +95,7 @@ interface IRewardPool {
         uint256 newRewardRatio; // Ratio for accepting new rewards
     }
 
-    // --- Data ---
-
-    /**
-     * @notice Getter for the reward token
-     * @return _rewardToken The reward token being distributed
-     */
-    function rewardToken() external view returns (IERC20 _rewardToken);
+    // --- Params ---
 
     /**
      * @notice Getter for the contract parameters struct
@@ -110,10 +107,94 @@ interface IRewardPool {
         returns (RewardPoolParams memory _rewardPoolParams);
 
     /**
+     * @notice Getter for the contract parameters struct
+     * @return _duration Duration of rewards distribution
+     * @return _newRewardRatio Ratio for accepting new rewards
+     */
+    // solhint-disable-next-line private-vars-leading-underscore
+    function _params()
+        external
+        view
+        returns (uint256 _duration, uint256 _newRewardRatio);
+
+    // --- Data ---
+
+    /**
+     * @notice Getter for the reward token
+     * @return _rewardToken The reward token being distributed
+     */
+    function rewardToken() external view returns (IERC20 _rewardToken);
+
+    /**
      * @notice Getter for the Total amount of tokens staked
      * @return _totalStaked Total amount of tokens staked
      */
     function totalStaked() external view returns (uint256 _totalStaked);
+
+    /**
+     * @notice Getter for the accumulated rewards per token
+     * @return _rewardPerTokenStored accumulated rewards per token
+     */
+    function rewardPerTokenStored()
+        external
+        view
+        returns (uint256 _rewardPerTokenStored);
+
+    /**
+     * @notice Getter for the timestamp when the current reward period finishes
+     * @return _periodFinish timestamp when the current reward period finishes
+     */
+    function periodFinish() external view returns (uint256 _periodFinish);
+
+    /**
+     * @notice Getter for the current rate at which rewards are distributed
+     * @return _rewardRate rate at which rewards are distributed
+     */
+    function rewardRate() external view returns (uint256 _rewardRate);
+
+    /**
+     * @notice Getter for the last time the rewards were updated
+     * @return _lastUpdateTime last time the rewards were updated
+     */
+    function lastUpdateTime() external view returns (uint256 _lastUpdateTime);
+
+    /**
+     * @notice Getter for the amount of rewards queued for distribution
+     * @return _queuedRewards amount of rewards queued for distribution
+     */
+    function queuedRewards() external view returns (uint256 _queuedRewards);
+
+    /**
+     * @notice Getter for the current rewards being distributed
+     * @return _currentRewards current rewards being distributed
+     */
+    function currentRewards() external view returns (uint256 _currentRewards);
+
+    /**
+     * @notice Getter for the total amount of rewards added
+     * @return _historicalRewards total amount of rewards added
+     */
+    function historicalRewards()
+        external
+        view
+        returns (uint256 _historicalRewards);
+
+    /**
+     * @notice Getter for the amount of rewards paid out for each token so far
+     * @return _rewardPerTokenPaid amount of rewards paid out for each token so far
+     */
+    function rewardPerTokenPaid()
+        external
+        view
+        returns (uint256 _rewardPerTokenPaid);
+
+    /**
+     * @notice Getter for the amount of rewards earned but not paid out yet
+     * @return _rewards amount of rewards earned but not paid out yet
+     */
+    function rewards() external view returns (uint256 _rewards);
+
+    // --- Methods ---
 
     /**
      * @notice Getter for the last timestamp that rewards were applicable
@@ -135,8 +216,6 @@ interface IRewardPool {
      * @return _earned earned rewards for an account
      */
     function earned() external view returns (uint256 _earned);
-
-    // --- Methods ---
 
     /// @notice Stake tokens in the pool
     function stake(uint256 amount) external;
