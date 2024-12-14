@@ -59,6 +59,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   mapping(address => uint256) public stakedBalances;
 
   /// @inheritdoc IStakingManager
+  // solhint-disable-next-line private-vars-leading-underscore
   mapping(address _account => PendingWithdrawal) public _pendingWithdrawals;
 
   /// @inheritdoc IStakingManager
@@ -67,27 +68,28 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   }
 
   /// @inheritdoc IStakingManager
+  // solhint-disable-next-line private-vars-leading-underscore
   mapping(uint256 _id => RewardType) public _rewardTypes;
 
   /// @inheritdoc IStakingManager
   function rewardTypes(uint256 _id) external view returns (RewardTypeInfo memory _rewardTypeInfo) {
-    RewardType storage rewardType = _rewardTypes[_id];
+    RewardType storage _rewardType = _rewardTypes[_id];
     return RewardTypeInfo({
-      rewardToken: rewardType.rewardToken,
-      rewardPool: rewardType.rewardPool,
-      isActive: rewardType.isActive,
-      rewardIntegral: rewardType.rewardIntegral,
-      rewardRemaining: rewardType.rewardRemaining
+      rewardToken: _rewardType.rewardToken,
+      rewardPool: _rewardType.rewardPool,
+      isActive: _rewardType.isActive,
+      rewardIntegral: _rewardType.rewardIntegral,
+      rewardRemaining: _rewardType.rewardRemaining
     });
   }
 
   /// @inheritdoc IStakingManager
-  function rewardIntegralFor(uint256 _id, address _user) external view returns (uint256) {
+  function rewardIntegralFor(uint256 _id, address _user) external view returns (uint256 _rewardIntegral) {
     return _rewardTypes[_id].rewardIntegralFor[_user];
   }
 
   /// @inheritdoc IStakingManager
-  function claimableReward(uint256 _id, address _user) external view returns (uint256) {
+  function claimableReward(uint256 _id, address _user) external view returns (uint256 _claimableReward) {
     return _rewardTypes[_id].claimableReward[_user];
   }
 
@@ -121,16 +123,16 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     protocolToken.safeTransferFrom(msg.sender, address(this), _wad);
 
     // Call stake in the reward pools
-    uint256 rewardCount = rewards;
-    for (uint256 _i = 0; _i < rewardCount; _i++) {
-      RewardType storage rewardType = _rewardTypes[_i];
-      if (rewardType.isActive) {
-        IRewardPool rewardPool = IRewardPool(rewardType.rewardPool);
-        rewardPool.stake(_wad);
+    uint256 _rewardCount = rewards;
+    for (uint256 _i = 0; _i < _rewardCount; _i++) {
+      RewardType storage _rewardType = _rewardTypes[_i];
+      if (_rewardType.isActive) {
+        IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
+        _rewardPool.stake(_wad);
       }
     }
 
-    emit StakingManager_Staked(_account, _wad);
+    emit StakingManagerStaked(_account, _wad);
   }
 
   /// @inheritdoc IStakingManager
@@ -149,14 +151,14 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     // Call decreaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
-      RewardType storage rewardType = _rewardTypes[_i];
-      if (rewardType.isActive) {
-        IRewardPool rewardPool = IRewardPool(rewardType.rewardPool);
-        rewardPool.decreaseStake(_wad);
+      RewardType storage _rewardType = _rewardTypes[_i];
+      if (_rewardType.isActive) {
+        IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
+        _rewardPool.decreaseStake(_wad);
       }
     }
 
-    emit StakingManager_WithdrawalInitiated(msg.sender, _wad);
+    emit StakingManagerWithdrawalInitiated(msg.sender, _wad);
   }
 
   /// @inheritdoc IStakingManager
@@ -173,14 +175,14 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
-      RewardType storage rewardType = _rewardTypes[_i];
-      if (rewardType.isActive) {
-        IRewardPool rewardPool = IRewardPool(rewardType.rewardPool);
-        rewardPool.increaseStake(_existingWithdrawal.amount);
+      RewardType storage _rewardType = _rewardTypes[_i];
+      if (_rewardType.isActive) {
+        IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
+        _rewardPool.increaseStake(_existingWithdrawal.amount);
       }
     }
 
-    emit StakingManager_WithdrawalCancelled(msg.sender, _existingWithdrawal.amount);
+    emit StakingManagerWithdrawalCancelled(msg.sender, _existingWithdrawal.amount);
   }
 
   /// @inheritdoc IStakingManager
@@ -201,7 +203,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     protocolToken.safeTransfer(msg.sender, _existingWithdrawal.amount);
 
-    emit StakingManager_Withdrawn(msg.sender, _existingWithdrawal.amount);
+    emit StakingManagerWithdrawn(msg.sender, _existingWithdrawal.amount);
   }
 
   /// @inheritdoc IStakingManager
@@ -210,7 +212,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     protocolToken.safeTransfer(_rescueReceiver, _wad);
 
-    emit StakingManager_EmergencyWithdrawal(_rescueReceiver, _wad);
+    emit StakingManagerEmergencyWithdrawal(_rescueReceiver, _wad);
   }
 
   /// @inheritdoc IStakingManager
@@ -224,7 +226,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     protocolToken.safeTransfer(_rescueReceiver, _wad);
 
-    emit StakingManager_EmergencyRewardWithdrawal(_rescueReceiver, _rewardTypes[_id].rewardToken, _wad);
+    emit StakingManagerEmergencyRewardWithdrawal(_rescueReceiver, _rewardTypes[_id].rewardToken, _wad);
   }
 
   /// @inheritdoc IStakingManager
@@ -246,14 +248,6 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     uint256 _id = ++rewards;
 
-    // _rewardTypes[_id] = RewardType({
-    //     rewardToken: _rewardToken,
-    //     rewardPool: _rewardPool,
-    //     isActive: true,
-    //     rewardIntegral: 0,
-    //     rewardRemaining: 0
-    // });
-
     RewardType storage _rewardType = _rewardTypes[_id];
     _rewardType.rewardToken = _rewardToken;
     _rewardType.rewardPool = _rewardPool;
@@ -261,7 +255,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     _rewardType.rewardIntegral = 0;
     _rewardType.rewardRemaining = 0;
 
-    emit StakingManager_AddRewardType(_id, _rewardToken, _rewardPool);
+    emit StakingManagerAddRewardType(_id, _rewardToken, _rewardPool);
   }
 
   /// @inheritdoc IStakingManager
@@ -270,7 +264,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_InvalidRewardType();
     }
     _rewardTypes[_id].isActive = true;
-    emit StakingManager_ActivateRewardType(_id);
+    emit StakingManagerActivateRewardType(_id);
   }
 
   /// @inheritdoc IStakingManager
@@ -279,11 +273,11 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_InvalidRewardType();
     }
     _rewardTypes[_id].isActive = false;
-    emit StakingManager_DeactivateRewardType(_id);
+    emit StakingManagerDeactivateRewardType(_id);
   }
 
   /// @inheritdoc IStakingManager
-  function earned(address _account) external returns (EarnedData[] memory claimable) {
+  function earned(address _account) external returns (EarnedData[] memory _claimable) {
     _checkpoint([_account, address(0)]);
     return _earned(_account);
   }
@@ -298,20 +292,20 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     _checkpoint([_account, address(0)]);
   }
 
-  function _earned(address _account) internal view returns (EarnedData[] memory claimable) {
-    claimable = new EarnedData[](rewards);
+  function _earned(address _account) internal view returns (EarnedData[] memory _claimable) {
+    _claimable = new EarnedData[](rewards);
 
     for (uint256 _i = 0; _i < rewards; _i++) {
-      RewardType storage rewardType = _rewardTypes[_i];
+      RewardType storage _rewardType = _rewardTypes[_i];
 
-      if (rewardType.rewardToken == address(0)) {
+      if (_rewardType.rewardToken == address(0)) {
         continue;
       }
 
-      claimable[_i].rewardToken = rewardType.rewardToken;
-      claimable[_i].rewardAmount = rewardType.claimableReward[_account];
+      _claimable[_i].rewardToken = _rewardType.rewardToken;
+      _claimable[_i].rewardAmount = _rewardType.claimableReward[_account];
     }
-    return claimable;
+    return _claimable;
   }
 
   // TODO: Check decimals
@@ -322,19 +316,19 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     uint256 _supply,
     bool _isClaim
   ) internal {
-    RewardType storage rewardType = _rewardTypes[_id];
+    RewardType storage _rewardType = _rewardTypes[_id];
 
-    if (!rewardType.isActive) return;
+    if (!_rewardType.isActive) return;
 
-    uint256 balance = IERC20(rewardType.rewardToken).balanceOf(address(this));
+    uint256 _balance = IERC20(_rewardType.rewardToken).balanceOf(address(this));
 
     // Checks if new rewards have been added by comparing current balance with rewardRemaining
-    if (balance > rewardType.rewardRemaining) {
-      uint256 newRewards = balance - rewardType.rewardRemaining;
+    if (_balance > _rewardType.rewardRemaining) {
+      uint256 _newRewards = _balance - _rewardType.rewardRemaining;
       // If there are new rewards and there are existing stakers
       if (_supply > 0) {
-        rewardType.rewardIntegral += newRewards / _supply;
-        rewardType.rewardRemaining = balance;
+        _rewardType.rewardIntegral += _newRewards / _supply;
+        _rewardType.rewardRemaining = _balance;
       }
     }
 
@@ -342,33 +336,33 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       if (_accounts[_i] == address(0)) continue;
       if (_isClaim && _i != 0) continue; //only update/claim for first address and use second as forwarding
 
-      uint256 userBalance = _balances[_i];
-      uint256 userIntegral = rewardType.rewardIntegralFor[_accounts[_i]];
+      uint256 _userBalance = _balances[_i];
+      uint256 _userIntegral = _rewardType.rewardIntegralFor[_accounts[_i]];
 
-      if (_isClaim || userIntegral < rewardType.rewardIntegral) {
+      if (_isClaim || _userIntegral < _rewardType.rewardIntegral) {
         if (_isClaim) {
           // Calculate total receiveable rewards
-          uint256 receiveable =
-            rewardType.claimableReward[_accounts[_i]] + (userBalance * (rewardType.rewardIntegral - userIntegral));
+          uint256 _receiveable =
+            _rewardType.claimableReward[_accounts[_i]] + (_userBalance * (_rewardType.rewardIntegral - _userIntegral));
           // (rewardType.rewardIntegral - userIntegral).div(
           //     1e20
           // ));
 
-          if (receiveable > 0) {
+          if (_receiveable > 0) {
             // Reset claimable rewards to 0
-            rewardType.claimableReward[_accounts[_i]] = 0;
+            _rewardType.claimableReward[_accounts[_i]] = 0;
 
             // Transfer rewards to the next address in the array (forwarding address)
-            IERC20(rewardType.rewardToken).safeTransfer(_accounts[_i + 1], receiveable);
+            IERC20(_rewardType.rewardToken).safeTransfer(_accounts[_i + 1], _receiveable);
 
-            emit StakingManager_RewardPaid(_accounts[_i], rewardType.rewardToken, receiveable, _accounts[_i + 1]);
+            emit StakingManagerRewardPaid(_accounts[_i], _rewardType.rewardToken, _receiveable, _accounts[_i + 1]);
             // Update the remaining balance
-            balance = balance - receiveable;
+            _balance = _balance - _receiveable;
           }
         } else {
           // Just accumulate rewards without claiming
-          rewardType.claimableReward[_accounts[_i]] =
-            rewardType.claimableReward[_accounts[_i]] + (userBalance * (rewardType.rewardIntegral - userIntegral));
+          _rewardType.claimableReward[_accounts[_i]] =
+            _rewardType.claimableReward[_accounts[_i]] + (_userBalance * (_rewardType.rewardIntegral - _userIntegral));
           // (rewardType.rewardIntegral - userIntegral).div(
           //     1e20
           // ));
@@ -377,42 +371,42 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
 
     // Update remaining reward here since balance could have changed if claiming
-    if (balance != rewardType.rewardRemaining) {
-      rewardType.rewardRemaining = uint256(balance);
+    if (_balance != _rewardType.rewardRemaining) {
+      _rewardType.rewardRemaining = uint256(_balance);
     }
   }
 
   function _checkpoint(address[2] memory _accounts) internal {
-    uint256 supply = stakingToken.totalSupply();
-    uint256[2] memory depositedBalance;
-    depositedBalance[0] = stakingToken.balanceOf(_accounts[0]);
-    depositedBalance[1] = stakingToken.balanceOf(_accounts[1]);
+    uint256 _supply = stakingToken.totalSupply();
+    uint256[2] memory _depositedBalance;
+    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]);
+    _depositedBalance[1] = stakingToken.balanceOf(_accounts[1]);
 
     _claimManagerRewards();
 
-    for (uint256 i = 0; i < rewards; i++) {
-      _calcRewardIntegral(i, _accounts, depositedBalance, supply, false);
+    for (uint256 _i = 0; _i < rewards; _i++) {
+      _calcRewardIntegral(_i, _accounts, _depositedBalance, _supply, false);
     }
   }
 
   function _checkpointAndClaim(address[2] memory _accounts) internal {
-    uint256 supply = stakingToken.totalSupply();
-    uint256[2] memory depositedBalance;
-    depositedBalance[0] = stakingToken.balanceOf(_accounts[0]); //only do first slot
+    uint256 _supply = stakingToken.totalSupply();
+    uint256[2] memory _depositedBalance;
+    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]); //only do first slot
 
     _claimManagerRewards();
 
-    for (uint256 i = 0; i < rewards; i++) {
-      _calcRewardIntegral(i, _accounts, depositedBalance, supply, true);
+    for (uint256 _i = 0; _i < rewards; _i++) {
+      _calcRewardIntegral(_i, _accounts, _depositedBalance, _supply, true);
     }
   }
 
   function _claimManagerRewards() internal {
     for (uint256 _i = 0; _i < rewards; _i++) {
-      RewardType storage rewardType = _rewardTypes[_i];
-      IRewardPool rewardPool = IRewardPool(rewardType.rewardPool);
-      if (!rewardType.isActive) continue;
-      rewardPool.getReward();
+      RewardType storage _rewardType = _rewardTypes[_i];
+      IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
+      if (!_rewardType.isActive) continue;
+      _rewardPool.getReward();
     }
   }
 

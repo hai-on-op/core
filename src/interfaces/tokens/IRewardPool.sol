@@ -18,48 +18,48 @@ interface IRewardPool is IAuthorizable, IModifiable {
    * @param _account The address that staked tokens
    * @param _amount Amount of tokens staked [wad]
    */
-  event RewardPool_Staked(address indexed _account, uint256 _amount);
+  event RewardPoolStaked(address indexed _account, uint256 _amount);
 
   /**
    * @notice Emitted when stake is increased
    * @param _account The address that increased stake
    * @param _amount Amount of tokens added to stake [wad]
    */
-  event RewardPool_IncreaseStake(address indexed _account, uint256 _amount);
+  event RewardPoolIncreaseStake(address indexed _account, uint256 _amount);
 
   /**
    * @notice Emitted when stake is decreased
    * @param _account The address that decreased stake
    * @param _amount Amount of tokens removed from stake [wad]
    */
-  event RewardPool_DecreaseStake(address indexed _account, uint256 _amount);
+  event RewardPoolDecreaseStake(address indexed _account, uint256 _amount);
 
   /**
    * @notice Emitted when tokens are withdrawn
    * @param _account The address that withdrew tokens
    * @param _amount Amount of tokens withdrawn [wad]
    */
-  event RewardPool_Withdrawn(address indexed _account, uint256 _amount);
+  event RewardPoolWithdrawn(address indexed _account, uint256 _amount);
 
   /**
    * @notice Emitted when rewards are paid out
    * @param _account The address that received rewards
    * @param _reward Amount of reward tokens paid [wad]
    */
-  event RewardPool_RewardPaid(address indexed _account, uint256 _reward);
+  event RewardPoolRewardPaid(address indexed _account, uint256 _reward);
 
   /**
    * @notice Emitted when new rewards are added
    * @param _reward Amount of reward tokens added [wad]
    */
-  event RewardPool_RewardAdded(uint256 _reward);
+  event RewardPoolRewardAdded(uint256 _reward);
 
   /**
    * @notice Emitted on emergency withdrawal
    * @param _account The address that performed the withdrawal
    * @param _amount Amount withdrawn [wad]
    */
-  event RewardPool_EmergencyWithdrawal(address indexed _account, uint256 _amount);
+  event RewardPoolEmergencyWithdrawal(address indexed _account, uint256 _amount);
 
   // --- Errors ---
 
@@ -117,9 +117,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
 
   /**
    * @notice Getter for the Total amount of tokens staked
-   * @return _totalStaked Total amount of tokens staked
+   * @return _totalStakedAmt Total amount of tokens staked
    */
-  function totalStaked() external view returns (uint256 _totalStaked);
+  function totalStaked() external view returns (uint256 _totalStakedAmt);
 
   /**
    * @notice Getter for the accumulated rewards per token
@@ -196,25 +196,25 @@ interface IRewardPool is IAuthorizable, IModifiable {
   function earned() external view returns (uint256 _earned);
 
   /// @notice Stake tokens in the pool
-  function stake(uint256 amount) external;
+  function stake(uint256 _amount) external;
 
   /// @notice Increase staked amount
-  function increaseStake(uint256 amount) external;
+  function increaseStake(uint256 _amount) external;
 
   /// @notice Decrease staked amount
-  function decreaseStake(uint256 amount) external;
+  function decreaseStake(uint256 _amount) external;
 
   /// @notice Withdraw staked tokens
-  function withdraw(uint256 amount, bool claim) external;
+  function withdraw(uint256 _amount, bool _claim) external;
 
   /// @notice Claim earned rewards
   function getReward() external;
 
   /// @notice Queue new rewards for distribution
-  function queueNewRewards(uint256 amount) external;
+  function queueNewRewards(uint256 _amount) external;
 
   /// @notice Notify reward amount for immediate distribution
-  function notifyRewardAmount(uint256 reward) external;
+  function notifyRewardAmount(uint256 _reward) external;
 
   /// @notice Emergency withdrawal of reward tokens
   function emergencyWithdraw(address _rescueReceiver, uint256 _wad) external;

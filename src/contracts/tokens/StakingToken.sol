@@ -70,11 +70,13 @@ contract StakingToken is
   /// @inheritdoc IStakingToken
   function mint(address _dst, uint256 _wad) external isAuthorized {
     _mint(_dst, _wad);
+    emit StakingTokenMint(_dst, _wad);
   }
 
   /// @inheritdoc IStakingToken
   function burn(uint256 _wad) public override(ERC20Burnable, IStakingToken) {
     _burn(msg.sender, _wad);
+    emit StakingTokenBurn(msg.sender, _wad);
   }
 
   /// @inheritdoc IStakingToken
@@ -86,19 +88,18 @@ contract StakingToken is
   /// @inheritdoc IStakingToken
   function unpause() external isAuthorized {
     _unpause();
-    emit StakingToken_Unpause();
+    emit StakingTokenUnpause();
   }
 
   /// @inheritdoc IStakingToken
   function pause() external isAuthorized {
     _pause();
-    emit StakingToken_Pause();
+    emit StakingTokenPause();
   }
 
   // --- Overrides ---
 
   function _beforeTokenTransfer(address _from, address _to) internal {
-    // super._beforeTokenTransfer(_from, _to, _wad);
     if (address(stakingManager) == address(0)) {
       revert StakingToken_NullStakingManager();
     }

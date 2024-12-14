@@ -16,54 +16,54 @@ interface IStakingManager is IAuthorizable, IModifiable {
    * @param  _rewardToken Address of the reward token
    * @param  _rewardPool Address of the reward pool
    */
-  event StakingManager_AddRewardType(uint256 indexed _id, address indexed _rewardToken, address indexed _rewardPool);
+  event StakingManagerAddRewardType(uint256 indexed _id, address indexed _rewardToken, address indexed _rewardPool);
 
   /**
    * @notice Emitted when an existing reward type is activated
    * @param  _id Id of the reward type
    */
-  event StakingManager_ActivateRewardType(uint256 indexed _id);
+  event StakingManagerActivateRewardType(uint256 indexed _id);
 
   /**
    * @notice Emitted when an existing reward type is deactivated
    * @param  _id Id of the reward type
    */
-  event StakingManager_DeactivateRewardType(uint256 indexed _id);
+  event StakingManagerDeactivateRewardType(uint256 indexed _id);
 
   /**
    * @notice Emitted when a user stakes tokens
    * @param _account Address of the user staking the tokens
    * @param _wad Amount of tokens staked
    */
-  event StakingManager_Staked(address indexed _account, uint256 _wad);
+  event StakingManagerStaked(address indexed _account, uint256 _wad);
 
   /**
    * @notice Emitted when a user initiates a withdrawal of staked tokens
    * @param  _account Address of the user initiating the withdrawal
    * @param  _wad Amount of tokens withdrawn
    */
-  event StakingManager_WithdrawalInitiated(address indexed _account, uint256 _wad);
+  event StakingManagerWithdrawalInitiated(address indexed _account, uint256 _wad);
 
   /**
    * @notice Emitted when a user cancels a pending withdrawal of staked tokens
    * @param  _account Address of the user that cancelled the withdrawal
    * @param  _wad Amount of tokens in the cancelled withdrawal
    */
-  event StakingManager_WithdrawalCancelled(address indexed _account, uint256 _wad);
+  event StakingManagerWithdrawalCancelled(address indexed _account, uint256 _wad);
 
   /**
    * @notice Emitted when a user withdraws staked tokens from a pending withdrawal
    * @param  _account Address of the user that withdrew
    * @param  _wad Amount of tokens withdrawn
    */
-  event StakingManager_Withdrawn(address indexed _account, uint256 _wad);
+  event StakingManagerWithdrawn(address indexed _account, uint256 _wad);
 
   /**
    * @notice Emitted when an emergency withdrawal is executed
    * @param  _account Address that the tokens were sent to from the emergency withdrawal
    * @param  _wad Amount of tokens withdrawn
    */
-  event StakingManager_EmergencyWithdrawal(address indexed _account, uint256 _wad);
+  event StakingManagerEmergencyWithdrawal(address indexed _account, uint256 _wad);
 
   /**
    * @notice Emitted when an emergency reward withdrawal is executed
@@ -71,7 +71,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
    * @param  _rewardToken Address of the reward token
    * @param  _wad Amount of reward tokens withdrawn
    */
-  event StakingManager_EmergencyRewardWithdrawal(address indexed _account, address indexed _rewardToken, uint256 _wad);
+  event StakingManagerEmergencyRewardWithdrawal(address indexed _account, address indexed _rewardToken, uint256 _wad);
 
   /**
    * @notice Emitted when a reward is paid to a user
@@ -80,7 +80,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
    * @param  _wad Amount of rewards paid
    * @param  _destination Address of the destination the rewards were sent to
    */
-  event StakingManager_RewardPaid(
+  event StakingManagerRewardPaid(
     address indexed _account, address indexed _rewardToken, uint256 _wad, address indexed _destination
   );
 
@@ -355,7 +355,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
    * @notice Check rewards earned for an account
    * @param _account Account to check
    */
-  function earned(address _account) external returns (EarnedData[] memory claimable);
+  function earned(address _account) external returns (EarnedData[] memory _claimable);
 
   /**
    * @notice Checkpoint account balances

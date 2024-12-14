@@ -21,23 +21,23 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
 
   /**
    * @notice Emitted when tokens are minted
-   * @param dst The address that received the minted tokens
-   * @param wad The amount of tokens minted
+   * @param _dst The address that received the minted tokens
+   * @param _wad The amount of tokens minted [wad]
    */
-  event StakingToken_Mint(address indexed dst, uint256 wad);
+  event StakingTokenMint(address indexed _dst, uint256 _wad);
 
   /**
    * @notice Emitted when tokens are burned
-   * @param src The address whose tokens were burned
-   * @param wad The amount of tokens burned
+   * @param _src The address whose tokens were burned
+   * @param _wad The amount of tokens burned [wad]
    */
-  event StakingToken_Burn(address indexed src, uint256 wad);
+  event StakingTokenBurn(address indexed _src, uint256 _wad);
 
   /// @notice Emitted when the contract is paused
-  event StakingToken_Pause();
+  event StakingTokenPause();
 
   /// @notice Emitted when the contract is unpaused
-  event StakingToken_Unpause();
+  event StakingTokenUnpause();
 
   // --- Errors ---
 

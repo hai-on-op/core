@@ -44,7 +44,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   uint256 private _totalStaked;
 
   /// @inheritdoc IRewardPool
-  function totalStaked() external view returns (uint256) {
+  function totalStaked() external view returns (uint256 _totalStakedAmt) {
     return _totalStaked;
   }
 
@@ -90,14 +90,14 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function stake(uint256 _wad) external updateReward(msg.sender) isAuthorized {
     if (_wad == 0) revert RewardPool_StakeNullAmount();
     _totalStaked += _wad;
-    emit RewardPool_Staked(msg.sender, _wad);
+    emit RewardPoolStaked(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
   function increaseStake(uint256 _wad) external isAuthorized {
     if (_wad == 0) revert RewardPool_IncreaseStakeNullAmount();
     _totalStaked += _wad;
-    emit RewardPool_IncreaseStake(msg.sender, _wad);
+    emit RewardPoolIncreaseStake(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
@@ -105,7 +105,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     if (_wad == 0) revert RewardPool_DecreaseStakeNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
     _totalStaked -= _wad;
-    emit RewardPool_DecreaseStake(msg.sender, _wad);
+    emit RewardPoolDecreaseStake(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
@@ -113,7 +113,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     if (_wad == 0) revert RewardPool_WithdrawNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
     _totalStaked -= _wad;
-    emit RewardPool_Withdrawn(msg.sender, _wad);
+    emit RewardPoolWithdrawn(msg.sender, _wad);
     if (_claim) {
       _getReward(msg.sender);
     }
@@ -129,19 +129,19 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     if (_reward > 0) {
       rewards = 0;
       rewardToken.safeTransfer(_account, _reward);
-      emit RewardPool_RewardPaid(_account, _reward);
+      emit RewardPoolRewardPaid(_account, _reward);
     }
   }
 
   /// @inheritdoc IRewardPool
-  function rewardPerToken() public view returns (uint256) {
+  function rewardPerToken() public view returns (uint256 _rewardPerToken) {
     if (_totalStaked == 0) return rewardPerTokenStored;
     uint256 _timeElapsed = lastTimeRewardApplicable() - lastUpdateTime;
     return rewardPerTokenStored + ((_timeElapsed * rewardRate * 1e18) / _totalStaked);
   }
 
   /// @inheritdoc IRewardPool
-  function earned() public view returns (uint256) {
+  function earned() public view returns (uint256 _earned) {
     return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / 1e18) + rewards;
   }
 
@@ -182,14 +182,14 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     currentRewards = _reward;
     lastUpdateTime = block.timestamp;
     periodFinish = block.timestamp + _params.duration;
-    emit RewardPool_RewardAdded(_reward);
+    emit RewardPoolRewardAdded(_reward);
   }
 
   /// @inheritdoc IRewardPool
   function emergencyWithdraw(address _rescueReceiver, uint256 _wad) external isAuthorized {
     if (_wad == 0) revert RewardPool_WithdrawNullAmount();
     IERC20(rewardToken).safeTransfer(_rescueReceiver, _wad);
-    emit RewardPool_EmergencyWithdrawal(msg.sender, _wad);
+    emit RewardPoolEmergencyWithdrawal(msg.sender, _wad);
   }
 
   // --- Modifiers ---
