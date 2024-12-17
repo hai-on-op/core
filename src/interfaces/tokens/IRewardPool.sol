@@ -161,4 +161,8 @@ interface IRewardPool {
 
     /// @notice Emergency withdrawal of reward tokens
     function emergencyWithdraw(address _rescueReceiver, uint256 _wad) external;
+
+    /// @notice Returns the address of the staking manager
+    /// @return The address of the staking manager
+    function stakingManager() external view returns (address);
 }

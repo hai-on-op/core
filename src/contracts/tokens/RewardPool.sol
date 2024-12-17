@@ -57,16 +57,20 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     /// @inheritdoc IRewardPool
     uint256 public rewards = 0;
 
+    /// @notice The address of the staking manager
+    address public stakingManager;
+
     // --- Init ---
 
     /**
      * @param _rewardToken Address of the reward token
      */
-    constructor(address _rewardToken) {
+    constructor(address _rewardToken, address _stakingManager) {
         if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
         rewardToken = IERC20(_rewardToken);
         _params.duration = 7 days;
         _params.newRewardRatio = 830;
+        stakingManager = _stakingManager;
     }
 
     // --- Methods ---
@@ -88,7 +92,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     /// @inheritdoc IRewardPool
     function stake(
         uint256 _wad
-    ) external updateReward(msg.sender) isAuthorized {
+    ) external updateReward() isAuthorized {
         if (_wad == 0) revert RewardPool_StakeNullAmount();
         _totalStaked += _wad;
         emit RewardPool_Staked(msg.sender, _wad);
@@ -113,27 +117,27 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     function withdraw(
         uint256 _wad,
         bool _claim
-    ) external updateReward(msg.sender) isAuthorized {
+    ) external updateReward() isAuthorized {
         if (_wad == 0) revert RewardPool_WithdrawNullAmount();
         if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
         _totalStaked -= _wad;
         emit RewardPool_Withdrawn(msg.sender, _wad);
         if (_claim) {
-            _getReward(msg.sender);
+            _getReward();
         }
     }
 
     /// @inheritdoc IRewardPool
-    function getReward() external updateReward(msg.sender) isAuthorized {
-        _getReward(msg.sender);
+    function getReward() external updateReward() isAuthorized {
+        _getReward();
     }
 
-    function _getReward(address _account) internal {
-        uint256 _reward = earned(_account);
+    function _getReward() internal {
+        uint256 _reward = earned();
         if (_reward > 0) {
             rewards = 0;
-            rewardToken.safeTransfer(_account, _reward);
-            emit RewardPool_RewardPaid(_account, _reward);
+            rewardToken.safeTransfer(stakingManager, _reward);
+            emit RewardPool_RewardPaid(stakingManager, _reward);
         }
     }
 
@@ -179,7 +183,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     /// @inheritdoc IRewardPool
     function notifyRewardAmount(
         uint256 _reward
-    ) public updateReward(address(0)) isAuthorized {
+    ) public updateReward() isAuthorized {
         if (_reward == 0) revert RewardPool_InvalidRewardAmount();
         if (block.timestamp >= periodFinish) {
             rewardRate = _reward / _params.duration;
@@ -206,10 +210,10 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
     // --- Modifiers ---
 
-    modifier updateReward(address _account) {
+    modifier updateReward() {
         rewardPerTokenStored = rewardPerToken();
         lastUpdateTime = lastTimeRewardApplicable();
-        if (_account != address(0)) {
+        if (msg.sender == stakingManager) {
             rewards = earned();
             rewardPerTokenPaid = rewardPerTokenStored;
         }
@@ -223,9 +227,9 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
         bytes32 _param,
         bytes memory _data
     ) internal virtual override {
-        uint256 _uint256 = data.toUint256();
-        if (_param == "duration") _params.duration = _uint256;
-        else if (_param == "newRewardRatio") _params.newRewardRatio = _uint256;
+        if (_param == "stakingManager") stakingManager = _data.toAddress();
+        else if (_param == "duration") _params.duration = _data.toUint256();
+        else if (_param == "newRewardRatio") _params.newRewardRatio = _data.toUint256();
         else revert UnrecognizedParam();
     }
 
@@ -233,5 +237,6 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     function _validateParameters() internal view override {
         _params.duration.assertNonNull().assertGt(0);
         _params.newRewardRatio.assertNonNull().assertGt(0);
+        address(stakingManager).assertHasCode();
     }
 }
