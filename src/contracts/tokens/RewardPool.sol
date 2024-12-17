@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
-import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
-
 import {Encoding} from '@libraries/Encoding.sol';
 import {Assertions} from '@libraries/Assertions.sol';
 import {Math, RAY, WAD} from '@libraries/Math.sol';
+import {EnumerableSet} from '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
 
 /**
  * @title  RewardPool
@@ -19,9 +19,10 @@ import {Math, RAY, WAD} from '@libraries/Math.sol';
  */
 contract RewardPool is Authorizable, Modifiable, IRewardPool {
   using Encoding for bytes;
-  using Assertions for uint256;
   using Math for uint256;
+  using Assertions for uint256;
   using SafeERC20 for IERC20;
+  using EnumerableSet for EnumerableSet.AddressSet;
 
   // --- Registry ---
 

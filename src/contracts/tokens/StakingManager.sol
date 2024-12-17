@@ -2,9 +2,6 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-
-import {Encoding} from '@libraries/Encoding.sol';
-import {Assertions} from '@libraries/Assertions.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 import {IProtocolToken} from '@interfaces/tokens/IProtocolToken.sol';
@@ -17,16 +14,21 @@ import {IStakingManager} from '@interfaces/tokens/IStakingManager.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {Encoding} from '@libraries/Encoding.sol';
+import {Assertions} from '@libraries/Assertions.sol';
+import {Math} from '@libraries/Math.sol';
+
 /**
  * @title  StakingManager
  * @notice This contract is used to manage staking positions
  *         and to distribute staking rewards
  */
 contract StakingManager is Authorizable, Modifiable, IStakingManager {
-  using Encoding for bytes;
-  using Assertions for uint256;
   using SafeERC20 for IProtocolToken;
   using SafeERC20 for IERC20;
+  using Math for uint256;
+  using Encoding for bytes;
+  using Assertions for uint256;
 
   // --- Registry ---
 
@@ -231,14 +233,14 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc IStakingManager
   function getReward(address _account) external {
-    _checkpointAndClaim([_account, _account]);
+    _checkPointAndClaim([_account, _account]);
   }
 
   /// @inheritdoc IStakingManager
   function getRewardAndForward(address _account, address _forwardTo) external {
     if (msg.sender != _account) revert StakingManager_ForwardingOnly();
 
-    _checkpointAndClaim([_account, _forwardTo]);
+    _checkPointAndClaim([_account, _forwardTo]);
   }
 
   /// @inheritdoc IStakingManager
@@ -248,12 +250,11 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     uint256 _id = ++rewards;
 
-    RewardType storage _rewardType = _rewardTypes[_id];
-    _rewardType.rewardToken = _rewardToken;
-    _rewardType.rewardPool = _rewardPool;
-    _rewardType.isActive = true;
-    _rewardType.rewardIntegral = 0;
-    _rewardType.rewardRemaining = 0;
+    _rewardTypes[_id].rewardToken = _rewardToken;
+    _rewardTypes[_id].rewardPool = _rewardPool;
+    _rewardTypes[_id].isActive = true;
+    _rewardTypes[_id].rewardIntegral = 0;
+    _rewardTypes[_id].rewardRemaining = 0;
 
     emit StakingManagerAddRewardType(_id, _rewardToken, _rewardPool);
   }
@@ -278,18 +279,18 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc IStakingManager
   function earned(address _account) external returns (EarnedData[] memory _claimable) {
-    _checkpoint([_account, address(0)]);
+    _checkPoint([_account, address(0)]);
     return _earned(_account);
   }
 
   /// @inheritdoc IStakingManager
   function checkpoint(address[2] memory _accounts) external {
-    _checkpoint(_accounts);
+    _checkPoint(_accounts);
   }
 
   /// @inheritdoc IStakingManager
   function userCheckpoint(address _account) external {
-    _checkpoint([_account, address(0)]);
+    _checkPoint([_account, address(0)]);
   }
 
   function _earned(address _account) internal view returns (EarnedData[] memory _claimable) {
@@ -376,7 +377,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
   }
 
-  function _checkpoint(address[2] memory _accounts) internal {
+  function _checkPoint(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
     _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]);
@@ -389,7 +390,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
   }
 
-  function _checkpointAndClaim(address[2] memory _accounts) internal {
+  function _checkPointAndClaim(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
     _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]); //only do first slot
