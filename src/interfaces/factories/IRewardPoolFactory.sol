@@ -16,13 +16,25 @@ interface IRewardPoolFactory is IAuthorizable {
    * @notice Emitted when a new RewardPool contract is deployed
    * @param _rewardPool Address of the deployed RewardPool contract
    * @param _rewardToken Address of the reward token
+   * @param _stakingManager Address of the staking manager
+   * @param _duration Duration of rewards distribution
+   * @param _newRewardRatio Ratio for accepting new rewards
    */
-  event NewRewardPool(address indexed _rewardPool, address indexed _rewardToken);
+  event NewRewardPool(
+    address indexed _rewardPool,
+    address indexed _rewardToken,
+    address indexed _stakingManager,
+    uint256 _duration,
+    uint256 _newRewardRatio
+  );
 
   // --- Errors ---
 
   /// @notice Thrown when attempting to deploy with a null reward token address
   error RewardPoolFactory_NullRewardToken();
+
+  /// @notice Thrown when attempting to deploy with a null staking manager address
+  error RewardPoolFactory_NullStakingManager();
 
   // --- Methods ---
 
@@ -30,9 +42,17 @@ interface IRewardPoolFactory is IAuthorizable {
    * @notice Deploys a new RewardPool contract
    * @param _rewardToken Address of the reward token
    * @return _rewardPool Address of the deployed RewardPool contract
+   * @param _stakingManager Address of the staking manager
+   * @param _duration Duration of rewards distribution
+   * @param _newRewardRatio Ratio for accepting new rewards
    * @dev Only callable by authorized addresses
    */
-  function deployRewardPool(address _rewardToken) external returns (IRewardPool _rewardPool);
+  function deployRewardPool(
+    address _rewardToken,
+    address _stakingManager,
+    uint256 _duration,
+    uint256 _newRewardRatio
+  ) external returns (IRewardPool _rewardPool);
 
   // --- Views ---
 

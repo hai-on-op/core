@@ -195,12 +195,6 @@ interface IStakingManager is IAuthorizable, IModifiable {
   // --- Data ---
 
   /**
-   * @notice The delay between when a withdrawal is initiated and when it is processed
-   * @return _cooldownPeriod Duration of the cooldown period in seconds
-   */
-  function cooldownPeriod() external view returns (uint256 _cooldownPeriod);
-
-  /**
    * @notice The total amount of tokens staked in the staking manager
    * @return _stakedSupply Total amount of tokens that is currently staked in the staking manager [wad]
    */
