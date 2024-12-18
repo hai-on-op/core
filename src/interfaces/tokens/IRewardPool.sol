@@ -87,6 +87,7 @@ interface IRewardPool is IAuthorizable, IModifiable {
   // --- Structs ---
 
   struct RewardPoolParams {
+    address stakingManager; // Address of the staking manager
     uint256 duration; // Duration of rewards distribution
     uint256 newRewardRatio; // Ratio for accepting new rewards
   }
@@ -101,11 +102,12 @@ interface IRewardPool is IAuthorizable, IModifiable {
 
   /**
    * @notice Getter for the contract parameters struct
+   * @return _stakingManager Address of the staking manager
    * @return _duration Duration of rewards distribution
    * @return _newRewardRatio Ratio for accepting new rewards
    */
   // solhint-disable-next-line private-vars-leading-underscore
-  function _params() external view returns (uint256 _duration, uint256 _newRewardRatio);
+  function _params() external view returns (address _stakingManager, uint256 _duration, uint256 _newRewardRatio);
 
   // --- Data ---
 

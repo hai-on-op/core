@@ -16,6 +16,14 @@ contract RewardPoolChild is RewardPool, FactoryChild, IRewardPoolChild {
 
   /**
    * @param  _rewardToken Address of the reward token
+   * @param _stakingManager Address of the staking manager
+   * @param _duration Duration of rewards distribution
+   * @param _newRewardRatio Ratio for accepting new rewards
    */
-  constructor(address _rewardToken) RewardPool(_rewardToken) {}
+  constructor(
+    address _rewardToken,
+    address _stakingManager,
+    uint256 _duration,
+    uint256 _newRewardRatio
+  ) RewardPool(_rewardToken, _stakingManager, _duration, _newRewardRatio) {}
 }

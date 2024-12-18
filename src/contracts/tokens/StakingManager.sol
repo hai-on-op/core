@@ -52,9 +52,6 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   // --- Data ---
 
   /// @inheritdoc IStakingManager
-  uint256 public cooldownPeriod = 3 days;
-
-  /// @inheritdoc IStakingManager
   uint256 public stakedSupply;
 
   /// @inheritdoc IStakingManager
@@ -103,10 +100,16 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /**
    * @param  _protocolToken Address of the ProtocolToken contract
    * @param  _stakingToken Address of the StakingToken contract
+   * @param  _cooldownPeriod Address of the StakingToken contract
    */
-  constructor(address _protocolToken, address _stakingToken) Authorizable(msg.sender) validParams {
+  constructor(
+    address _protocolToken,
+    address _stakingToken,
+    uint256 _cooldownPeriod
+  ) Authorizable(msg.sender) validParams {
     stakingToken = IStakingToken(_stakingToken);
     protocolToken = IProtocolToken(_protocolToken);
+    _params.cooldownPeriod = _cooldownPeriod;
   }
 
   // --- Methods ---
@@ -195,7 +198,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_NoPendingWithdrawal();
     }
 
-    if (block.timestamp - _existingWithdrawal.timestamp < cooldownPeriod) {
+    if (block.timestamp - _existingWithdrawal.timestamp < _params.cooldownPeriod) {
       revert StakingManager_CooldownPeriodNotElapsed();
     }
 

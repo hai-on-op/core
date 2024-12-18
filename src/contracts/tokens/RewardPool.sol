@@ -21,6 +21,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   using Encoding for bytes;
   using Math for uint256;
   using Assertions for uint256;
+  using Assertions for address;
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -73,11 +74,17 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   /**
    * @param _rewardToken Address of the reward token
    */
-  constructor(address _rewardToken) Authorizable(msg.sender) validParams {
+  constructor(
+    address _rewardToken,
+    address _stakingManager,
+    uint256 _duration,
+    uint256 _newRewardRatio
+  ) Authorizable(msg.sender) validParams {
     if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
     rewardToken = IERC20(_rewardToken);
-    _params.duration = 7 days;
-    _params.newRewardRatio = 830;
+    _params.stakingManager = _stakingManager;
+    _params.duration = _duration;
+    _params.newRewardRatio = _newRewardRatio;
   }
 
   // --- Methods ---
@@ -88,7 +95,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function stake(uint256 _wad) external updateReward(msg.sender) isAuthorized {
+  function stake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_StakeNullAmount();
     _totalStaked += _wad;
     emit RewardPoolStaked(msg.sender, _wad);
@@ -110,27 +117,27 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function withdraw(uint256 _wad, bool _claim) external updateReward(msg.sender) isAuthorized {
+  function withdraw(uint256 _wad, bool _claim) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_WithdrawNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
     _totalStaked -= _wad;
     emit RewardPoolWithdrawn(msg.sender, _wad);
     if (_claim) {
-      _getReward(msg.sender);
+      _getReward();
     }
   }
 
   /// @inheritdoc IRewardPool
-  function getReward() external updateReward(msg.sender) isAuthorized {
-    _getReward(msg.sender);
+  function getReward() external updateReward isAuthorized {
+    _getReward();
   }
 
-  function _getReward(address _account) internal {
+  function _getReward() internal {
     uint256 _reward = earned();
     if (_reward > 0) {
       rewards = 0;
-      rewardToken.safeTransfer(_account, _reward);
-      emit RewardPoolRewardPaid(_account, _reward);
+      rewardToken.safeTransfer(_params.stakingManager, _reward);
+      emit RewardPoolRewardPaid(_params.stakingManager, _reward);
     }
   }
 
@@ -169,7 +176,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function notifyRewardAmount(uint256 _reward) public updateReward(address(0)) isAuthorized {
+  function notifyRewardAmount(uint256 _reward) public updateReward isAuthorized {
     if (_reward == 0) revert RewardPool_InvalidRewardAmount();
     historicalRewards = historicalRewards + _reward;
     if (block.timestamp >= periodFinish) {
@@ -195,10 +202,10 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
   // --- Modifiers ---
 
-  modifier updateReward(address _account) {
+  modifier updateReward() {
     rewardPerTokenStored = rewardPerToken();
     lastUpdateTime = lastTimeRewardApplicable();
-    if (_account != address(0)) {
+    if (msg.sender == _params.stakingManager) {
       rewards = earned();
       rewardPerTokenPaid = rewardPerTokenStored;
     }
@@ -209,9 +216,9 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    uint256 _uint256 = _data.toUint256();
-    if (_param == 'duration') _params.duration = _uint256;
-    else if (_param == 'newRewardRatio') _params.newRewardRatio = _uint256;
+    if (_param == 'stakingManager') _params.stakingManager = _data.toAddress();
+    else if (_param == 'duration') _params.duration = _data.toUint256();
+    else if (_param == 'newRewardRatio') _params.newRewardRatio = _data.toUint256();
     else revert UnrecognizedParam();
   }
 
@@ -219,5 +226,6 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function _validateParameters() internal view override {
     _params.duration.assertNonNull().assertGt(0);
     _params.newRewardRatio.assertNonNull().assertGt(0);
+    address(_params.stakingManager).assertHasCode();
   }
 }

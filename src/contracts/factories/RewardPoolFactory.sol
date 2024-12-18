@@ -30,15 +30,24 @@ contract RewardPoolFactory is Authorizable, IRewardPoolFactory {
   // --- Methods ---
 
   /// @inheritdoc IRewardPoolFactory
-  function deployRewardPool(address _rewardToken) external isAuthorized returns (IRewardPool _rewardPool) {
+  function deployRewardPool(
+    address _rewardToken,
+    address _stakingManager,
+    uint256 _duration,
+    uint256 _newRewardRatio
+  ) external isAuthorized returns (IRewardPool _rewardPool) {
     if (_rewardToken == address(0)) {
       revert RewardPoolFactory_NullRewardToken();
     }
 
-    _rewardPool = new RewardPoolChild(_rewardToken);
+    if (_stakingManager == address(0)) {
+      revert RewardPoolFactory_NullStakingManager();
+    }
+
+    _rewardPool = new RewardPoolChild(_rewardToken, _stakingManager, _duration, _newRewardRatio);
     _rewardPools.add(address(_rewardPool));
 
-    emit NewRewardPool(address(_rewardPool), _rewardToken);
+    emit NewRewardPool(address(_rewardPool), _rewardToken, _stakingManager, _duration, _newRewardRatio);
   }
 
   /// @inheritdoc IRewardPoolFactory
