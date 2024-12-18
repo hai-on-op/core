@@ -63,14 +63,6 @@ interface IWrappedToken is IERC20Metadata, IERC20Permit, IAuthorizable {
   // solhint-disable-next-line private-vars-leading-underscore
   function _params() external view returns (address _baseTokenManager);
 
-  // -- - Data ---
-
-  /**
-   * @notice The address where deposited tokens are transferred to that can manage them
-   * @return _baseTokenManager Address of the base token manager
-   */
-  function baseTokenManager() external view returns (address _baseTokenManager);
-
   // -- - Methods ---
 
   /**

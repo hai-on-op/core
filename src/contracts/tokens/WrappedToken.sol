@@ -46,11 +46,6 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     return _params;
   }
 
-  // --- Data ---
-
-  /// @inheritdoc IWrappedToken
-  address public baseTokenManager;
-
   /**
    * @param  _name String with the name of the token
    * @param  _symbol String with the symbol of the token
@@ -66,7 +61,7 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     if (_baseToken == address(0)) revert WrappedToken_NullBaseToken();
     if (_baseTokenManager == address(0)) revert WrappedToken_NullBaseTokenManager();
     BASE_TOKEN = IERC20(_baseToken);
-    baseTokenManager = _baseTokenManager;
+    _params.baseTokenManager = _baseTokenManager;
   }
 
   /// @inheritdoc IWrappedToken
@@ -74,7 +69,7 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     if (_account == address(0)) revert WrappedToken_NullReceiver();
     if (_wad == 0) revert WrappedToken_NullAmount();
 
-    IERC20(BASE_TOKEN).safeTransferFrom(msg.sender, baseTokenManager, _wad);
+    IERC20(BASE_TOKEN).safeTransferFrom(msg.sender, _params.baseTokenManager, _wad);
 
     _mint(_account, _wad);
 
@@ -94,7 +89,7 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     address _address = _data.toAddress();
     if (_param == 'baseTokenManager') {
       if (_address == address(0)) revert WrappedToken_NullBaseTokenManager();
-      baseTokenManager = _address;
+      _params.baseTokenManager = _address;
     } else {
       revert UnrecognizedParam();
     }
