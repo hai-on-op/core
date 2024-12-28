@@ -9,7 +9,7 @@ on:
 
 jobs:
   generate_interfaces:
-    if: github.repository == 'hai-on-op/hai'
+    if: github.repository == 'hai-on-op/core'
     runs-on: ubuntu-latest
 
     steps:
@@ -43,7 +43,7 @@ jobs:
       - name: Generate canary tag
         if: github.ref_name != 'main'
         run: cd interfaces-package && yarn version --new-version "0.0.0-${GITHUB_SHA::8}" --no-git-tag-version
-      
+
       - name: Publish
         run: cd interfaces-package && npm publish --access public
         env:
