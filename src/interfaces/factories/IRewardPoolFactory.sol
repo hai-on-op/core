@@ -20,7 +20,7 @@ interface IRewardPoolFactory is IAuthorizable {
    * @param _duration Duration of rewards distribution
    * @param _newRewardRatio Ratio for accepting new rewards
    */
-  event NewRewardPool(
+  event DeployRewardPool(
     address indexed _rewardPool,
     address indexed _rewardToken,
     address indexed _stakingManager,

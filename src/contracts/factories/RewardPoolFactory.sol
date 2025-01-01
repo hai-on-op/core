@@ -47,7 +47,7 @@ contract RewardPoolFactory is Authorizable, IRewardPoolFactory {
     _rewardPool = new RewardPoolChild(_rewardToken, _stakingManager, _duration, _newRewardRatio);
     _rewardPools.add(address(_rewardPool));
 
-    emit NewRewardPool(address(_rewardPool), _rewardToken, _stakingManager, _duration, _newRewardRatio);
+    emit DeployRewardPool(address(_rewardPool), _rewardToken, _stakingManager, _duration, _newRewardRatio);
   }
 
   /// @inheritdoc IRewardPoolFactory
