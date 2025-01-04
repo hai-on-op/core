@@ -28,7 +28,7 @@ abstract contract Base is HaiTest {
 
   // RewardPool params
   uint256 constant DURATION = 7 days;
-  uint256 constant NEW_REWARD_RATIO = 420; // 100%
+  uint256 constant NEW_REWARD_RATIO = 420;
 
   IRewardPool.RewardPoolParams rewardPoolParams;
 
