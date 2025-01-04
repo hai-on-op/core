@@ -119,11 +119,11 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function withdraw(uint256 _wad, bool _claim) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_WithdrawNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
-    _totalStaked -= _wad;
-    emit RewardPoolWithdrawn(msg.sender, _wad);
     if (_claim) {
       _getReward();
     }
+    _totalStaked -= _wad;
+    emit RewardPoolWithdrawn(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
@@ -197,6 +197,10 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     if (_wad == 0) revert RewardPool_WithdrawNullAmount();
     IERC20(rewardToken).safeTransfer(_rescueReceiver, _wad);
     emit RewardPoolEmergencyWithdrawal(msg.sender, _wad);
+  }
+
+  function updateRewardHelper() public updateReward {
+    // Empty function that just applies the modifier
   }
 
   // --- Modifiers ---
