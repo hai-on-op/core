@@ -199,7 +199,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     emit RewardPoolEmergencyWithdrawal(msg.sender, _wad);
   }
 
-  function updateRewardHelper() public updateReward {
+  function updateRewardHelper() public updateReward isAuthorized {
     // Empty function that just applies the modifier
   }
 
