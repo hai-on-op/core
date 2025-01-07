@@ -9,7 +9,6 @@ import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
 import {Assertions} from '@libraries/Assertions.sol';
 import {VmSafe} from 'forge-std/Vm.sol';
-import {console2} from 'forge-std/console2.sol';
 import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 abstract contract Base is HaiTest {
