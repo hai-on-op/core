@@ -112,7 +112,7 @@ contract Unit_StakingManager_AddRewardType is Base {
   function test_AddRewardType() public authorized {
     uint256 initialRewardId = stakingManager.rewards();
 
-    uint256 rewardId = initialRewardId + 1;
+    uint256 rewardId = initialRewardId;
 
     vm.expectEmit(true, true, true, true);
     emit StakingManagerAddRewardType(rewardId, address(mockRewardToken), address(mockRewardPool));
@@ -127,13 +127,13 @@ contract Unit_StakingManager_AddRewardType is Base {
     assertEq(rewardType.rewardRemaining, 0);
 
     // Verify rewards counter was incremented
-    assertEq(stakingManager.rewards(), rewardId);
+    assertEq(stakingManager.rewards(), rewardId + 1);
   }
 
   function test_AddMultipleRewardTypes() public authorized {
     uint256 initialRewardId = stakingManager.rewards();
     // Add first reward type
-    uint256 firstRewardId = initialRewardId + 1;
+    uint256 firstRewardId = initialRewardId;
     vm.expectEmit(true, true, true, true);
     emit StakingManagerAddRewardType(firstRewardId, address(mockRewardToken), address(mockRewardPool));
     stakingManager.addRewardType(address(mockRewardToken), address(mockRewardPool));
@@ -172,7 +172,7 @@ contract Unit_StakingManager_ActivateRewardType is Base {
   function test_Revert_ActivateRewardType_Unauthorized() public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
     vm.prank(user);
-    stakingManager.activateRewardType(1);
+    stakingManager.activateRewardType(0);
   }
 
   function test_Revert_ActivateRewardType_InvalidRewardType() public authorized {
@@ -182,7 +182,7 @@ contract Unit_StakingManager_ActivateRewardType is Base {
   }
 
   function test_ActivateRewardType() public authorized {
-    uint256 rewardId = 1; // From setUp
+    uint256 rewardId = 0; // From setUp
 
     // First deactivate it so we can test activation
     stakingManager.deactivateRewardType(rewardId);
@@ -208,7 +208,7 @@ contract Unit_StakingManager_ActivateRewardType is Base {
   }
 
   function test_ActivateRewardType_AlreadyActive() public authorized {
-    uint256 rewardId = 1; // From setUp
+    uint256 rewardId = 0; // From setUp
 
     // Reward type should already be active from setUp
     IStakingManager.RewardTypeInfo memory rewardTypeBefore = stakingManager.rewardTypes(rewardId);
@@ -239,7 +239,7 @@ contract Unit_StakingManager_DeactivateRewardType is Base {
   function test_Revert_DeactivateRewardType_Unauthorized() public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
     vm.prank(user);
-    stakingManager.deactivateRewardType(1);
+    stakingManager.deactivateRewardType(0);
   }
 
   function test_Revert_DeactivateRewardType_InvalidRewardType() public authorized {
@@ -249,7 +249,7 @@ contract Unit_StakingManager_DeactivateRewardType is Base {
   }
 
   function test_DeactivateRewardType() public authorized {
-    uint256 rewardId = 1; // From setUp
+    uint256 rewardId = 0; // From setUp
 
     // Verify it's active initially
     IStakingManager.RewardTypeInfo memory rewardTypeBefore = stakingManager.rewardTypes(rewardId);
@@ -272,7 +272,7 @@ contract Unit_StakingManager_DeactivateRewardType is Base {
   }
 
   function test_DeactivateRewardType_AlreadyInactive() public authorized {
-    uint256 rewardId = 1; // From setUp
+    uint256 rewardId = 0; // From setUp
 
     // First deactivate
     stakingManager.deactivateRewardType(rewardId);
@@ -475,13 +475,13 @@ contract Unit_StakingManager_InitiateWithdrawal is Base {
   }
 
   function test_InitiateWithdrawal_UpdatesRewardPools() public {
-    // Add a reward type at index 1
+    // Add a reward type at index 0
     vm.startPrank(authorizedAccount);
     stakingManager.addRewardType(address(mockRewardToken), address(mockRewardPool));
     vm.stopPrank();
 
-    // Get the reward type at index 1 and verify it
-    IStakingManager.RewardTypeInfo memory rewardType = stakingManager.rewardTypes(1);
+    // Get the reward type at index 0 and verify it
+    IStakingManager.RewardTypeInfo memory rewardType = stakingManager.rewardTypes(0);
     assertEq(rewardType.rewardToken, address(mockRewardToken));
     assertEq(rewardType.rewardPool, address(mockRewardPool));
 
@@ -931,6 +931,108 @@ contract Unit_StakingManager_EmergencyWithdraw is Base {
   }
 }
 
+// contract Unit_StakingManager_EmergencyWithdrawReward is Base {
+//   event StakingManagerEmergencyRewardWithdrawal(
+//     address indexed _rescueReceiver, address indexed _rewardToken, uint256 _wad
+//   );
+
+//   uint256 constant EMERGENCY_AMOUNT = 100 ether;
+//   uint256 rewardTypeId;
+
+//   function setUp() public override {
+//     super.setUp();
+
+//     // Add a reward type
+//     vm.prank(authorizedAccount);
+//     stakingManager.addRewardType(address(mockRewardToken), address(mockRewardPool));
+//     rewardTypeId = stakingManager.rewards(); // Get the current reward ID (1-based)
+//   }
+
+//   function test_Revert_EmergencyWithdrawReward_NotAuthorized() public {
+//     vm.prank(user);
+//     vm.expectRevert(IAuthorizable.Unauthorized.selector);
+//     stakingManager.emergencyWithdrawReward(rewardTypeId, rescueReceiver, EMERGENCY_AMOUNT);
+//   }
+
+//   function test_Revert_EmergencyWithdrawReward_InvalidRewardType() public {
+//     uint256 invalidRewardTypeId = 999;
+//     vm.prank(authorizedAccount);
+//     vm.expectRevert(IStakingManager.StakingManager_InvalidRewardType.selector);
+//     stakingManager.emergencyWithdrawReward(invalidRewardTypeId, rescueReceiver, EMERGENCY_AMOUNT);
+//   }
+
+//   function test_Revert_EmergencyWithdrawReward_NullAmount() public {
+//     vm.prank(authorizedAccount);
+//     vm.expectRevert(IStakingManager.StakingManager_WithdrawNullAmount.selector);
+//     stakingManager.emergencyWithdrawReward(rewardTypeId, rescueReceiver, 0);
+//   }
+
+//   function test_EmergencyWithdrawReward() public {
+//     // Mock initial balances
+//     vm.mockCall(
+//       address(mockRewardToken),
+//       abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+//       abi.encode(EMERGENCY_AMOUNT)
+//     );
+//     vm.mockCall(
+//       address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, rescueReceiver), abi.encode(0)
+//     );
+
+//     // Get initial balances
+//     uint256 initialRewardBalance = IERC20(mockRewardToken).balanceOf(address(stakingManager));
+//     uint256 initialReceiverRewardBalance = IERC20(mockRewardToken).balanceOf(rescueReceiver);
+
+//     // Mock token transfer
+//     vm.mockCall(
+//       address(mockRewardToken),
+//       abi.encodeWithSelector(IERC20.transfer.selector, rescueReceiver, EMERGENCY_AMOUNT),
+//       abi.encode(true)
+//     );
+
+//     // Expect token transfer
+//     vm.expectCall(
+//       address(mockRewardToken), abi.encodeWithSelector(IERC20.transfer.selector, rescueReceiver, EMERGENCY_AMOUNT)
+//     );
+
+//     // Expect event emission
+//     vm.expectEmit(true, true, true, true);
+//     emit StakingManagerEmergencyRewardWithdrawal(rescueReceiver, address(mockRewardToken), EMERGENCY_AMOUNT);
+
+//     // Execute emergency withdrawal
+//     vm.prank(authorizedAccount);
+//     stakingManager.emergencyWithdrawReward(rewardTypeId, rescueReceiver, EMERGENCY_AMOUNT);
+
+//     // Mock final balances
+//     vm.clearMockedCalls();
+//     vm.mockCall(
+//       address(mockRewardToken),
+//       abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+//       abi.encode(0)
+//     );
+//     vm.mockCall(
+//       address(mockRewardToken),
+//       abi.encodeWithSelector(IERC20.balanceOf.selector, rescueReceiver),
+//       abi.encode(EMERGENCY_AMOUNT)
+//     );
+
+//     // Check final balances
+//     uint256 finalRewardBalance = IERC20(mockRewardToken).balanceOf(address(stakingManager));
+//     uint256 finalReceiverRewardBalance = IERC20(mockRewardToken).balanceOf(rescueReceiver);
+
+//     // Verify reward token balances changed correctly
+//     assertEq(
+//       finalRewardBalance,
+//       initialRewardBalance - EMERGENCY_AMOUNT,
+//       'StakingManager reward token balance should decrease by emergency amount'
+//     );
+//     assertEq(
+//       finalReceiverRewardBalance,
+//       initialReceiverRewardBalance + EMERGENCY_AMOUNT,
+//       'Receiver reward token balance should increase by emergency amount'
+//     );
+//   }
+// }
+
 contract Unit_StakingManager_EmergencyWithdrawReward is Base {
   event StakingManagerEmergencyRewardWithdrawal(
     address indexed _rescueReceiver, address indexed _rewardToken, uint256 _wad
@@ -945,7 +1047,7 @@ contract Unit_StakingManager_EmergencyWithdrawReward is Base {
     // Add a reward type
     vm.prank(authorizedAccount);
     stakingManager.addRewardType(address(mockRewardToken), address(mockRewardPool));
-    rewardTypeId = stakingManager.rewards(); // Get the current reward ID (1-based)
+    rewardTypeId = stakingManager.rewards() - 1; // Get the current reward ID (0-based)
   }
 
   function test_Revert_EmergencyWithdrawReward_NotAuthorized() public {

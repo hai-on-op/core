@@ -127,8 +127,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     protocolToken.safeTransferFrom(msg.sender, address(this), _wad);
 
     // Call stake in the reward pools
-    uint256 _rewardCount = rewards;
-    for (uint256 _i = 1; _i <= _rewardCount; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
@@ -154,7 +153,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
 
     // Call decreaseStake in the reward pools
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
@@ -180,7 +179,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     stakedBalances[msg.sender] += withdrawalAmount; // use stored amount
 
     // Call increaseStake in the reward pools
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
@@ -254,7 +253,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     if (_rewardToken == address(0)) revert StakingManager_NullRewardToken();
     if (_rewardPool == address(0)) revert StakingManager_NullRewardPool();
 
-    uint256 _id = ++rewards;
+    uint256 _id = rewards;
+    rewards++;
 
     RewardType storage _rewardType = _rewardTypes[_id];
     _rewardType.rewardToken = _rewardToken;
@@ -303,7 +303,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _earned(address _account) internal view returns (EarnedData[] memory _claimable) {
     _claimable = new EarnedData[](rewards);
 
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
 
       if (_rewardType.rewardToken == address(0)) {
@@ -392,7 +392,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     _claimManagerRewards();
 
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       _calcRewardIntegral(_i, _accounts, _depositedBalance, _supply, false);
     }
   }
@@ -404,13 +404,13 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     _claimManagerRewards();
 
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       _calcRewardIntegral(_i, _accounts, _depositedBalance, _supply, true);
     }
   }
 
   function _claimManagerRewards() internal {
-    for (uint256 _i = 1; _i <= rewards; _i++) {
+    for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
       IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
       if (!_rewardType.isActive) continue;
