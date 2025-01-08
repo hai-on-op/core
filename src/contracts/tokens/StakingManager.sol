@@ -335,7 +335,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       uint256 _newRewards = _balance - _rewardType.rewardRemaining;
       // If there are new rewards and there are existing stakers
       if (_supply > 0) {
-        _rewardType.rewardIntegral += _newRewards / _supply;
+        _rewardType.rewardIntegral += (_newRewards * 1e18) / _supply;
         _rewardType.rewardRemaining = _balance;
       }
     }
@@ -350,11 +350,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       if (_isClaim || _userIntegral < _rewardType.rewardIntegral) {
         if (_isClaim) {
           // Calculate total receiveable rewards
-          uint256 _receiveable =
-            _rewardType.claimableReward[_accounts[_i]] + (_userBalance * (_rewardType.rewardIntegral - _userIntegral));
-          // (rewardType.rewardIntegral - userIntegral).div(
-          //     1e20
-          // ));
+          uint256 _receiveable = _rewardType.claimableReward[_accounts[_i]]
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
 
           if (_receiveable > 0) {
             // Reset claimable rewards to 0
@@ -369,11 +366,11 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
           }
         } else {
           // Just accumulate rewards without claiming
-          _rewardType.claimableReward[_accounts[_i]] =
-            _rewardType.claimableReward[_accounts[_i]] + (_userBalance * (_rewardType.rewardIntegral - _userIntegral));
-          // (rewardType.rewardIntegral - userIntegral).div(
-          //     1e20
-          // ));
+          _rewardType.claimableReward[_accounts[_i]] = _rewardType.claimableReward[_accounts[_i]]
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
+
+          // Update user's reward integral
+          _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
         }
       }
     }
