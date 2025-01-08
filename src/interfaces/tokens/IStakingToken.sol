@@ -47,12 +47,6 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
   /// @notice Throws when ProtocolToken is null
   error StakingToken_NullProtocolToken();
 
-  /// @notice Throws when attempting to mint to zero address
-  error StakingToken_MintToZeroAddress();
-
-  /// @notice Throws when attempting to burn more than balance
-  error StakingToken_InsufficientBalance();
-
   // --- Registry ---
 
   /**
