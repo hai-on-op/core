@@ -99,14 +99,11 @@ contract StakingToken is
 
   // --- Overrides ---
 
-  function _beforeTokenTransfer(address _from, address _to) internal {
+  function _update(address _from, address _to, uint256 _value) internal override(ERC20, ERC20Votes, ERC20Pausable) {
     if (address(stakingManager) == address(0)) {
-      revert StakingToken_NullStakingManager();
+        revert StakingToken_NullStakingManager();
     }
     stakingManager.checkpoint([_from, _to]);
-  }
-
-  function _update(address _from, address _to, uint256 _value) internal override(ERC20, ERC20Votes, ERC20Pausable) {
     super._update(_from, _to, _value);
   }
 
