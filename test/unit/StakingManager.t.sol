@@ -48,6 +48,10 @@ abstract contract Base is HaiTest {
     _;
     vm.stopPrank();
   }
+
+  function _mockRewardPoolTotalStaked(address _rewardPool, uint256 _totalStaked) public {
+    vm.mockCall(_rewardPool, abi.encodeWithSelector(IRewardPool.totalStaked.selector), abi.encode(_totalStaked));
+  }
 }
 
 contract Unit_StakingManager_Constructor is Base {
@@ -467,9 +471,7 @@ contract Unit_StakingManager_InitiateWithdrawal is Base {
     uint256 withdrawAmount = 50 ether;
 
     // Mock the totalStaked call for both before and after states
-    vm.mockCall(
-      address(mockRewardPool), abi.encodeWithSelector(IRewardPool.totalStaked.selector), abi.encode(STAKE_AMOUNT)
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
 
     // Get initial totalStaked value
     uint256 initialTotalStaked = IRewardPool(mockRewardPool).totalStaked();
@@ -485,11 +487,7 @@ contract Unit_StakingManager_InitiateWithdrawal is Base {
 
     // Clear previous mock and set new totalStaked value for after withdrawal
     vm.clearMockedCalls();
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - withdrawAmount)
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT - withdrawAmount);
 
     // Then make the withdrawal call
     vm.prank(user);
@@ -564,11 +562,7 @@ contract Unit_StakingManager_CancelWithdrawal is Base {
     vm.stopPrank();
 
     // Mock initial totalStaked value
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT)
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
 
     // Get initial totalStaked value
     uint256 initialTotalStaked = IRewardPool(mockRewardPool).totalStaked();
@@ -583,11 +577,7 @@ contract Unit_StakingManager_CancelWithdrawal is Base {
 
     // Clear previous mocks and set new totalStaked value for after cancellation
     vm.clearMockedCalls();
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT) // Should be back to full amount after cancellation
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
 
     // Cancel withdrawal
     vm.prank(user);
@@ -613,16 +603,8 @@ contract Unit_StakingManager_CancelWithdrawal is Base {
     vm.stopPrank();
 
     // Mock initial totalStaked values
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT)
-    );
-    vm.mockCall(
-      address(mockSecondRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT)
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
+    _mockRewardPoolTotalStaked(address(mockSecondRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
 
     // Get initial totalStaked values
     uint256 initialTotalStaked1 = IRewardPool(mockRewardPool).totalStaked();
@@ -647,16 +629,8 @@ contract Unit_StakingManager_CancelWithdrawal is Base {
 
     // Clear previous mocks and set new totalStaked values for after cancellation
     vm.clearMockedCalls();
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT) // Should be back to full amount after cancellation
-    );
-    vm.mockCall(
-      address(mockSecondRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT) // Should be back to full amount after cancellation
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
+    _mockRewardPoolTotalStaked(address(mockSecondRewardPool), STAKE_AMOUNT);
 
     // Cancel withdrawal
     vm.prank(user);
@@ -761,16 +735,8 @@ contract Unit_StakingManager_Withdraw is Base {
     vm.warp(block.timestamp + stakingManager.params().cooldownPeriod + 1);
 
     // Mock initial totalStaked values
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT)
-    );
-    vm.mockCall(
-      address(mockSecondRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT)
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
+    _mockRewardPoolTotalStaked(address(mockSecondRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
 
     // Get initial totalStaked values
     uint256 initialTotalStaked1 = IRewardPool(mockRewardPool).totalStaked();
@@ -790,16 +756,8 @@ contract Unit_StakingManager_Withdraw is Base {
 
     // Clear previous mocks and set new totalStaked values for after withdrawal
     vm.clearMockedCalls();
-    vm.mockCall(
-      address(mockRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT) // Should remain the same after withdrawal
-    );
-    vm.mockCall(
-      address(mockSecondRewardPool),
-      abi.encodeWithSelector(IRewardPool.totalStaked.selector),
-      abi.encode(STAKE_AMOUNT - WITHDRAW_AMOUNT) // Should remain the same after withdrawal
-    );
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
+    _mockRewardPoolTotalStaked(address(mockSecondRewardPool), STAKE_AMOUNT - WITHDRAW_AMOUNT);
 
     // Verify final totalStaked values
     uint256 finalTotalStaked1 = IRewardPool(mockRewardPool).totalStaked();
@@ -1077,7 +1035,8 @@ contract Unit_StakingManager_Checkpoint is Base {
 
     // Expect getReward call to reward pool - must be right before the action that triggers it
     vm.expectCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integral was updated
     rewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1129,7 +1088,8 @@ contract Unit_StakingManager_Checkpoint is Base {
 
     // Expect getReward call to reward pool - must be right before the action that triggers it
     vm.expectCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integral was updated
     IStakingManager.RewardTypeInfo memory rewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1183,7 +1143,8 @@ contract Unit_StakingManager_Checkpoint is Base {
 
     // Expect getReward call to reward pool - must be right before the action that triggers it
     vm.expectCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integral was updated
     IStakingManager.RewardTypeInfo memory rewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1252,7 +1213,8 @@ contract Unit_StakingManager_Checkpoint is Base {
     // Expect getReward calls to both reward pools
     vm.expectCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
     vm.expectCall(address(mockSecondRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integrals were updated for both reward types
     IStakingManager.RewardTypeInfo memory firstRewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1343,7 +1305,8 @@ contract Unit_StakingManager_Checkpoint is Base {
     vm.expectCall(address(mockSecondRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
 
     // Call checkpoint
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integrals were updated correctly
     IStakingManager.RewardTypeInfo memory firstRewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1409,8 +1372,9 @@ contract Unit_StakingManager_Checkpoint is Base {
     );
 
     // Call checkpoint
+    address[2] memory accounts = [user, address(0)];
     vm.expectCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector));
-    stakingManager.checkpoint([user, address(0)]);
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integral was not updated (no stakers)
     IStakingManager.RewardTypeInfo memory finalRewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1458,7 +1422,8 @@ contract Unit_StakingManager_Checkpoint is Base {
     );
 
     // Call checkpoint - should not expect getReward call since reward type is inactive
-    stakingManager.checkpoint([user, address(0)]);
+    address[2] memory accounts = [user, address(0)];
+    stakingManager.checkpoint(accounts);
 
     // Verify reward integral was not updated (inactive reward type)
     IStakingManager.RewardTypeInfo memory finalRewardType = stakingManager.rewardTypes(rewardTypeId);
@@ -1648,6 +1613,10 @@ contract Unit_StakingManager_GetReward is Base {
 }
 
 contract Unit_StakingManager_CheckpointAndClaim is Base {
+  event StakingManagerRewardPaid(
+    address indexed _account, address indexed _rewardToken, uint256 _wad, address indexed _destination
+  );
+
   uint256 constant REWARD_AMOUNT = 100 ether;
   uint256 constant STAKE_AMOUNT = 50 ether;
   uint256 rewardTypeId;
@@ -1676,7 +1645,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
 
   function test_CheckpointAndClaim_SingleReward() public {
     uint256 rewardAmount = 10e18;
-    address[2] memory accounts = [user, address(0)];
+    address[2] memory accounts = [user, user];
 
     // Setup initial state for staking token
     vm.mockCall(
@@ -1694,37 +1663,34 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
     );
     vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
 
+    // Mock initial user reward balance and get initial state
+    vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
+    uint256 initialUserRewardBalance = mockRewardToken.balanceOf(user);
+
     // Mock reward pool calls
     vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Mock reward token transfer
     vm.mockCall(
       address(mockRewardToken), abi.encodeWithSelector(IERC20.transfer.selector, user, rewardAmount), abi.encode(true)
     );
 
-    // Get initial state
-    IStakingManager.RewardTypeInfo memory initialRewardType = stakingManagerTest.rewardTypes(rewardTypeId);
-    uint256 initialUserRewardBalance = mockRewardToken.balanceOf(user);
-
-    // Call checkpointAndClaim with debug logs
-    emit log_named_uint('Initial reward integral', initialRewardType.rewardIntegral);
-    emit log_named_uint('Initial user reward balance', initialUserRewardBalance);
-    emit log_named_uint('Reward amount', rewardAmount);
-    emit log_named_uint('Stake amount', STAKE_AMOUNT);
-
-    // Update mock for reward token balance after transfer
+    // Mock final reward token balance after transfer
     vm.mockCall(
       address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(rewardAmount)
     );
 
+    // Expect reward paid event
+    vm.expectEmit(true, true, true, true);
+    emit StakingManagerRewardPaid(user, address(mockRewardToken), rewardAmount, user);
+
+    // Call checkpointAndClaim
     vm.prank(user);
     stakingManagerTest.checkpointAndClaim(accounts);
 
     // Verify reward integral was updated
-    IStakingManager.RewardTypeInfo memory finalRewardType = stakingManagerTest.rewardTypes(rewardTypeId);
-    assertEq(
-      finalRewardType.rewardIntegral,
-      initialRewardType.rewardIntegral + ((rewardAmount * 1e18) / STAKE_AMOUNT),
-      'Reward integral not updated correctly'
-    );
+    IStakingManager.RewardTypeInfo memory rewardType = stakingManagerTest.rewardTypes(rewardTypeId);
+    assertEq(rewardType.rewardIntegral, (rewardAmount * 1e18) / STAKE_AMOUNT, 'Reward integral not updated correctly');
 
     // Verify rewards were transferred to user
     uint256 finalUserRewardBalance = mockRewardToken.balanceOf(user);
@@ -1739,7 +1705,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
 
     uint256 firstRewardAmount = 10e18;
     uint256 secondRewardAmount = 20e18;
-    address[2] memory accounts = [user, address(0)];
+    address[2] memory accounts = [user, user];
 
     // Setup initial state for staking token
     vm.mockCall(
@@ -1829,7 +1795,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
 
   function test_CheckpointAndClaim_InactiveRewardType() public {
     uint256 rewardAmount = 10e18;
-    address[2] memory accounts = [user, address(0)];
+    address[2] memory accounts = [user, user];
 
     // Deactivate reward type
     vm.prank(authorizedAccount);
@@ -1875,7 +1841,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
 
   function test_CheckpointAndClaim_ZeroBalance() public {
     uint256 rewardAmount = 10e18;
-    address[2] memory accounts = [user, address(0)];
+    address[2] memory accounts = [user, user];
 
     // Setup initial state for staking token with zero balance
     vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
@@ -1917,7 +1883,6 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
 
   function test_CheckpointAndClaim_ForwardToOtherAddress() public {
     uint256 rewardAmount = 10e18;
-    // address receiver = address(0xBEEF);
     address[2] memory accounts = [user, receiver];
 
     // Setup initial state for staking token
@@ -1936,34 +1901,36 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
     );
     vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, receiver), abi.encode(0));
 
+    // Mock initial receiver reward balance and get initial state
+    vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, receiver), abi.encode(0));
+    uint256 initialReceiverBalance = mockRewardToken.balanceOf(receiver);
+
     // Mock reward pool calls
     vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Mock reward token transfer
     vm.mockCall(
       address(mockRewardToken),
       abi.encodeWithSelector(IERC20.transfer.selector, receiver, rewardAmount),
       abi.encode(true)
     );
 
-    // Get initial state
-    IStakingManager.RewardTypeInfo memory initialRewardType = stakingManagerTest.rewardTypes(rewardTypeId);
-    uint256 initialReceiverBalance = mockRewardToken.balanceOf(receiver);
-
-    // Update mock for reward token balance after transfer
+    // Mock final reward token balance after transfer
     vm.mockCall(
       address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, receiver), abi.encode(rewardAmount)
     );
+
+    // Expect reward paid event
+    vm.expectEmit(true, true, true, true);
+    emit StakingManagerRewardPaid(user, address(mockRewardToken), rewardAmount, receiver);
 
     // Call checkpointAndClaim
     vm.prank(user);
     stakingManagerTest.checkpointAndClaim(accounts);
 
     // Verify reward integral was updated
-    IStakingManager.RewardTypeInfo memory finalRewardType = stakingManagerTest.rewardTypes(rewardTypeId);
-    assertEq(
-      finalRewardType.rewardIntegral,
-      initialRewardType.rewardIntegral + ((rewardAmount * 1e18) / STAKE_AMOUNT),
-      'Reward integral not updated correctly'
-    );
+    IStakingManager.RewardTypeInfo memory rewardType = stakingManagerTest.rewardTypes(rewardTypeId);
+    assertEq(rewardType.rewardIntegral, (rewardAmount * 1e18) / STAKE_AMOUNT, 'Reward integral not updated correctly');
 
     // Verify rewards were transferred to receiver
     uint256 finalReceiverBalance = mockRewardToken.balanceOf(receiver);
@@ -1975,7 +1942,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
   function test_CheckpointAndClaim_MultipleCheckpoints() public {
     uint256 firstRewardAmount = 10e18;
     uint256 secondRewardAmount = 20e18;
-    address[2] memory accounts = [user, user]; // Use same address for both slots to avoid forwarding
+    address[2] memory accounts = [user, user];
 
     // First checkpoint setup
     vm.mockCall(
@@ -1990,7 +1957,6 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
       abi.encode(firstRewardAmount)
     );
     vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
-    vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
 
     // Get initial state
     IStakingManager.RewardTypeInfo memory initialRewardType = stakingManagerTest.rewardTypes(rewardTypeId);
@@ -2103,5 +2069,321 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
     // Verify rewards were distributed proportionally
     assertEq(mockRewardToken.balanceOf(user), (rewardAmount * 2) / 3, 'First user should receive 2/3 of rewards');
     assertEq(mockRewardToken.balanceOf(secondUser), rewardAmount / 3, 'Second user should receive 1/3 of rewards');
+  }
+}
+
+contract Unit_StakingManager_Earned is Base {
+  uint256 constant REWARD_AMOUNT = 100 ether;
+  uint256 constant STAKE_AMOUNT = 50 ether;
+  uint256 rewardTypeId;
+
+  function setUp() public override {
+    super.setUp();
+
+    // Add reward type
+    vm.startPrank(authorizedAccount);
+    stakingManager.addRewardType(address(mockRewardToken), address(mockRewardPool));
+    stakingManager.activateRewardType(0);
+    vm.stopPrank();
+    rewardTypeId = 0;
+
+    // Setup initial state for staking token
+    vm.mockCall(
+      address(mockStakingToken), abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(STAKE_AMOUNT)
+    );
+    vm.mockCall(
+      address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(STAKE_AMOUNT)
+    );
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, address(0)), abi.encode(0));
+  }
+
+  function test_Earned_SingleRewardType() public {
+    uint256 rewardAmount = 10e18;
+
+    // Mock token transfers for staking
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+
+    // Setup mock for reward pool
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
+
+    // Mock transfer of reward tokens to StakingManager
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.transfer.selector, address(stakingManager), rewardAmount),
+      abi.encode(true)
+    );
+
+    // Mock reward token balance
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+      abi.encode(rewardAmount)
+    );
+
+    // Mock reward pool getReward call
+    vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Stake tokens
+    vm.startPrank(user);
+    stakingManager.stake(user, STAKE_AMOUNT);
+    vm.stopPrank();
+
+    // Checkpoint to update reward balances
+    address[2] memory accounts = [user, user];
+    stakingManager.checkpoint(accounts);
+
+    // Get earned rewards
+    IStakingManager.EarnedData[] memory earnedData = stakingManager.earned(user);
+
+    // Verify earned data
+    assertEq(earnedData.length, 1, 'Should have one reward type');
+    assertEq(earnedData[0].rewardToken, address(mockRewardToken), 'Incorrect reward token');
+    assertEq(earnedData[0].rewardAmount, rewardAmount, 'Incorrect reward amount');
+  }
+
+  function test_Earned_MultipleRewardTypes() public {
+    uint256 firstRewardAmount = 10e18;
+    uint256 secondRewardAmount = 20e18;
+
+    // Add second reward type
+    vm.startPrank(authorizedAccount);
+    stakingManager.addRewardType(address(mockSecondRewardToken), address(mockSecondRewardPool));
+    stakingManager.activateRewardType(1);
+    vm.stopPrank();
+
+    // Mock token transfers for staking
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+
+    // Setup mocks for reward pools
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
+    _mockRewardPoolTotalStaked(address(mockSecondRewardPool), STAKE_AMOUNT);
+
+    // Mock transfers of reward tokens
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.transfer.selector, address(stakingManager), firstRewardAmount),
+      abi.encode(true)
+    );
+    vm.mockCall(
+      address(mockSecondRewardToken),
+      abi.encodeWithSelector(IERC20.transfer.selector, address(stakingManager), secondRewardAmount),
+      abi.encode(true)
+    );
+
+    // Mock reward token balances
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+      abi.encode(firstRewardAmount)
+    );
+    vm.mockCall(
+      address(mockSecondRewardToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+      abi.encode(secondRewardAmount)
+    );
+
+    // Mock reward pool getReward calls
+    vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+    vm.mockCall(address(mockSecondRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Stake tokens
+    vm.startPrank(user);
+    stakingManager.stake(user, STAKE_AMOUNT);
+    vm.stopPrank();
+
+    // Checkpoint to update reward balances
+    address[2] memory accounts = [user, user];
+    stakingManager.checkpoint(accounts);
+
+    // Get earned rewards
+    IStakingManager.EarnedData[] memory earnedData = stakingManager.earned(user);
+
+    // Verify earned data
+    assertEq(earnedData.length, 2, 'Should have two reward types');
+    assertEq(earnedData[0].rewardToken, address(mockRewardToken), 'Incorrect first reward token');
+    assertEq(earnedData[0].rewardAmount, firstRewardAmount, 'Incorrect first reward amount');
+    assertEq(earnedData[1].rewardToken, address(mockSecondRewardToken), 'Incorrect second reward token');
+    assertEq(earnedData[1].rewardAmount, secondRewardAmount, 'Incorrect second reward amount');
+  }
+
+  function test_Earned_NoStake() public {
+    // Mock zero balances
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, address(0)), abi.encode(0));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(0));
+
+    // Mock reward token balance
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+      abi.encode(0)
+    );
+
+    // Mock reward pool getReward call
+    vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Get earned rewards for user with no stake
+    IStakingManager.EarnedData[] memory earnedData = stakingManager.earned(user);
+
+    // Verify earned data
+    assertEq(earnedData.length, 1, 'Should have one reward type');
+    assertEq(earnedData[0].rewardToken, address(mockRewardToken), 'Incorrect reward token');
+    assertEq(earnedData[0].rewardAmount, 0, 'Should have no rewards');
+  }
+
+  function test_Earned_InactiveRewardType() public {
+    uint256 rewardAmount = 10e18;
+
+    // Deactivate reward type
+    vm.prank(authorizedAccount);
+    stakingManager.deactivateRewardType(rewardTypeId);
+
+    // Setup mock for reward pool
+    _mockRewardPoolTotalStaked(address(mockRewardPool), STAKE_AMOUNT);
+
+    // Mock transfer of reward tokens
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.transfer.selector, address(stakingManager), rewardAmount),
+      abi.encode(true)
+    );
+
+    // Mock reward token balance
+    vm.mockCall(
+      address(mockRewardToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
+      abi.encode(rewardAmount)
+    );
+
+    // Mock token transfers for staking
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+
+    // Mock reward pool getReward call
+    vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
+
+    // Stake tokens
+    vm.startPrank(user);
+    stakingManager.stake(user, STAKE_AMOUNT);
+    vm.stopPrank();
+
+    // Checkpoint to update reward balances
+    address[2] memory accounts = [user, user];
+    stakingManager.checkpoint(accounts);
+
+    // Get earned rewards
+    IStakingManager.EarnedData[] memory earnedData = stakingManager.earned(user);
+
+    // Verify earned data
+    assertEq(earnedData.length, 1, 'Should have one reward type');
+    assertEq(earnedData[0].rewardToken, address(mockRewardToken), 'Incorrect reward token');
+    assertEq(earnedData[0].rewardAmount, 0, 'Should have no rewards for inactive type');
+  }
+}
+
+contract Unit_StakingManager_PendingWithdrawals is Base {
+  uint256 constant STAKE_AMOUNT = 100 ether;
+  uint256 constant WITHDRAW_AMOUNT = 50 ether;
+
+  function setUp() public override {
+    super.setUp();
+
+    // Setup mocks for initial stake
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector), abi.encode());
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector), abi.encode(true));
+
+    // Add initial stake
+    vm.prank(user);
+    stakingManager.stake(user, STAKE_AMOUNT);
+
+    // Clear previous mocks
+    vm.clearMockedCalls();
+  }
+
+  function test_PendingWithdrawals_NoWithdrawal() public {
+    // Check pending withdrawals when there are none
+    IStakingManager.PendingWithdrawal memory withdrawal = stakingManager.pendingWithdrawals(user);
+    assertEq(withdrawal.amount, 0, 'Should have no pending withdrawal amount');
+    assertEq(withdrawal.timestamp, 0, 'Should have no pending withdrawal timestamp');
+  }
+
+  function test_PendingWithdrawals_AfterInitiation() public {
+    // Initiate a withdrawal
+    vm.prank(user);
+    stakingManager.initiateWithdrawal(WITHDRAW_AMOUNT);
+
+    // Check pending withdrawal details
+    IStakingManager.PendingWithdrawal memory withdrawal = stakingManager.pendingWithdrawals(user);
+    assertEq(withdrawal.amount, WITHDRAW_AMOUNT, 'Incorrect pending withdrawal amount');
+    assertEq(withdrawal.timestamp, block.timestamp, 'Incorrect pending withdrawal timestamp');
+  }
+
+  function test_PendingWithdrawals_AfterCancel() public {
+    // First initiate a withdrawal
+    vm.prank(user);
+    stakingManager.initiateWithdrawal(WITHDRAW_AMOUNT);
+
+    // Then cancel it
+    vm.prank(user);
+    stakingManager.cancelWithdrawal();
+
+    // Check that pending withdrawal is cleared
+    IStakingManager.PendingWithdrawal memory withdrawal = stakingManager.pendingWithdrawals(user);
+    assertEq(withdrawal.amount, 0, 'Should have no pending withdrawal amount after cancellation');
+    assertEq(withdrawal.timestamp, 0, 'Should have no pending withdrawal timestamp after cancellation');
+  }
+
+  function test_PendingWithdrawals_AfterWithdraw() public {
+    // First initiate a withdrawal
+    vm.prank(user);
+    stakingManager.initiateWithdrawal(WITHDRAW_AMOUNT);
+
+    // Move time forward past cooldown period
+    vm.warp(block.timestamp + stakingManager.params().cooldownPeriod + 1);
+
+    // Mock token transfer for withdrawal
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector), abi.encode(true));
+
+    // Then complete the withdrawal
+    vm.prank(user);
+    stakingManager.withdraw();
+
+    // Check that pending withdrawal is cleared
+    IStakingManager.PendingWithdrawal memory withdrawal = stakingManager.pendingWithdrawals(user);
+    assertEq(withdrawal.amount, 0, 'Should have no pending withdrawal amount after withdrawal');
+    assertEq(withdrawal.timestamp, 0, 'Should have no pending withdrawal timestamp after withdrawal');
+  }
+
+  function test_PendingWithdrawals_MultipleUsers() public {
+    // Setup second user's stake
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+
+    vm.prank(secondUser);
+    stakingManager.stake(secondUser, STAKE_AMOUNT);
+
+    vm.clearMockedCalls();
+
+    // First user initiates withdrawal
+    vm.prank(user);
+    stakingManager.initiateWithdrawal(WITHDRAW_AMOUNT);
+
+    // Second user initiates withdrawal with different amount
+    vm.prank(secondUser);
+    stakingManager.initiateWithdrawal(WITHDRAW_AMOUNT / 2);
+
+    // Check first user's pending withdrawal
+    IStakingManager.PendingWithdrawal memory withdrawal1 = stakingManager.pendingWithdrawals(user);
+    assertEq(withdrawal1.amount, WITHDRAW_AMOUNT, 'Incorrect first user pending withdrawal amount');
+    assertEq(withdrawal1.timestamp, block.timestamp, 'Incorrect first user pending withdrawal timestamp');
+
+    // Check second user's pending withdrawal
+    IStakingManager.PendingWithdrawal memory withdrawal2 = stakingManager.pendingWithdrawals(secondUser);
+    assertEq(withdrawal2.amount, WITHDRAW_AMOUNT / 2, 'Incorrect second user pending withdrawal amount');
+    assertEq(withdrawal2.timestamp, block.timestamp, 'Incorrect second user pending withdrawal timestamp');
   }
 }
