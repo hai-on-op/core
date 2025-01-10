@@ -20,6 +20,24 @@ HAI is an enhanced fork of [GEB](https://github.com/reflexer-labs/geb), but it c
 
 By incorporating these features, HAI aims to provide a more advanced, reliable, and user-friendly stablecoin system.
 
+### Chainlink Oracles
+
+HAI uses the industry-standard decentralized oracle Chainlink as its primary oracle which provides highly secure and reliable, tamper-resistant data feeds.
+
+Chainlink oracles are used across our Optimism instance:
+
+| **Asset**  |
+| ---------- |
+| WETH-USD   |
+| wstETH-USD |
+| tBTC-USD   |
+| rETH-USD   |
+| apxETH-USD |
+| OP-USD     |
+| SNX-USD    |
+| VELO-USD   |
+| LINK-USD   |
+
 ### RedStone Oracles
 
 HAI uses RedStone Oracles as one of its primary solutions for crypto assets pricing. RedStone is a Modular Oracle that delivers frequently updated, reliable, and diverse data feeds in a few models. HAI utilizes Push model which ensures that data is pushed into on-chain storage via a relayer with set conditions. (heartbeat and deviation threshold)
