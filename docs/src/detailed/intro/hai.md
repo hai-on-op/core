@@ -32,7 +32,6 @@ Chainlink oracles are used across our Optimism instance:
 | wstETH-USD |
 | tBTC-USD   |
 | rETH-USD   |
-| apxETH-USD |
 | OP-USD     |
 | SNX-USD    |
 | VELO-USD   |
@@ -40,4 +39,4 @@ Chainlink oracles are used across our Optimism instance:
 
 ### RedStone Oracles
 
-HAI uses RedStone Oracles as one of its primary solutions for crypto assets pricing. RedStone is a Modular Oracle that delivers frequently updated, reliable, and diverse data feeds in a few models. HAI utilizes Push model which ensures that data is pushed into on-chain storage via a relayer with set conditions. (heartbeat and deviation threshold)
+HAI uses RedStone Oracles as one of its solutions for crypto assets pricing. RedStone is a Modular Oracle that delivers frequently updated, reliable, and diverse data feeds in a few models. HAI utilizes Push model which ensures that data is pushed into on-chain storage via a relayer with set conditions. (heartbeat and deviation threshold)
