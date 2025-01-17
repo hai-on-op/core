@@ -35,16 +35,11 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
   // solhint-disable-next-line var-name-mixedcase
   IERC20 public immutable BASE_TOKEN;
 
-  // --- Params ---
+  // --- Registry ---
 
   /// @inheritdoc IWrappedToken
   // solhint-disable-next-line private-vars-leading-underscore
-  WrappedTokenParams public _params;
-
-  /// @inheritdoc IWrappedToken
-  function params() external view returns (WrappedTokenParams memory _wrappedTokenParams) {
-    return _params;
-  }
+  address public baseTokenManager;
 
   /**
    * @param  _name String with the name of the token
@@ -59,9 +54,11 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     address _baseTokenManager
   ) ERC20(_name, _symbol) ERC20Permit(_name) Authorizable(msg.sender) {
     if (_baseToken == address(0)) revert WrappedToken_NullBaseToken();
-    if (_baseTokenManager == address(0)) revert WrappedToken_NullBaseTokenManager();
+    if (_baseTokenManager == address(0)) {
+      revert WrappedToken_NullBaseTokenManager();
+    }
     BASE_TOKEN = IERC20(_baseToken);
-    _params.baseTokenManager = _baseTokenManager;
+    baseTokenManager = _baseTokenManager;
   }
 
   /// @inheritdoc IWrappedToken
@@ -69,7 +66,7 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
     if (_account == address(0)) revert WrappedToken_NullReceiver();
     if (_wad == 0) revert WrappedToken_NullAmount();
 
-    IERC20(BASE_TOKEN).safeTransferFrom(msg.sender, _params.baseTokenManager, _wad);
+    IERC20(BASE_TOKEN).safeTransferFrom(msg.sender, baseTokenManager, _wad);
 
     _mint(_account, _wad);
 
@@ -88,8 +85,7 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
     address _address = _data.toAddress();
     if (_param == 'baseTokenManager') {
-      if (_address == address(0)) revert WrappedToken_NullBaseTokenManager();
-      _params.baseTokenManager = _address;
+      baseTokenManager = _address;
     } else {
       revert UnrecognizedParam();
     }
@@ -97,6 +93,6 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
 
   /// @inheritdoc Modifiable
   function _validateParameters() internal view override {
-    _params.baseTokenManager.assertNonNull();
+    baseTokenManager.assertNonNull();
   }
 }
