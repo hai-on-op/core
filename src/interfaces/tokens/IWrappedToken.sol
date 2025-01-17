@@ -36,32 +36,19 @@ interface IWrappedToken is IERC20Metadata, IERC20Permit, IAuthorizable {
   /// @notice Throws when base token manager is null
   error WrappedToken_NullBaseTokenManager();
 
-  // -- - Data ---
-
-  struct WrappedTokenParams {
-    address baseTokenManager;
-  }
-
   // -- - Registry ---
 
   /// @notice Address of the base token
   /// @return _baseToken The base token contract
+  // solhint-disable-next-line func-name-mixedcase
   function BASE_TOKEN() external view returns (IERC20 _baseToken);
 
-  // -- - Params ---
+  // --- Registry ---
 
   /**
-   * @notice Getter for the contract parameters struct
-   * @return _params WrappedToken parameters struct
+   * @notice The manager contract where deposited tokens are transferred
    */
-  function params() external view returns (WrappedTokenParams memory _params);
-
-  /**
-   * @notice Getter for the unpacked contract parameters struct
-   * @return _baseTokenManager Address of the base token manager
-   */
-  // solhint-disable-next-line private-vars-leading-underscore
-  function _params() external view returns (address _baseTokenManager);
+  function baseTokenManager() external view returns (address _baseTokenManager);
 
   // -- - Methods ---
 
