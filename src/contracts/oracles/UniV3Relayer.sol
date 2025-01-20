@@ -43,7 +43,7 @@ contract UniV3Relayer is IBaseOracle, IUniV3Relayer {
    * @param  _quotePeriod Length in seconds of the TWAP used to consult the pool
    */
   constructor(address _uniV3Factory, address _baseToken, address _quoteToken, uint24 _feeTier, uint32 _quotePeriod) {
-    uniV3Pool = IUniswapV3Factory(_uniV3Factory).getPool(_baseToken, _quoteToken, _feeTier);
+    uniV3Pool = _getPool(_uniV3Factory, _baseToken, _quoteToken, _feeTier);
     if (uniV3Pool == address(0)) revert UniV3Relayer_InvalidPool();
 
     address _token0 = IUniswapV3Pool(uniV3Pool).token0();
@@ -107,5 +107,14 @@ contract UniV3Relayer is IBaseOracle, IUniV3Relayer {
   /// @notice Parses the result from the aggregator into 18 decimals format
   function _parseResult(uint256 _quoteResult) internal view returns (uint256 _result) {
     return _quoteResult * 10 ** multiplier;
+  }
+
+  function _getPool(
+    address _uniV3Factory,
+    address _tokenA,
+    address _tokenB,
+    uint24 _feeTier
+  ) internal view virtual returns (address _pool) {
+    return IUniswapV3Factory(_uniV3Factory).getPool(_tokenA, _tokenB, _feeTier);
   }
 }
