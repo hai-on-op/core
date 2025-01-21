@@ -57,7 +57,7 @@ contract Unit_WrappedToken_Constructor is Base {
   }
 
   function test_Set_BaseTokenManager() public happyPath {
-    assertEq(wrappedToken.params().baseTokenManager, baseTokenManager);
+    assertEq(wrappedToken.baseTokenManager(), baseTokenManager);
   }
 
   function test_Revert_NullBaseToken() public happyPath {
@@ -137,9 +137,26 @@ contract Unit_WrappedToken_Deposit is Base {
   }
 }
 
-contract Unit_WrappedToken_Params is Base {
-  function test_Return_Params() public {
-    IWrappedToken.WrappedTokenParams memory _params = wrappedToken.params();
-    assertEq(_params.baseTokenManager, baseTokenManager);
+contract Unit_WrappedToken_ModifyParameters is Base {
+  modifier happyPath() {
+    vm.startPrank(authorizedAccount);
+    _;
+  }
+
+  function test_ModifyParameters_Set_BaseTokenManager_Contract(address _baseTokenManager)
+    public
+    happyPath
+    mockAsContract(_baseTokenManager)
+  {
+    wrappedToken.modifyParameters('baseTokenManager', abi.encode(_baseTokenManager));
+
+    assertEq(wrappedToken.baseTokenManager(), _baseTokenManager);
+  }
+
+  function test_ModifyParameters_Set_BaseTokenManager_EOA(address _baseTokenManager) public happyPath {
+    vm.assume(_baseTokenManager != address(0));
+    wrappedToken.modifyParameters('baseTokenManager', abi.encode(_baseTokenManager));
+
+    assertEq(wrappedToken.baseTokenManager(), _baseTokenManager);
   }
 }
