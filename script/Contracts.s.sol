@@ -51,6 +51,7 @@ import {
 } from '@contracts/factories/CollateralAuctionHouseFactory.sol';
 import {ChainlinkRelayerFactory, IChainlinkRelayerFactory} from '@contracts/factories/ChainlinkRelayerFactory.sol';
 import {UniV3RelayerFactory, IUniV3RelayerFactory} from '@contracts/factories/UniV3RelayerFactory.sol';
+import {SlipstreamCLRelayerFactory} from '@contracts/factories/SlipstreamCLRelayerFactory.sol';
 import {DenominatedOracleFactory, IDenominatedOracleFactory} from '@contracts/factories/DenominatedOracleFactory.sol';
 import {DelayedOracleFactory, IDelayedOracleFactory} from '@contracts/factories/DelayedOracleFactory.sol';
 
@@ -129,6 +130,7 @@ abstract contract Contracts {
 
   IChainlinkRelayerFactory public chainlinkRelayerFactory;
   IUniV3RelayerFactory public uniV3RelayerFactory;
+  IUniV3RelayerFactory public slipstreamCLRelayerFactory;
   IDenominatedOracleFactory public denominatedOracleFactory;
   IDelayedOracleFactory public delayedOracleFactory;
 
