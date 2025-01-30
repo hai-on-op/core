@@ -51,9 +51,6 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   // --- Data ---
 
   /// @inheritdoc IStakingManager
-  uint256 public stakedSupply;
-
-  /// @inheritdoc IStakingManager
   mapping(address => uint256) public stakedBalances;
 
   /// @inheritdoc IStakingManager
@@ -172,22 +169,22 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_NoPendingWithdrawal();
     }
 
-    uint256 withdrawalAmount = _existingWithdrawal.amount; // Store the amount before deleting
+    uint256 _withdrawalAmount = _existingWithdrawal.amount; // Store the amount before deleting
 
     delete _pendingWithdrawals[msg.sender];
 
-    stakedBalances[msg.sender] += withdrawalAmount; // use stored amount
+    stakedBalances[msg.sender] += _withdrawalAmount; // use stored amount
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
-        _rewardPool.increaseStake(withdrawalAmount);
+        _rewardPool.increaseStake(_withdrawalAmount);
       }
     }
 
-    emit StakingManagerWithdrawalCancelled(msg.sender, withdrawalAmount);
+    emit StakingManagerWithdrawalCancelled(msg.sender, _withdrawalAmount);
   }
 
   /// @inheritdoc IStakingManager
@@ -202,15 +199,15 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_CooldownPeriodNotElapsed();
     }
 
-    uint256 withdrawalAmount = _existingWithdrawal.amount; // Store amount first
+    uint256 _withdrawalAmount = _existingWithdrawal.amount; // Store amount first
 
     delete _pendingWithdrawals[msg.sender];
 
-    stakingToken.burnFrom(msg.sender, withdrawalAmount);
+    stakingToken.burnFrom(msg.sender, _withdrawalAmount);
 
-    protocolToken.safeTransfer(msg.sender, withdrawalAmount);
+    protocolToken.safeTransfer(msg.sender, _withdrawalAmount);
 
-    emit StakingManagerWithdrawn(msg.sender, withdrawalAmount);
+    emit StakingManagerWithdrawn(msg.sender, _withdrawalAmount);
   }
 
   /// @inheritdoc IStakingManager

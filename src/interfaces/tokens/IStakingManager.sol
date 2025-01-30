@@ -195,12 +195,6 @@ interface IStakingManager is IAuthorizable, IModifiable {
   // --- Data ---
 
   /**
-   * @notice The total amount of tokens staked in the staking manager
-   * @return _stakedSupply Total amount of tokens that is currently staked in the staking manager [wad]
-   */
-  function stakedSupply() external view returns (uint256 _stakedSupply);
-
-  /**
    * @notice The total amount of reward types
    * @return _rewards Total amount of reward types [wad]
    */
