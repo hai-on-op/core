@@ -24,6 +24,7 @@ contract RewardPoolChild is RewardPool, FactoryChild, IRewardPoolChild {
     address _rewardToken,
     address _stakingManager,
     uint256 _duration,
-    uint256 _newRewardRatio
-  ) RewardPool(_rewardToken, _stakingManager, _duration, _newRewardRatio) {}
+    uint256 _newRewardRatio,
+    address _deployer
+  ) RewardPool(_rewardToken, _stakingManager, _duration, _newRewardRatio, _deployer) {}
 }
