@@ -36,7 +36,9 @@ abstract contract Base is HaiTest {
       newRewardRatio: NEW_REWARD_RATIO
     });
 
-    rewardPool = new RewardPool(address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO);
+    rewardPool = new RewardPool(
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(deployer)
+    );
     label(address(rewardPool), 'RewardPool');
 
     // rewardPool.addAuthorization(authorizedAccount);
@@ -105,22 +107,22 @@ contract Unit_RewardPool_Constructor is Base {
 
   function test_Revert_NullAddress_RewardToken() public {
     vm.expectRevert(IRewardPool.RewardPool_InvalidRewardToken.selector);
-    new RewardPool(address(0), address(mockStakingManager), DURATION, NEW_REWARD_RATIO);
+    new RewardPool(address(0), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAddress_StakingManager() public {
     vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
-    new RewardPool(address(mockRewardToken), address(0), DURATION, NEW_REWARD_RATIO);
+    new RewardPool(address(mockRewardToken), address(0), DURATION, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAmount_Duration() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(address(mockRewardToken), address(mockStakingManager), 0, NEW_REWARD_RATIO);
+    new RewardPool(address(mockRewardToken), address(mockStakingManager), 0, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAmount_NewRewardRatio() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(address(mockRewardToken), address(mockStakingManager), DURATION, 0);
+    new RewardPool(address(mockRewardToken), address(mockStakingManager), DURATION, 0, address(deployer));
   }
 }
 
@@ -348,7 +350,7 @@ contract Unit_RewardPool_Withdraw is Base {
 
     assertEq(rewardPool.totalStaked(), _stakeAmount - _withdrawAmount);
 
-    assertEq(amountPaid, rewardPerTokenPaid * _stakeAmount / 1e18);
+    assertEq(amountPaid, (rewardPerTokenPaid * _stakeAmount) / 1e18);
   }
 }
 
