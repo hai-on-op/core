@@ -77,13 +77,16 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     address _rewardToken,
     address _stakingManager,
     uint256 _duration,
-    uint256 _newRewardRatio
+    uint256 _newRewardRatio,
+    address _deployer
   ) Authorizable(msg.sender) validParams {
     if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
     rewardToken = IERC20(_rewardToken);
     _params.stakingManager = _stakingManager;
     _params.duration = _duration;
     _params.newRewardRatio = _newRewardRatio;
+    _addAuthorization(_deployer);
+    _addAuthorization(_stakingManager);
   }
 
   // --- Methods ---
@@ -219,10 +222,15 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    if (_param == 'stakingManager') _params.stakingManager = _data.toAddress();
-    else if (_param == 'duration') _params.duration = _data.toUint256();
-    else if (_param == 'newRewardRatio') _params.newRewardRatio = _data.toUint256();
-    else revert UnrecognizedParam();
+    if (_param == 'stakingManager') {
+      _params.stakingManager = _data.toAddress();
+    } else if (_param == 'duration') {
+      _params.duration = _data.toUint256();
+    } else if (_param == 'newRewardRatio') {
+      _params.newRewardRatio = _data.toUint256();
+    } else {
+      revert UnrecognizedParam();
+    }
   }
 
   /// @inheritdoc Modifiable

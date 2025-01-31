@@ -44,7 +44,8 @@ contract RewardPoolFactory is Authorizable, IRewardPoolFactory {
       revert RewardPoolFactory_NullStakingManager();
     }
 
-    _rewardPool = new RewardPoolChild(_rewardToken, _stakingManager, _duration, _newRewardRatio);
+    _rewardPool = new RewardPoolChild(_rewardToken, _stakingManager, _duration, _newRewardRatio, msg.sender);
+
     _rewardPools.add(address(_rewardPool));
 
     emit DeployRewardPool(address(_rewardPool), _rewardToken, _stakingManager, _duration, _newRewardRatio);
