@@ -79,13 +79,13 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     uint256 _duration,
     uint256 _newRewardRatio,
     address _deployer
-  ) Authorizable(_deployer) validParams {
+  ) Authorizable(msg.sender) validParams {
     if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
     rewardToken = IERC20(_rewardToken);
     _params.stakingManager = _stakingManager;
     _params.duration = _duration;
     _params.newRewardRatio = _newRewardRatio;
-    _addAuthorization(msg.sender);
+    _addAuthorization(_deployer);
     _addAuthorization(_stakingManager);
   }
 

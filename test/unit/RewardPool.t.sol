@@ -13,6 +13,7 @@ import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 abstract contract Base is HaiTest {
   address deployer = label('deployer');
+  address factoryDeployer = label('factoryDeployer');
   address authorizedAccount = label('authorizedAccount');
   address user = label('user');
 
@@ -37,12 +38,10 @@ abstract contract Base is HaiTest {
     });
 
     rewardPool = new RewardPool(
-      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(deployer)
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(factoryDeployer)
     );
     label(address(rewardPool), 'RewardPool');
 
-    // rewardPool.addAuthorization(authorizedAccount);
-    rewardPool.addAuthorization(address(mockStakingManager));
     rewardPool.addAuthorization(authorizedAccount);
 
     vm.stopPrank();
