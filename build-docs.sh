@@ -27,7 +27,7 @@ else
 fi
 # copy the generated SUMMARY, from the tmp directory, without the first 5 lines
 # and paste them after the Interfaces section on the original SUMMARY
-tail -n +4 $temp_folder/src/SUMMARY.md >> docs/src/SUMMARY.md
+tail -n +4 $temp_folder/src/SUMMARY.md >>docs/src/SUMMARY.md
 
 # delete old generated interfaces docs
 rm -rf docs/src/$root_path
@@ -42,13 +42,14 @@ rm -rf $temp_folder
 
 # function to replace text in all files (to fix the internal paths)
 replace_text() {
-    for file in "$1"/*; do
-        if [ -f "$file" ]; then
-            sed -i "s|$temp_folder/src/||g" "$file"
-        elif [ -d "$file" ]; then
-            replace_text "$file"
-        fi
-    done
+  #  for file in "$1"/*; do
+  #       if [ -f "$file" ]; then
+  #           sed -i "s|$temp_folder/src/||g" "$file"
+  #       elif [ -d "$file" ]; then
+  #           replace_text "$file"
+  #       fi
+  #   done
+  find "$1" -type f -exec perl -pi -e 's|'$temp_folder'/src/||g' {} +
 }
 
 # path to the base folder
