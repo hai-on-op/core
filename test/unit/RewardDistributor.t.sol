@@ -7,6 +7,7 @@ import {MerkleTreeGenerator} from '@test/utils/MerkleTreeGenerator.sol';
 import {IRewardDistributor} from '@interfaces/tokens/IRewardDistributor.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
+import {Pausable} from '@openzeppelin/contracts/utils/Pausable.sol';
 
 abstract contract Base is HaiTest {
   address deployer = label('deployer');
@@ -297,6 +298,25 @@ contract Unit_RewardDistributor_Pause is Base {
   function test_Revert_Pause_NotAuthorized() public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
     rewardDistributor.pause();
+  }
+
+  function test_Revert_Pause_CannotClaim() public authorized {
+    rewardDistributor.pause();
+
+    vm.stopPrank();
+    vm.prank(user);
+
+    vm.expectRevert(Pausable.EnforcedPause.selector);
+    rewardDistributor.claim(address(mockRewardToken), REWARD_AMOUNT_A, new bytes32[](0));
+  }
+
+  function test_Revert_Pause_CannotMultiClaim() public authorized {
+    rewardDistributor.pause();
+
+    vm.stopPrank();
+    vm.prank(user);
+    vm.expectRevert(Pausable.EnforcedPause.selector);
+    rewardDistributor.multiClaim(new address[](1), new uint256[](1), new bytes32[][](1));
   }
 }
 
