@@ -36,9 +36,10 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
   mapping(bytes32 _root => mapping(address _account => bool _hasClaimed)) public isClaimed;
 
   // --- Init ---
-  constructor(uint256 _epochDuration) Authorizable(msg.sender) {
+  constructor(uint256 _epochDuration, address _rootSetter) Authorizable(msg.sender) {
     epochDuration = _epochDuration;
     epochCounter = 0;
+    rootSetter = _rootSetter;
   }
 
   // --- Methods ---
@@ -135,7 +136,3 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
     else revert UnrecognizedParam();
   }
 }
-
-// add pause
-// add unpause
-// add balance check
