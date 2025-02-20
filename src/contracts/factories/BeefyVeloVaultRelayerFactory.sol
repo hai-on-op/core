@@ -6,6 +6,7 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 import {IBeefyVaultV7} from '@interfaces/external/IBeefyVaultV7.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
+import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
 
 import {BeefyVeloVaultRelayerChild} from '@contracts/factories/BeefyVeloVaultRelayerChild.sol';
 
@@ -34,20 +35,18 @@ contract BeefyVeloVaultRelayerFactory is Authorizable, IBeefyVeloVaultRelayerFac
 
   /// @inheritdoc IBeefyVeloVaultRelayerFactory
   function deployBeefyVeloVaultRelayer(
-    IBaseOracle _token0priceSource,
-    IBaseOracle _token1priceSource,
     IBeefyVaultV7 _beefyVault,
-    IVeloPool _veloPool
+    IVeloPool _veloPool,
+    IPessimisticVeloLpOracle _veloLpOracle
   ) external isAuthorized returns (IBaseOracle _beefyVeloVaultRelayer) {
     _beefyVeloVaultRelayer =
-      new BeefyVeloVaultRelayerChild(_token0priceSource, _token1priceSource, _beefyVault, _veloPool);
+      new BeefyVeloVaultRelayerChild(_beefyVault, _veloPool, _veloLpOracle);
     _beefyVeloVaultRelayers.add(address(_beefyVeloVaultRelayer));
     emit NewBeefyVeloVaultRelayer(
       address(_beefyVeloVaultRelayer),
-      address(_token0priceSource),
-      address(_token1priceSource),
       address(_beefyVault),
-      address(_veloPool)
+      address(_veloPool),
+      address(_veloLpOracle)
     );
   }
 

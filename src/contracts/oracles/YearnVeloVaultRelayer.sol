@@ -3,30 +3,30 @@ pragma solidity 0.8.20;
 
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
-import {IBeefyVeloVaultRelayer} from '@interfaces/oracles/IBeefyVeloVaultRelayer.sol';
+import {IYearnVeloVaultRelayer} from '@interfaces/oracles/IYearnVeloVaultRelayer.sol';
 
-import {IBeefyVaultV7} from '@interfaces/external/IBeefyVaultV7.sol';
+import {IYearnVault} from '@interfaces/external/IYearnVault.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
 
 import {Math, WAD} from '@libraries/Math.sol';
 
 /**
- * @title  BeefyVeloVaultRelayer
- * @notice Deconstructs a Beefy Vault to it's Velodrome liquidity pool and that pool's constituent tokens to return a price feed
+ * @title  YearnVeloVaultRelayer
+ * @notice Deconstructs a Yearn Vault to it's Velodrome liquidity pool and that pool's constituent tokens to return a price feed
  * @dev    Requires an underlying Velodrome pool and price feeds for the pool's tokens
  */
-contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
+contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
   using Math for uint256;
 
   // --- Registry ---
-  /// @inheritdoc IBeefyVeloVaultRelayer
-  IBeefyVaultV7 public beefyVault;
+  /// @inheritdoc IYearnVeloVaultRelayer
+  IYearnVault public yearnVault;
 
-  /// @inheritdoc IBeefyVeloVaultRelayer
+  /// @inheritdoc IYearnVeloVaultRelayer
   IVeloPool public veloPool;
 
-  /// @inheritdoc IBeefyVeloVaultRelayer
+  /// @inheritdoc IYearnVeloVaultRelayer
   IPessimisticVeloLpOracle public veloLpOracle;
 
   // --- Data ---
@@ -38,30 +38,30 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
 
   /**
    *
-   * @param  _beefyVault The address of the beefy vault contract
-   * @param  _veloPool The address of the velo pool underlying the beefy vault
+   * @param  _yearnVault The address of the yearn vault contract
+   * @param  _veloPool The address of the velo pool underlying the yearn vault
    * @param _veloLpOracle The address of the pessimistic velo lp oracle
    */
   constructor(
-    IBeefyVaultV7 _beefyVault,
+    IYearnVault _yearnVault,
     IVeloPool _veloPool,
     IPessimisticVeloLpOracle _veloLpOracle
   ) {
-    if (address(_beefyVault) == address(0)) {
-      revert BeefyVeloVaultRelayer_NullBeefyVault();
+    if (address(_yearnVault) == address(0)) {
+      revert YearnVeloVaultRelayer_NullYearnVault();
     }
     if (address(_veloPool) == address(0)) {
-      revert BeefyVeloVaultRelayer_NullVeloPool();
+      revert YearnVeloVaultRelayer_NullVeloPool();
     }
     if (address(_veloLpOracle) == address(0)) {
-      revert BeefyVeloVaultRelayer_NullVeloLpOracle();
+      revert YearnVeloVaultRelayer_NullVeloLpOracle();
     }
 
-    beefyVault = _beefyVault;
+    yearnVault = _yearnVault;
     veloPool = _veloPool;
     veloLpOracle = _veloLpOracle;
 
-    symbol = string(abi.encodePacked(_beefyVault.symbol(), ' / USD '));
+    symbol = string(abi.encodePacked(_yearnVault.symbol(), ' / USD '));
   }
 
   /// @inheritdoc IBaseOracle
@@ -82,7 +82,7 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
     uint256 _mooTokenBalance = 1_000_000_000_000_000_000;
 
     // # of velo LP tokens in 1 mooToken
-    uint256 _veloLpBalance = _mooTokenBalance.wmul(beefyVault.getPricePerFullShare());
+    uint256 _veloLpBalance = _mooTokenBalance.wmul(yearnVault.pricePerShare());
 
     // price of 1 velo LP token in chainlink price decimals (8)
     uint256 _veloLpPrice = veloLpOracle.getCurrentPrice(address(veloPool));
