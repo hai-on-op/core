@@ -45,10 +45,6 @@ abstract contract Base is HaiTest {
 
     vm.stopPrank();
   }
-
-  function _mockPaused(bool _paused) internal {
-    stdstore.target(address(stakingToken)).sig(Pausable.paused.selector).checked_write(_paused);
-  }
 }
 
 contract Unit_StakingToken_Constructor is Base {
@@ -71,12 +67,6 @@ contract Unit_StakingToken_Constructor is Base {
     assertEq(stakingToken.symbol(), _symbol);
   }
 
-  function test_Set_Paused() public happyPath {
-    _mockPaused(true);
-
-    assertEq(stakingToken.paused(), true);
-  }
-
   function test_Emit_AddAuthorization() public happyPath {
     vm.expectEmit();
     emit AddAuthorization(user);
@@ -93,8 +83,6 @@ contract Unit_StakingToken_Mint is Base {
     vm.startPrank(authorizedAccount);
 
     _assumeHappyPath(_dst, _wad);
-
-    stakingToken.unpause();
 
     _;
   }
@@ -127,7 +115,6 @@ contract Unit_StakingToken_Burn is Base {
 
   modifier happyPath(uint256 _wad) {
     _assumeHappyPath(_wad);
-    _mockPaused(false);
 
     vm.prank(authorizedAccount);
     stakingToken.mint(user, _wad);
@@ -151,59 +138,6 @@ contract Unit_StakingToken_Burn is Base {
   }
 }
 
-contract Unit_StakingToken_Unpause is Base {
-  event Unpaused(address _account);
-  event StakingTokenUnpause();
-
-  modifier happyPath() {
-    vm.startPrank(authorizedAccount);
-    _;
-  }
-
-  function test_Revert_Unauthorized() public {
-    vm.expectRevert(IAuthorizable.Unauthorized.selector);
-
-    stakingToken.unpause();
-  }
-
-  function test_Emit_Events() public happyPath {
-    vm.expectEmit();
-    emit Unpaused(authorizedAccount);
-
-    vm.expectEmit();
-    emit StakingTokenUnpause();
-
-    stakingToken.unpause();
-  }
-}
-
-contract Unit_StakingToken_Pause is Base {
-  event Paused(address _account);
-  event StakingTokenPause();
-
-  modifier happyPath() {
-    vm.startPrank(authorizedAccount);
-    stakingToken.unpause();
-    _;
-  }
-
-  function test_Revert_Unauthorized() public {
-    vm.expectRevert(IAuthorizable.Unauthorized.selector);
-
-    stakingToken.pause();
-  }
-
-  function test_Emit_Events() public happyPath {
-    vm.expectEmit();
-    emit Paused(authorizedAccount);
-
-    vm.expectEmit();
-    emit StakingTokenPause();
-
-    stakingToken.pause();
-  }
-}
-
 contract Unit_StakingToken_Clock is Base {
   function test_Return_Timestamp() public {
     assertEq(stakingToken.clock(), block.timestamp);
@@ -219,7 +153,6 @@ contract Unit_StakingToken_CLOCK_MODE is Base {
 contract Unit_StakingToken_Update is Base {
   modifier happyPath(address _from, address _to, uint256 _value) {
     vm.startPrank(authorizedAccount);
-    stakingToken.unpause();
     _assumeHappyPath(_from, _to, _value);
     _;
   }
@@ -237,7 +170,6 @@ contract Unit_StakingToken_Update is Base {
     // Deploy a new token without setting the staking manager
     vm.startPrank(authorizedAccount);
     StakingToken newToken = new StakingToken(name, symbol, address(mockProtocolToken));
-    newToken.unpause();
     vm.stopPrank();
 
     vm.prank(_from);
@@ -246,26 +178,23 @@ contract Unit_StakingToken_Update is Base {
     newToken.transfer(_to, 0);
   }
 
-  function test_Call_Checkpoint_OnTransfer(
-    address _from,
-    address _to,
-    uint256 _value
-  ) public happyPath(_from, _to, _value) {
-    _mockPaused(false);
+  function test_Revert_TransfersDisabled(address _from, address _to, uint256 _amount) public {
+    vm.assume(_from != address(0) && _to != address(0));
+    vm.assume(_from != _to);
+    _amount = bound(_amount, 0, 1_000_000 * 10 ** 18);
 
-    // Mint tokens to the sender first
-    vm.startPrank(authorizedAccount);
-    stakingToken.mint(_from, _value);
+    // Set up staking manager
     vm.stopPrank();
+    vm.startPrank(authorizedAccount);
+    stakingToken.modifyParameters('stakingManager', abi.encode(address(mockStakingManager)));
 
-    vm.mockCall(
-      address(mockStakingManager), abi.encodeCall(mockStakingManager.checkpoint, ([_from, _to])), abi.encode()
-    );
+    // Mint tokens to _from
+    stakingToken.mint(_from, _amount);
 
-    vm.expectCall(address(mockStakingManager), abi.encodeCall(mockStakingManager.checkpoint, ([_from, _to])));
-
-    vm.prank(_from); // Make sure we're calling transfer as _from
-    stakingToken.transfer(_to, _value);
+    vm.expectRevert(IStakingToken.StakingToken_TransfersDisabled.selector);
+    vm.stopPrank();
+    vm.startPrank(_from);
+    stakingToken.transfer(_to, _amount);
   }
 
   function test_Call_Checkpoint_OnMint(address _to, uint256 _value) public {
@@ -274,9 +203,6 @@ contract Unit_StakingToken_Update is Base {
     vm.assume(_value <= 1_000_000e18); // Reasonable maximum value
 
     vm.startPrank(authorizedAccount);
-
-    // Unpause the token first
-    stakingToken.unpause();
 
     // Set the staking manager
     stakingToken.modifyParameters('stakingManager', abi.encode(address(mockStakingManager)));
@@ -299,9 +225,6 @@ contract Unit_StakingToken_Update is Base {
 
     vm.startPrank(authorizedAccount);
 
-    // Unpause the token first
-    stakingToken.unpause();
-
     // Set the staking manager
     stakingToken.modifyParameters('stakingManager', abi.encode(address(mockStakingManager)));
 
@@ -321,5 +244,41 @@ contract Unit_StakingToken_Update is Base {
 
     stakingToken.burn(_value);
     vm.stopPrank();
+  }
+}
+
+contract Unit_StakingManager_ModifyParameters is Base {
+  function test_ModifyParameters_UpdateStakingManager() public {
+    address newStakingManager = makeAddr('newStakingManager');
+
+    // Mock that both addresses have code
+    vm.mockCall(address(mockStakingManager), abi.encodeWithSignature('extcodesize(address)'), abi.encode(1));
+    vm.mockCall(newStakingManager, abi.encodeWithSignature('extcodesize(address)'), abi.encode(1));
+
+    vm.startPrank(authorizedAccount);
+    stakingToken.modifyParameters('stakingManager', abi.encode(newStakingManager));
+    vm.stopPrank();
+
+    assertEq(address(stakingToken.stakingManager()), newStakingManager);
+  }
+
+  function test_ModifyParameters_EnableTransfers() public {
+    vm.startPrank(authorizedAccount);
+
+    // Enable transfers
+    stakingToken.modifyParameters('transfersEnabled', abi.encode(true));
+
+    // Mint some tokens to test transfer
+    stakingToken.mint(alice, 100e18);
+
+    // Stop being authorized account and become alice
+    vm.stopPrank();
+    vm.startPrank(alice);
+
+    // Transfer should now work
+    stakingToken.transfer(bob, 50e18);
+
+    assertEq(stakingToken.balanceOf(alice), 50e18);
+    assertEq(stakingToken.balanceOf(bob), 50e18);
   }
 }
