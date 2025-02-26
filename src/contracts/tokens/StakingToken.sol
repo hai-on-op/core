@@ -10,7 +10,6 @@ import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {ERC20Permit, IERC20Permit} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol';
 import {ERC20Votes} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Votes.sol';
 import {ERC20Burnable} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol';
-import {ERC20Pausable, Pausable} from '@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol';
 import {Time} from '@openzeppelin/contracts/utils/types/Time.sol';
 import {Nonces} from '@openzeppelin/contracts/utils/Nonces.sol';
 
@@ -25,18 +24,14 @@ import {Assertions} from '@libraries/Assertions.sol';
  * @notice This contract represents the staked protocol ERC20Votes token
  *         ERC20Votes is to potentially support voting with staked tokens in the future
  */
-contract StakingToken is
-  ERC20,
-  ERC20Permit,
-  ERC20Votes,
-  ERC20Burnable,
-  ERC20Pausable,
-  Authorizable,
-  Modifiable,
-  IStakingToken
-{
+contract StakingToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable, Authorizable, Modifiable, IStakingToken {
   using Encoding for bytes;
   using Assertions for address;
+
+  // --- Data ---
+
+  /// @notice Whether token transfers are enabled
+  bool public transfersEnabled;
 
   // --- Registry ---
 
@@ -62,7 +57,6 @@ contract StakingToken is
       revert StakingToken_NullProtocolToken();
     }
     protocolToken = IProtocolToken(_protocolToken);
-    _pause();
   }
 
   // --- Methods ---
@@ -85,23 +79,16 @@ contract StakingToken is
     _burn(_account, _wad);
   }
 
-  /// @inheritdoc IStakingToken
-  function unpause() external isAuthorized {
-    _unpause();
-    emit StakingTokenUnpause();
-  }
-
-  /// @inheritdoc IStakingToken
-  function pause() external isAuthorized {
-    _pause();
-    emit StakingTokenPause();
-  }
-
   // --- Overrides ---
 
-  function _update(address _from, address _to, uint256 _value) internal override(ERC20, ERC20Votes, ERC20Pausable) {
+  function _update(address _from, address _to, uint256 _value) internal override(ERC20, ERC20Votes) {
     if (address(stakingManager) == address(0)) {
       revert StakingToken_NullStakingManager();
+    }
+
+    // Check if transfers are enabled (skip check for minting and burning)
+    if (_from != address(0) && _to != address(0) && !transfersEnabled) {
+      revert StakingToken_TransfersDisabled();
     }
     stakingManager.checkpoint([_from, _to]);
     super._update(_from, _to, _value);
@@ -127,10 +114,10 @@ contract StakingToken is
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    address _address = _data.toAddress();
-    // registry
     if (_param == 'stakingManager') {
-      stakingManager = IStakingManager(_address);
+      stakingManager = IStakingManager(_data.toAddress());
+    } else if (_param == 'transfersEnabled') {
+      transfersEnabled = _data.toBool();
     } else {
       revert UnrecognizedParam();
     }

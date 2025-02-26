@@ -14,7 +14,7 @@ import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
 /**
  * @title  IStakingToken
  * @notice Interface for the StakingToken contract which represents staked protocol tokens
- * @dev    Implements ERC20 with voting capabilities and pausable functionality
+ * @dev    Implements ERC20 with voting capabilities and transfers disabled but minting and burning are enabled
  */
 interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
   // --- Events ---
@@ -33,12 +33,6 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
    */
   event StakingTokenBurn(address indexed _src, uint256 _wad);
 
-  /// @notice Emitted when the contract is paused
-  event StakingTokenPause();
-
-  /// @notice Emitted when the contract is unpaused
-  event StakingTokenUnpause();
-
   // --- Errors ---
 
   /// @notice Throws when StakingManager is null
@@ -46,6 +40,14 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
 
   /// @notice Throws when ProtocolToken is null
   error StakingToken_NullProtocolToken();
+
+  /// @notice Throws when transfers are disabled
+  error StakingToken_TransfersDisabled();
+
+  // --- Data ---
+
+  /// @notice Whether token transfers are enabled
+  function transfersEnabled() external view returns (bool _transfersEnabled);
 
   // --- Registry ---
 
@@ -83,16 +85,4 @@ interface IStakingToken is IERC20Metadata, IERC20Permit, IVotes, IAuthorizable {
    * @param _wad The amount of tokens to burn
    */
   function burnFrom(address _account, uint256 _wad) external;
-
-  /**
-   * @notice Pauses all token transfers
-   * @dev Only callable by authorized addresses
-   */
-  function pause() external;
-
-  /**
-   * @notice Unpauses token transfers
-   * @dev Only callable by authorized addresses
-   */
-  function unpause() external;
 }
