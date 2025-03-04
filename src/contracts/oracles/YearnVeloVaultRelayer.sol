@@ -42,11 +42,7 @@ contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
    * @param  _veloPool The address of the velo pool underlying the yearn vault
    * @param _veloLpOracle The address of the pessimistic velo lp oracle
    */
-  constructor(
-    IYearnVault _yearnVault,
-    IVeloPool _veloPool,
-    IPessimisticVeloLpOracle _veloLpOracle
-  ) {
+  constructor(IYearnVault _yearnVault, IVeloPool _veloPool, IPessimisticVeloLpOracle _veloLpOracle) {
     if (address(_yearnVault) == address(0)) {
       revert YearnVeloVaultRelayer_NullYearnVault();
     }
@@ -61,10 +57,11 @@ contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
     veloPool = _veloPool;
     veloLpOracle = _veloLpOracle;
 
-    symbol = string(abi.encodePacked(_yearnVault.symbol(), ' / USD '));
+    symbol = string(abi.encodePacked(_yearnVault.symbol(), ' / USD'));
   }
 
   /// @inheritdoc IBaseOracle
+  /// @notice This function always returns `_validity` as `true` since there are no conditions where the result would be invalid.
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
     uint256 _totalValue = _getPriceValue();
 
@@ -85,7 +82,7 @@ contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
     uint256 _veloLpBalance = _yvTokenBalance.wmul(yearnVault.pricePerShare());
 
     // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPrice(address(veloPool));
+    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
 
     return _veloLpBalance.wmul(_veloLpPrice);
   }

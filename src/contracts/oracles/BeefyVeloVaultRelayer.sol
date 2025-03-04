@@ -42,11 +42,7 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
    * @param  _veloPool The address of the velo pool underlying the beefy vault
    * @param _veloLpOracle The address of the pessimistic velo lp oracle
    */
-  constructor(
-    IBeefyVaultV7 _beefyVault,
-    IVeloPool _veloPool,
-    IPessimisticVeloLpOracle _veloLpOracle
-  ) {
+  constructor(IBeefyVaultV7 _beefyVault, IVeloPool _veloPool, IPessimisticVeloLpOracle _veloLpOracle) {
     if (address(_beefyVault) == address(0)) {
       revert BeefyVeloVaultRelayer_NullBeefyVault();
     }
@@ -61,10 +57,11 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
     veloPool = _veloPool;
     veloLpOracle = _veloLpOracle;
 
-    symbol = string(abi.encodePacked(_beefyVault.symbol(), ' / USD '));
+    symbol = string(abi.encodePacked(_beefyVault.symbol(), ' / USD'));
   }
 
   /// @inheritdoc IBaseOracle
+  /// @notice This function always returns `_validity` as `true` since there are no conditions where the result would be invalid.
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
     uint256 _totalValue = _getPriceValue();
 
