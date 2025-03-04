@@ -78,11 +78,11 @@ contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
 
   /// @notice Returns the price of the moo token
   function _getPriceValue() internal view returns (uint256 _combinedPriceValue) {
-    // 1 mooToken
-    uint256 _mooTokenBalance = 1_000_000_000_000_000_000;
+    // 1 yvToken
+    uint256 _yvTokenBalance = 1_000_000_000_000_000_000;
 
-    // # of velo LP tokens in 1 mooToken
-    uint256 _veloLpBalance = _mooTokenBalance.wmul(yearnVault.pricePerShare());
+    // # of velo LP tokens in 1 yvToken
+    uint256 _veloLpBalance = _yvTokenBalance.wmul(yearnVault.pricePerShare());
 
     // price of 1 velo LP token in chainlink price decimals (8)
     uint256 _veloLpPrice = veloLpOracle.getCurrentPrice(address(veloPool));

@@ -85,7 +85,7 @@ contract BeefyVeloVaultRelayer is IBaseOracle, IBeefyVeloVaultRelayer {
     uint256 _veloLpBalance = _mooTokenBalance.wmul(beefyVault.getPricePerFullShare());
 
     // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPrice(address(veloPool));
+    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
 
     return _veloLpBalance.wmul(_veloLpPrice);
   }
