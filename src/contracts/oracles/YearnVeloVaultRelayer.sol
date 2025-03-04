@@ -84,6 +84,6 @@ contract YearnVeloVaultRelayer is IBaseOracle, IYearnVeloVaultRelayer {
     // price of 1 velo LP token in chainlink price decimals (8)
     uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
 
-    return _veloLpBalance.wmul(_veloLpPrice);
+    return _veloLpBalance * _veloLpPrice / 1e8;
   }
 }
