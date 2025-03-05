@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 
 import {IBeefyVaultV7} from '@interfaces/external/IBeefyVaultV7.sol';
 
-interface IBeefyVeloVaultRelayer is IBaseOracle {
+interface IBeefyVeloVaultRelayer is IAbstractVeloVaultRelayer {
   // --- Errors ---
 
   /// @notice Throws if the provided beefy vault address is null

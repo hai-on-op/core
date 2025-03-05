@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
-import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 
 import {IYearnVault} from '@interfaces/external/IYearnVault.sol';
 
-interface IYearnVeloVaultRelayer is IBaseOracle {
+interface IYearnVeloVaultRelayer is IAbstractVeloVaultRelayer {
   // --- Errors ---
 
   /// @notice Throws if the provided yearn vault address is null
