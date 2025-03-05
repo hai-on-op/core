@@ -11,12 +11,27 @@ import {DenominatedOracle, IDenominatedOracle} from '@contracts/oracles/Denomina
 import {DelayedOracle, IDelayedOracle} from '@contracts/oracles/DelayedOracle.sol';
 
 import {
+  BeefyVeloVaultRelayer,
+  IBeefyVeloVaultRelayer,
+  IBeefyVaultV7,
+  IVeloPool,
+  IPessimisticVeloLpOracle
+} from '@contracts/oracles/BeefyVeloVaultRelayer.sol';
+import {
+  YearnVeloVaultRelayer, IYearnVeloVaultRelayer, IYearnVault
+} from '@contracts/oracles/YearnVeloVaultRelayer.sol';
+
+import {
   OP_CHAINLINK_ETH_USD_FEED,
   OP_CHAINLINK_WSTETH_ETH_FEED,
   OP_CHAINLINK_SEQUENCER_UPTIME_FEED,
   OP_WETH,
   OP_WBTC,
-  UNISWAP_V3_FACTORY
+  UNISWAP_V3_FACTORY,
+  OP_VELO_POOL,
+  OP_BEEFY_VAULT,
+  OP_YEARN_VAULT,
+  OP_PESSIMISTIC_VELODROME_LP_ORACLE
 } from '@script/Registry.s.sol';
 
 import {Math, WAD} from '@libraries/Math.sol';
@@ -24,21 +39,24 @@ import {Math, WAD} from '@libraries/Math.sol';
 contract E2EOracleSetup is HaiTest {
   using Math for uint256;
 
-  uint256 FORK_BLOCK = 99_000_000;
+  uint256 FORK_BLOCK = 132_000_000;
 
-  uint256 CHAINLINK_ETH_USD_PRICE = 181_865_000_000;
-  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 1_818_650_000_000_000_000_000;
+  uint256 CHAINLINK_ETH_USD_PRICE = 272_041_245_000;
+  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 2_720_412_450_000_000_000_000;
 
   uint256 NEW_ETH_USD_PRICE = 200_000_000_000;
   uint256 NEW_ETH_USD_PRICE_18_DECIMALS = 2_000_000_000_000_000_000_000;
 
-  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_124_766_090_043_756_600; // NOTE: 18 decimals
+  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_193_800_000_000_000_000; // NOTE: 18 decimals
   uint256 WSTETH_USD_PRICE = CHAINLINK_WSTETH_ETH_PRICE.wmul(CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
 
   uint24 FEE_TIER = 500;
 
-  uint256 WBTC_ETH_PRICE = 14_864_307_223_256_388_569; // 1 BTC = 14.8 ETH
-  uint256 WBTC_USD_PRICE = 27_032_972_331_575_231_071_011; // 1 BTC = 27,032 USD
+  uint256 WBTC_ETH_PRICE = 35_709_581_021_379_870_014; // 1 BTC = 35.7 ETH
+  uint256 WBTC_USD_PRICE = 97_144_788_794_845_514_565_467; // 1 BTC = 97,144 USD
+
+  uint256 BEEFY_VAULT_USD_PRICE = 6_342_856_314_535_727_422_890;
+  uint256 YEARN_VAULT_USD_PRICE = 6_226_675_854_311_674_727_197;
 
   IBaseOracle public wethUsdPriceSource;
   IBaseOracle public wstethEthPriceSource;
@@ -48,6 +66,9 @@ contract E2EOracleSetup is HaiTest {
   IDenominatedOracle public wbtcUsdPriceSource;
 
   IDelayedOracle public wethUsdDelayedOracle;
+
+  IBeefyVeloVaultRelayer public beefyVeloVaultRelayerOracle;
+  IYearnVeloVaultRelayer public yearnVeloVaultRelayerOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -66,6 +87,16 @@ contract E2EOracleSetup is HaiTest {
 
     // --- Delayed ---
     wethUsdDelayedOracle = new DelayedOracle(wethUsdPriceSource, 1 hours);
+
+    // --- Vaults ---
+    beefyVeloVaultRelayerOracle = new BeefyVeloVaultRelayer(
+      IBeefyVaultV7(OP_BEEFY_VAULT),
+      IVeloPool(OP_VELO_POOL),
+      IPessimisticVeloLpOracle(OP_PESSIMISTIC_VELODROME_LP_ORACLE)
+    );
+    yearnVeloVaultRelayerOracle = new YearnVeloVaultRelayer(
+      IYearnVault(OP_YEARN_VAULT), IVeloPool(OP_VELO_POOL), IPessimisticVeloLpOracle(OP_PESSIMISTIC_VELODROME_LP_ORACLE)
+    );
   }
 
   function test_OptimismFork() public {
@@ -79,7 +110,7 @@ contract E2EOracleSetup is HaiTest {
   }
 
   function test_ChainlinkRelayer() public {
-    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 1818);
+    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 2720);
     assertEq(wethUsdPriceSource.read(), CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
   }
 
@@ -111,12 +142,12 @@ contract E2EOracleSetup is HaiTest {
    *       concatenate in the right order, e.g WSTETH/ETH - ETH/USD
    */
   function test_DenominatedOracle() public {
-    assertEq(WSTETH_USD_PRICE / 1e18, 2045); // 1818.65 * 1.1247 = 2045
+    assertEq(WSTETH_USD_PRICE / 1e18, 3247); // 2720.41 * 1.1938 = 3247
     assertEq(wstethUsdPriceSource.read(), WSTETH_USD_PRICE);
   }
 
   function test_DenominatedOracleUniV3() public {
-    assertEq(WBTC_USD_PRICE / 1e18, 27_032); // 14.864 * 1818.65 = 27032
+    assertEq(WBTC_USD_PRICE / 1e18, 97_144); // 35.709 * 2720.41 = 97144
     assertEq(wbtcUsdPriceSource.read(), WBTC_USD_PRICE);
   }
 
@@ -222,5 +253,23 @@ contract E2EOracleSetup is HaiTest {
 
   function test_DelayedOracleSymbol() public {
     assertEq(wethUsdDelayedOracle.symbol(), 'ETH / USD');
+  }
+
+  // --- Vaults ---
+
+  function test_BeefyVeloVaultRelayer() public {
+    assertEq(beefyVeloVaultRelayerOracle.read(), BEEFY_VAULT_USD_PRICE);
+  }
+
+  function test_BeefyVeloVaultRelayerSymbol() public {
+    assertEq(beefyVeloVaultRelayerOracle.symbol(), 'mooVeloV2wstETH-WETH / USD');
+  }
+
+  function test_YearnVeloVaultRelayer() public {
+    assertEq(yearnVeloVaultRelayerOracle.read(), YEARN_VAULT_USD_PRICE);
+  }
+
+  function test_YearnVeloVaultRelayerSymbol() public {
+    assertEq(yearnVeloVaultRelayerOracle.symbol(), 'yvVelo-wstETH-WETH-f / USD');
   }
 }
