@@ -4,8 +4,6 @@ pragma solidity 0.8.20;
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 import {IBeefyVaultV7} from '@interfaces/external/IBeefyVaultV7.sol';
-import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
-import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
 
 interface IBeefyVeloVaultRelayer is IBaseOracle {
   // --- Errors ---
@@ -13,30 +11,12 @@ interface IBeefyVeloVaultRelayer is IBaseOracle {
   /// @notice Throws if the provided beefy vault address is null
   error BeefyVeloVaultRelayer_NullBeefyVault();
 
-  /// @notice Throws if the provided velo pool address is null
-  error BeefyVeloVaultRelayer_NullVeloPool();
-
   /// @notice Throws if either of the provided price sources are invalid
   error BeefyVeloVaultRelayer_InvalidPriceSource();
-
-  /// @notice Throws if either of the provided velo lp oracle address is null
-  error BeefyVeloVaultRelayer_NullVeloLpOracle();
 
   /**
    * @notice Address of the beefy vault
    * @dev    Assumes that the beefy vault is a valid IBeefyVaultV7
    */
   function beefyVault() external view returns (IBeefyVaultV7 _beefyVault);
-
-  /**
-   * @notice Address of the velo pool underlying the beefy vault
-   * @dev    Assumes that the price source is a valid IVeloPool
-   */
-  function veloPool() external view returns (IVeloPool _veloPool);
-
-  /**
-   * @notice Address of the pessimistic velo lp oracle
-   * @dev    Assumes that the price source is a valid IPessimisticVeloLpOracle
-   */
-  function veloLpOracle() external view returns (IPessimisticVeloLpOracle _veloPool);
 }
