@@ -365,10 +365,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
           // Just accumulate rewards without claiming
           _rewardType.claimableReward[_accounts[_i]] = _rewardType.claimableReward[_accounts[_i]]
             + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
-
-          // Update user's reward integral
-          _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
         }
+        // Update user's reward integral
+        _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
       }
     }
 
