@@ -25,6 +25,7 @@ abstract contract Base is HaiTest {
   // RewardPool params
   uint256 constant DURATION = 365 days;
   uint256 constant NEW_REWARD_RATIO = 420;
+  uint256 constant INITIAL_STAKED = 0;
 
   IRewardPool.RewardPoolParams rewardPoolParams;
 
@@ -38,7 +39,12 @@ abstract contract Base is HaiTest {
     });
 
     rewardPool = new RewardPool(
-      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(factoryDeployer)
+      address(mockRewardToken),
+      address(mockStakingManager),
+      INITIAL_STAKED,
+      DURATION,
+      NEW_REWARD_RATIO,
+      address(factoryDeployer)
     );
     label(address(rewardPool), 'RewardPool');
 
@@ -96,6 +102,24 @@ contract Unit_RewardPool_Constructor is Base {
     assertEq(rewardPool.params().stakingManager, address(mockStakingManager));
   }
 
+  function test_Set_InitialStaked() public happyPath {
+    assertEq(rewardPool.totalStaked(), INITIAL_STAKED);
+  }
+
+  function test_Set_InitialStakedNonZero() public happyPath {
+    uint256 _initialStakedNonZero = 100e18;
+    RewardPool rp;
+    rp = new RewardPool(
+      address(mockRewardToken),
+      address(mockStakingManager),
+      _initialStakedNonZero,
+      DURATION,
+      NEW_REWARD_RATIO,
+      address(factoryDeployer)
+    );
+    assertEq(rp.totalStaked(), _initialStakedNonZero);
+  }
+
   function test_Set_Duration() public happyPath {
     assertEq(rewardPool.params().duration, DURATION);
   }
@@ -106,22 +130,28 @@ contract Unit_RewardPool_Constructor is Base {
 
   function test_Revert_NullAddress_RewardToken() public {
     vm.expectRevert(IRewardPool.RewardPool_InvalidRewardToken.selector);
-    new RewardPool(address(0), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(deployer));
+    new RewardPool(
+      address(0), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO, address(deployer)
+    );
   }
 
   function test_Revert_NullAddress_StakingManager() public {
     vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
-    new RewardPool(address(mockRewardToken), address(0), DURATION, NEW_REWARD_RATIO, address(deployer));
+    new RewardPool(address(mockRewardToken), address(0), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAmount_Duration() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(address(mockRewardToken), address(mockStakingManager), 0, NEW_REWARD_RATIO, address(deployer));
+    new RewardPool(
+      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, 0, NEW_REWARD_RATIO, address(deployer)
+    );
   }
 
   function test_Revert_NullAmount_NewRewardRatio() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(address(mockRewardToken), address(mockStakingManager), DURATION, 0, address(deployer));
+    new RewardPool(
+      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, 0, address(deployer)
+    );
   }
 }
 

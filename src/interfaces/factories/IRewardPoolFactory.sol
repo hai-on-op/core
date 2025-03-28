@@ -17,6 +17,7 @@ interface IRewardPoolFactory is IAuthorizable {
    * @param _rewardPool Address of the deployed RewardPool contract
    * @param _rewardToken Address of the reward token
    * @param _stakingManager Address of the staking manager
+   * @param _initialStakedAmount Initial staked amount (e.g. adding reward pool when current staked amount is > 0)
    * @param _duration Duration of rewards distribution
    * @param _newRewardRatio Ratio for accepting new rewards
    */
@@ -24,6 +25,7 @@ interface IRewardPoolFactory is IAuthorizable {
     address indexed _rewardPool,
     address indexed _rewardToken,
     address indexed _stakingManager,
+    uint256 _initialStakedAmount,
     uint256 _duration,
     uint256 _newRewardRatio
   );
@@ -43,6 +45,7 @@ interface IRewardPoolFactory is IAuthorizable {
    * @param _rewardToken Address of the reward token
    * @return _rewardPool Address of the deployed RewardPool contract
    * @param _stakingManager Address of the staking manager
+   * @param _initialStakedAmount Initial staked amount (e.g. adding reward pool when current staked amount is > 0)
    * @param _duration Duration of rewards distribution
    * @param _newRewardRatio Ratio for accepting new rewards
    * @dev Only callable by authorized addresses
@@ -50,6 +53,7 @@ interface IRewardPoolFactory is IAuthorizable {
   function deployRewardPool(
     address _rewardToken,
     address _stakingManager,
+    uint256 _initialStakedAmount,
     uint256 _duration,
     uint256 _newRewardRatio
   ) external returns (IRewardPool _rewardPool);
