@@ -197,6 +197,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
    */
   function earned() external view returns (uint256 _earned);
 
+  /// @notice Set the total staked amount
+  function setTotalStaked(uint256 _totalStaked) external;
+
   /// @notice Stake tokens in the pool
   function stake(uint256 _amount) external;
 

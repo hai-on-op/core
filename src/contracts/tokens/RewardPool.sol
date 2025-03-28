@@ -99,6 +99,11 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
+  function setTotalStaked(uint256 _totalStakedUpdated) external isAuthorized {
+    _totalStaked = _totalStakedUpdated;
+  }
+
+  /// @inheritdoc IRewardPool
   function stake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_StakeNullAmount();
     _totalStaked += _wad;

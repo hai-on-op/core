@@ -155,6 +155,26 @@ contract Unit_RewardPool_Constructor is Base {
   }
 }
 
+contract Unit_RewardPool_SetTotalStaked is Base {
+  event RewardPoolStaked(address indexed _account, uint256 _amount);
+
+  modifier happyPath() {
+    vm.startPrank(authorizedAccount);
+    _;
+  }
+
+  function test_Revert_Unauthorized() public {
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    rewardPool.setTotalStaked(1);
+  }
+
+  function test_SetTotalStaked(uint256 _amount) public happyPath {
+    vm.assume(_amount > 0);
+    rewardPool.setTotalStaked(_amount);
+    assertEq(rewardPool.totalStaked(), _amount);
+  }
+}
+
 contract Unit_RewardPool_Stake is Base {
   event RewardPoolStaked(address indexed _account, uint256 _amount);
 
