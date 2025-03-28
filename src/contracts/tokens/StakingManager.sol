@@ -380,8 +380,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _checkpoint(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
-    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]);
-    _depositedBalance[1] = stakingToken.balanceOf(_accounts[1]);
+    _depositedBalance[0] = stakedBalances[_accounts[0]];
+    _depositedBalance[1] = stakedBalances[_accounts[1]];
 
     _claimManagerRewards();
 
@@ -393,7 +393,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _checkpointAndClaim(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
-    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]); //only do first slot
+    _depositedBalance[0] = stakedBalances[_accounts[0]]; //only do first slot
 
     _claimManagerRewards();
 
