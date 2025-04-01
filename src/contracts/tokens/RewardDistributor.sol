@@ -11,6 +11,7 @@ import {IRewardDistributor} from '@interfaces/tokens/IRewardDistributor.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {Assertions} from '@libraries/Assertions.sol';
 import {Encoding} from '@libraries/Encoding.sol';
 /**
  * @title  RewardDistributor
@@ -20,7 +21,7 @@ import {Encoding} from '@libraries/Encoding.sol';
 contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistributor {
   using Encoding for bytes;
   using SafeERC20 for IERC20;
-
+  using Assertions for uint256;
   // --- Data ---
 
   /// @inheritdoc IRewardDistributor
@@ -101,7 +102,7 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
   }
 
   /// @inheritdoc IRewardDistributor
-  function emergencyWidthdraw(address _rescueReceiver, address _token, uint256 _wad) external isAuthorized {
+  function emergencyWithdraw(address _rescueReceiver, address _token, uint256 _wad) external isAuthorized {
     if (_token == address(0)) {
       revert RewardDistributor_InvalidTokenAddress();
     }
@@ -136,5 +137,10 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
     if (_param == 'epochDuration') epochDuration = _uint256;
     else if (_param == 'rootSetter') rootSetter = _address;
     else revert UnrecognizedParam();
+  }
+
+  /// @inheritdoc Modifiable
+  function _validateParameters() internal view override {
+    epochDuration.assertGt(0);
   }
 }

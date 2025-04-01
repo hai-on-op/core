@@ -180,6 +180,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
   }
 
   struct StakingManagerParams {
+    // Amount of time before a user can withdraw their staked tokens
     uint256 cooldownPeriod;
   }
 

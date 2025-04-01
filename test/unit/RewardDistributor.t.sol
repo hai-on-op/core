@@ -261,7 +261,7 @@ contract Unit_RewardDistributor_EmergencyWithdrawal is Base {
     vm.expectEmit(true, true, true, true);
     emit RewardDistributorEmergencyWithdrawal(rescueReceiver, address(mockRewardToken), RESCUE_AMOUNT);
     vm.prank(authorizedAccount);
-    rewardDistributor.emergencyWidthdraw(rescueReceiver, address(mockRewardToken), RESCUE_AMOUNT);
+    rewardDistributor.emergencyWithdraw(rescueReceiver, address(mockRewardToken), RESCUE_AMOUNT);
   }
 
   function test_Revert_EmergencyWithdrawal_NotAuthorized() public {
@@ -269,7 +269,7 @@ contract Unit_RewardDistributor_EmergencyWithdrawal is Base {
 
     vm.prank(user);
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
-    rewardDistributor.emergencyWidthdraw(rescueReceiver, address(mockRewardToken), RESCUE_AMOUNT);
+    rewardDistributor.emergencyWithdraw(rescueReceiver, address(mockRewardToken), RESCUE_AMOUNT);
   }
 
   function test_Revert_EmergencyWithdrawal_InvalidTokenAddress() public {
@@ -277,7 +277,7 @@ contract Unit_RewardDistributor_EmergencyWithdrawal is Base {
 
     vm.prank(authorizedAccount);
     vm.expectRevert(IRewardDistributor.RewardDistributor_InvalidTokenAddress.selector);
-    rewardDistributor.emergencyWidthdraw(rescueReceiver, address(0), RESCUE_AMOUNT);
+    rewardDistributor.emergencyWithdraw(rescueReceiver, address(0), RESCUE_AMOUNT);
   }
 
   function test_Revert_EmergencyWithdrawal_InvalidAmount() public {
@@ -285,7 +285,7 @@ contract Unit_RewardDistributor_EmergencyWithdrawal is Base {
 
     vm.prank(authorizedAccount);
     vm.expectRevert(IRewardDistributor.RewardDistributor_InvalidAmount.selector);
-    rewardDistributor.emergencyWidthdraw(rescueReceiver, address(mockRewardToken), 0);
+    rewardDistributor.emergencyWithdraw(rescueReceiver, address(mockRewardToken), 0);
   }
 }
 

@@ -147,5 +147,5 @@ interface IRewardDistributor is IAuthorizable, IModifiable {
    * @param _token Address of the token
    * @param _wad Amount of reward tokens to withdraw
    */
-  function emergencyWidthdraw(address _rescueReceiver, address _token, uint256 _wad) external;
+  function emergencyWithdraw(address _rescueReceiver, address _token, uint256 _wad) external;
 }

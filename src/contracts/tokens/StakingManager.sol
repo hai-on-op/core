@@ -98,7 +98,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /**
    * @param  _protocolToken Address of the ProtocolToken contract
    * @param  _stakingToken Address of the StakingToken contract
-   * @param  _cooldownPeriod Address of the StakingToken contract
+   * @param  _cooldownPeriod Amount of time before a user can withdraw their staked tokens
    */
   constructor(
     address _protocolToken,
