@@ -109,9 +109,6 @@ interface IStakingManager is IAuthorizable, IModifiable {
   /// @notice Throws when trying to withdraw a null amount
   error StakingManager_WithdrawNullAmount();
 
-  /// @notice Throws when trying to withdraw a negative amount
-  error StakingManager_WithdrawNegativeAmount();
-
   /// @notice Throws when trying to withdraw an amount greater than the staked balance
   error StakingManager_WithdrawAmountExceedsBalance();
 
@@ -126,9 +123,6 @@ interface IStakingManager is IAuthorizable, IModifiable {
 
   /// @notice Throws when trying to add a reward type with a null reward pool
   error StakingManager_NullRewardPool();
-
-  /// @notice Throws when trying to calculate rewards on an inactive reward type
-  error StakingManager_InactiveRewardType();
 
   /// @notice Throws when trying to forward rewards without being the account owner
   error StakingManager_ForwardingOnly();
