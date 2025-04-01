@@ -421,8 +421,11 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    uint256 _uint256 = _data.toUint256();
-    if (_param == 'cooldownPeriod') _params.cooldownPeriod = _uint256;
+    if (_param == 'cooldownPeriod') {
+      _params.cooldownPeriod = _data.toUint256();
+    } else {
+      revert UnrecognizedParam();
+    }
   }
 
   /// @inheritdoc Modifiable

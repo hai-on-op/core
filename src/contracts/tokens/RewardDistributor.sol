@@ -131,11 +131,8 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    uint256 _uint256 = _data.toUint256();
-    address _address = _data.toAddress();
-
-    if (_param == 'epochDuration') epochDuration = _uint256;
-    else if (_param == 'rootSetter') rootSetter = _address;
+    if (_param == 'epochDuration') epochDuration = _data.toUint256();
+    else if (_param == 'rootSetter') rootSetter = _data.toAddress();
     else revert UnrecognizedParam();
   }
 

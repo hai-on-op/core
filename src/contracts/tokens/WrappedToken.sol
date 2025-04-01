@@ -83,12 +83,8 @@ contract WrappedToken is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappedT
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    address _address = _data.toAddress();
-    if (_param == 'baseTokenManager') {
-      baseTokenManager = _address;
-    } else {
-      revert UnrecognizedParam();
-    }
+    if (_param == 'baseTokenManager') baseTokenManager = _data.toAddress();
+    else revert UnrecognizedParam();
   }
 
   /// @inheritdoc Modifiable
