@@ -129,6 +129,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
         _rewardPool.stake(_wad);
+        emit StakingManagerRewardPoolStaked(_account, _i, _rewardType.rewardPool, _wad);
       }
     }
 
