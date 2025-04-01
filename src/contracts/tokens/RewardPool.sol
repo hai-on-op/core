@@ -21,7 +21,6 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   using Encoding for bytes;
   using Assertions for uint256;
   using Assertions for address;
-  using Math for uint256;
   using SafeERC20 for IERC20;
 
   // --- Registry ---

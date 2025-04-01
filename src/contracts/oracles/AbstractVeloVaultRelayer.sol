@@ -5,15 +5,12 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
-import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  AbstractVeloVaultRelayer
  * @notice Abstract contract for Velo vault relayers (Beefy, Yearn, etc.)
  */
 abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
-  using Math for uint256;
-
   // --- Registry ---
 
   /// @inheritdoc IAbstractVeloVaultRelayer
