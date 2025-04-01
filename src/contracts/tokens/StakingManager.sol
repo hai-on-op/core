@@ -17,6 +17,8 @@ import {IStakingManager} from '@interfaces/tokens/IStakingManager.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {WAD} from '@libraries/Math.sol';
+
 /**
  * @title  StakingManager
  * @notice This contract is used to manage staking positions
@@ -336,7 +338,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       uint256 _newRewards = _balance - _rewardType.rewardRemaining;
       // If there are new rewards and there are existing stakers
       if (_supply > 0) {
-        _rewardType.rewardIntegral += (_newRewards * 1e18) / _supply;
+        _rewardType.rewardIntegral += (_newRewards * WAD) / _supply;
         _rewardType.rewardRemaining = _balance;
       }
     }
@@ -352,7 +354,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
         if (_isClaim) {
           // Calculate total receiveable rewards
           uint256 _receiveable = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
 
           if (_receiveable > 0) {
             // Reset claimable rewards to 0
@@ -368,7 +370,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
         } else {
           // Just accumulate rewards without claiming
           _rewardType.claimableReward[_accounts[_i]] = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
         }
         // Update user's reward integral
         _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;

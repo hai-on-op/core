@@ -11,7 +11,7 @@ import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
 
 import {Encoding} from '@libraries/Encoding.sol';
 import {Assertions} from '@libraries/Assertions.sol';
-import {Math, RAY, WAD} from '@libraries/Math.sol';
+import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  RewardPool
@@ -154,12 +154,12 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function rewardPerToken() public view returns (uint256 _rewardPerToken) {
     if (_totalStaked == 0) return rewardPerTokenStored;
     uint256 _timeElapsed = lastTimeRewardApplicable() - lastUpdateTime;
-    return rewardPerTokenStored + ((_timeElapsed * rewardRate * 1e18) / _totalStaked);
+    return rewardPerTokenStored + ((_timeElapsed * rewardRate * WAD) / _totalStaked);
   }
 
   /// @inheritdoc IRewardPool
   function earned() public view returns (uint256 _earned) {
-    return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / 1e18) + rewards;
+    return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / WAD) + rewards;
   }
 
   /// @inheritdoc IRewardPool
