@@ -111,14 +111,14 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function increaseStake(uint256 _wad) external isAuthorized {
+  function increaseStake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_IncreaseStakeNullAmount();
     _totalStaked += _wad;
     emit RewardPoolIncreaseStake(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
-  function decreaseStake(uint256 _wad) external isAuthorized {
+  function decreaseStake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_DecreaseStakeNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
     _totalStaked -= _wad;
