@@ -14,6 +14,9 @@ interface IBeefyVeloVaultRelayer is IAbstractVeloVaultRelayer {
   /// @notice Throws if either of the provided price sources are invalid
   error BeefyVeloVaultRelayer_InvalidPriceSource();
 
+  /// @notice Throws if the price is 0
+  error BeefyVeloVaultRelayer_ZeroPrice();
+
   /**
    * @notice Address of the beefy vault
    * @dev    Assumes that the beefy vault is a valid IBeefyVaultV7

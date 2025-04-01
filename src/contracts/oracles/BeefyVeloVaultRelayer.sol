@@ -56,6 +56,12 @@ contract BeefyVeloVaultRelayer is AbstractVeloVaultRelayer, IBeefyVeloVaultRelay
     // price of 1 velo LP token in chainlink price decimals (8)
     uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
 
-    return (_veloLpBalance * _veloLpPrice) / 1e8;
+    uint256 _price = (_veloLpBalance * _veloLpPrice) / 1e8;
+
+    if (_price == 0) {
+      revert BeefyVeloVaultRelayer_ZeroPrice();
+    }
+
+    return _price;
   }
 }

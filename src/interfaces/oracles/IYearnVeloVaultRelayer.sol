@@ -14,6 +14,9 @@ interface IYearnVeloVaultRelayer is IAbstractVeloVaultRelayer {
   /// @notice Throws if either of the provided price sources are invalid
   error YearnVeloVaultRelayer_InvalidPriceSource();
 
+  /// @notice Throws if the price is 0
+  error YearnVeloVaultRelayer_ZeroPrice();
+
   /**
    * @notice Address of the yearn vault
    * @dev    Assumes that the yearn vault is a valid IYearnVault
