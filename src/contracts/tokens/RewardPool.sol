@@ -171,7 +171,9 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
       queuedRewards = 0;
       return;
     }
-
+    if (block.timestamp + _params.duration < periodFinish) {
+      revert RewardPool_NewPeriodWillFinishTooSoon();
+    }
     uint256 _elapsedTime = block.timestamp - (periodFinish - _params.duration);
     uint256 _currentAtNow = rewardRate * _elapsedTime;
     uint256 _queuedRatio = (_currentAtNow * 1000) / _totalRewards;

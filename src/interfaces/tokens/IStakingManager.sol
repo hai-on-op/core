@@ -101,6 +101,9 @@ interface IStakingManager is IAuthorizable, IModifiable {
   /// @notice Throws when trying to withdraw a negative amount
   error StakingManager_WithdrawNegativeAmount();
 
+  /// @notice Throws when trying to withdraw an amount greater than the staked balance
+  error StakingManager_WithdrawAmountExceedsBalance();
+
   /// @notice Throws when trying to cancel or withdraw with no pending withdrawal
   error StakingManager_NoPendingWithdrawal();
 

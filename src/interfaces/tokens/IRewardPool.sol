@@ -84,6 +84,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
   /// @notice Throws when reward amount is invalid
   error RewardPool_InvalidRewardAmount();
 
+  /// @notice Throws when new period will finish too soon
+  error RewardPool_NewPeriodWillFinishTooSoon();
+
   // --- Structs ---
 
   struct RewardPoolParams {

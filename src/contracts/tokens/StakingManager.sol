@@ -138,6 +138,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /// @inheritdoc IStakingManager
   function initiateWithdrawal(uint256 _wad) external {
     if (_wad == 0) revert StakingManager_WithdrawNullAmount();
+    if (_wad > stakedBalances[msg.sender]) {
+      revert StakingManager_WithdrawAmountExceedsBalance();
+    }
 
     PendingWithdrawal storage _existingWithdrawal = _pendingWithdrawals[msg.sender];
     stakedBalances[msg.sender] -= _wad;
