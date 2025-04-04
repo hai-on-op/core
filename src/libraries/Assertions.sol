@@ -39,12 +39,6 @@ library Assertions {
     return _x;
   }
 
-  /// @dev Asserts that `_x` is greater than `_y` and returns `_x`
-  function assertGt(int256 _x, int256 _y) internal pure returns (int256 __x) {
-    if (_x <= _y) revert IntNotGreaterThan(_x, _y);
-    return _x;
-  }
-
   /// @dev Asserts that `_x` is greater than or equal to `_y` and returns `_x`
   function assertGtEq(uint256 _x, uint256 _y) internal pure returns (uint256 __x) {
     if (_x < _y) revert NotGreaterOrEqualThan(_x, _y);
