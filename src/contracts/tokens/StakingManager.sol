@@ -56,6 +56,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   mapping(address => uint256) public stakedBalances;
 
   /// @inheritdoc IStakingManager
+  uint256 public totalStaked;
+
+  /// @inheritdoc IStakingManager
   // solhint-disable-next-line private-vars-leading-underscore
   mapping(address _account => PendingWithdrawal) public _pendingWithdrawals;
 
@@ -119,6 +122,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     stakedBalances[_account] += _wad;
 
+    totalStaked += _wad;
+
     // Mint stKITE
     stakingToken.mint(_account, _wad);
 
@@ -147,6 +152,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     PendingWithdrawal storage _existingWithdrawal = _pendingWithdrawals[msg.sender];
     stakedBalances[msg.sender] -= _wad;
+
+    totalStaked -= _wad;
 
     if (_existingWithdrawal.amount != 0) {
       _existingWithdrawal.amount += _wad;
@@ -180,6 +187,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     delete _pendingWithdrawals[msg.sender];
 
     stakedBalances[msg.sender] += _withdrawalAmount; // use stored amount
+
+    totalStaked += _withdrawalAmount;
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
