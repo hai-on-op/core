@@ -13,7 +13,6 @@ import {Math, WAD} from '@libraries/Math.sol';
  */
 abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
   using Math for uint256;
-
   // --- Registry ---
 
   /// @inheritdoc IAbstractVeloVaultRelayer
@@ -62,6 +61,25 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     return _getPriceValue();
   }
 
+  function _getPriceValue() internal view returns (uint256 _combinedPriceValue) {
+    // 1 yvToken or mooToken
+    uint256 _baseTokenBalance = 1_000_000_000_000_000_000;
+
+    // # of velo LP tokens in 1 yvToken
+    uint256 _veloLpBalance = _baseTokenBalance.wmul(_getPricePerFullShare());
+
+    // price of 1 velo LP token in chainlink price decimals (8)
+    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
+
+    uint256 _price = (_veloLpBalance * _veloLpPrice) / 1e8;
+
+    if (_price == 0) {
+      revert AbstractVeloVaultRelayer_ZeroPrice();
+    }
+
+    return _price;
+  }
+
   /// @notice Virtual function to be implemented by child contracts
-  function _getPriceValue() internal view virtual returns (uint256 _combinedPriceValue);
+  function _getPricePerFullShare() internal view virtual returns (uint256 _pricePerFullShare);
 }

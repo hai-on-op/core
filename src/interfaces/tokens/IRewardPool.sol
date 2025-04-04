@@ -84,6 +84,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
   /// @notice Throws when reward amount is invalid
   error RewardPool_InvalidRewardAmount();
 
+  /// @notice Throws when new period will finish too soon
+  error RewardPool_NewPeriodWillFinishTooSoon();
+
   // --- Structs ---
 
   struct RewardPoolParams {
@@ -91,6 +94,14 @@ interface IRewardPool is IAuthorizable, IModifiable {
     uint256 duration; // Duration of rewards distribution
     uint256 newRewardRatio; // Ratio for accepting new rewards
   }
+
+  // --- Constants ---
+  /**
+   * @notice Getter for the ratio multiplier
+   * @return _ratioMultiplier The ratio multiplier
+   */
+  // solhint-disable-next-line func-name-mixedcase
+  function RATIO_MULTIPLIER() external view returns (uint256 _ratioMultiplier);
 
   // --- Params ---
 
@@ -196,6 +207,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
    * @return _earned earned rewards for an account
    */
   function earned() external view returns (uint256 _earned);
+
+  /// @notice Set the total staked amount
+  function setTotalStaked(uint256 _totalStaked) external;
 
   /// @notice Stake tokens in the pool
   function stake(uint256 _amount) external;

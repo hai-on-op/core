@@ -77,6 +77,7 @@ contract StakingToken is ERC20, ERC20Permit, ERC20Votes, ERC20Burnable, Authoriz
   function burnFrom(address _account, uint256 _wad) public override(ERC20Burnable, IStakingToken) {
     _spendAllowance(_account, msg.sender, _wad);
     _burn(_account, _wad);
+    emit StakingTokenBurn(_account, _wad);
   }
 
   // --- Overrides ---

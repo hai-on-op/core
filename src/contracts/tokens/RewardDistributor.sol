@@ -10,6 +10,7 @@ import {IRewardDistributor} from '@interfaces/tokens/IRewardDistributor.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {Assertions} from '@libraries/Assertions.sol';
 import {Encoding} from '@libraries/Encoding.sol';
 /**
  * @title  RewardDistributor
@@ -18,7 +19,7 @@ import {Encoding} from '@libraries/Encoding.sol';
 
 contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistributor {
   using Encoding for bytes;
-
+  using Assertions for uint256;
   // --- Data ---
 
   /// @inheritdoc IRewardDistributor
@@ -99,7 +100,7 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
   }
 
   /// @inheritdoc IRewardDistributor
-  function emergencyWidthdraw(address _rescueReceiver, address _token, uint256 _wad) external isAuthorized {
+  function emergencyWithdraw(address _rescueReceiver, address _token, uint256 _wad) external isAuthorized {
     if (_token == address(0)) {
       revert RewardDistributor_InvalidTokenAddress();
     }
@@ -116,8 +117,9 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
     bytes32 _leaf = keccak256(bytes.concat(keccak256(abi.encode(address(msg.sender), _wad))));
 
     if (MerkleProof.verify(_merkleProof, merkleRoots[_token], _leaf)) {
+      bool _success = IERC20(_token).transfer(msg.sender, _wad);
+      if (!_success) revert RewardDistributor_TransferFailed();
       isClaimed[merkleRoots[_token]][msg.sender] = true;
-      IERC20(_token).transfer(msg.sender, _wad);
       emit RewardDistributorRewardClaimed(msg.sender, _token, _wad);
     } else {
       revert RewardDistributor_InvalidMerkleProof();
@@ -128,11 +130,13 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    uint256 _uint256 = _data.toUint256();
-    address _address = _data.toAddress();
-
-    if (_param == 'epochDuration') epochDuration = _uint256;
-    else if (_param == 'rootSetter') rootSetter = _address;
+    if (_param == 'epochDuration') epochDuration = _data.toUint256();
+    else if (_param == 'rootSetter') rootSetter = _data.toAddress();
     else revert UnrecognizedParam();
+  }
+
+  /// @inheritdoc Modifiable
+  function _validateParameters() internal view override {
+    epochDuration.assertGt(0);
   }
 }

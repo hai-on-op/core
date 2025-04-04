@@ -38,6 +38,17 @@ interface IStakingManager is IAuthorizable, IModifiable {
   event StakingManagerStaked(address indexed _account, uint256 _wad);
 
   /**
+   * @notice Emitted when the staking manager stakes tokens in a reward pool
+   * @param _account Address of the user staking the tokens
+   * @param _id Id of the reward type
+   * @param _rewardPool Address of the reward pool
+   * @param _wad Amount of tokens staked
+   */
+  event StakingManagerRewardPoolStaked(
+    address indexed _account, uint256 indexed _id, address indexed _rewardPool, uint256 _wad
+  );
+
+  /**
    * @notice Emitted when a user initiates a withdrawal of staked tokens
    * @param  _account Address of the user initiating the withdrawal
    * @param  _wad Amount of tokens withdrawn
@@ -98,8 +109,8 @@ interface IStakingManager is IAuthorizable, IModifiable {
   /// @notice Throws when trying to withdraw a null amount
   error StakingManager_WithdrawNullAmount();
 
-  /// @notice Throws when trying to withdraw a negative amount
-  error StakingManager_WithdrawNegativeAmount();
+  /// @notice Throws when trying to withdraw an amount greater than the staked balance
+  error StakingManager_WithdrawAmountExceedsBalance();
 
   /// @notice Throws when trying to cancel or withdraw with no pending withdrawal
   error StakingManager_NoPendingWithdrawal();
@@ -112,9 +123,6 @@ interface IStakingManager is IAuthorizable, IModifiable {
 
   /// @notice Throws when trying to add a reward type with a null reward pool
   error StakingManager_NullRewardPool();
-
-  /// @notice Throws when trying to calculate rewards on an inactive reward type
-  error StakingManager_InactiveRewardType();
 
   /// @notice Throws when trying to forward rewards without being the account owner
   error StakingManager_ForwardingOnly();
@@ -166,6 +174,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
   }
 
   struct StakingManagerParams {
+    // Amount of time before a user can withdraw their staked tokens
     uint256 cooldownPeriod;
   }
 
@@ -193,6 +202,9 @@ interface IStakingManager is IAuthorizable, IModifiable {
   function _params() external view returns (uint256 _cooldownPeriod);
 
   // --- Data ---
+
+  /// @notice The total amount of staked tokens
+  function totalStaked() external view returns (uint256 _totalStaked);
 
   /**
    * @notice The total amount of reward types

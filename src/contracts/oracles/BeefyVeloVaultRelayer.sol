@@ -45,17 +45,7 @@ contract BeefyVeloVaultRelayer is AbstractVeloVaultRelayer, IBeefyVeloVaultRelay
     beefyVault = _beefyVault;
   }
 
-  /// @notice Returns the price of the moo token
-  function _getPriceValue() internal view override returns (uint256 _combinedPriceValue) {
-    // 1 mooToken
-    uint256 _mooTokenBalance = 1_000_000_000_000_000_000;
-
-    // # of velo LP tokens in 1 mooToken
-    uint256 _veloLpBalance = _mooTokenBalance.wmul(beefyVault.getPricePerFullShare());
-
-    // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
-
-    return (_veloLpBalance * _veloLpPrice) / 1e8;
+  function _getPricePerFullShare() internal view override returns (uint256 _pricePerFullShare) {
+    return beefyVault.getPricePerFullShare();
   }
 }
