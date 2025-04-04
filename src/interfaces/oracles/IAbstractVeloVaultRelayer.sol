@@ -16,6 +16,9 @@ interface IAbstractVeloVaultRelayer is IBaseOracle {
   /// @notice Throws if either of the provided velo lp oracle address is null
   error AbstractVeloVaultRelayer_NullVeloLpOracle();
 
+  /// @notice Throws if the price is 0
+  error AbstractVeloVaultRelayer_ZeroPrice();
+
   /**
    * @notice Address of the velo pool underlying the beefy vault
    * @dev    Assumes that the price source is a valid IVeloPool
