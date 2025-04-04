@@ -17,6 +17,8 @@ import {IStakingManager} from '@interfaces/tokens/IStakingManager.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {WAD} from '@libraries/Math.sol';
+
 /**
  * @title  StakingManager
  * @notice This contract is used to manage staking positions
@@ -52,6 +54,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc IStakingManager
   mapping(address => uint256) public stakedBalances;
+
+  /// @inheritdoc IStakingManager
+  uint256 public totalStaked;
 
   /// @inheritdoc IStakingManager
   // solhint-disable-next-line private-vars-leading-underscore
@@ -96,7 +101,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /**
    * @param  _protocolToken Address of the ProtocolToken contract
    * @param  _stakingToken Address of the StakingToken contract
-   * @param  _cooldownPeriod Address of the StakingToken contract
+   * @param  _cooldownPeriod Amount of time before a user can withdraw their staked tokens
    */
   constructor(
     address _protocolToken,
@@ -117,6 +122,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     stakedBalances[_account] += _wad;
 
+    totalStaked += _wad;
+
     // Mint stKITE
     stakingToken.mint(_account, _wad);
 
@@ -129,6 +136,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       if (_rewardType.isActive) {
         IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
         _rewardPool.stake(_wad);
+        emit StakingManagerRewardPoolStaked(_account, _i, _rewardType.rewardPool, _wad);
       }
     }
 
@@ -138,9 +146,14 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /// @inheritdoc IStakingManager
   function initiateWithdrawal(uint256 _wad) external {
     if (_wad == 0) revert StakingManager_WithdrawNullAmount();
+    if (_wad > stakedBalances[msg.sender]) {
+      revert StakingManager_WithdrawAmountExceedsBalance();
+    }
 
     PendingWithdrawal storage _existingWithdrawal = _pendingWithdrawals[msg.sender];
     stakedBalances[msg.sender] -= _wad;
+
+    totalStaked -= _wad;
 
     if (_existingWithdrawal.amount != 0) {
       _existingWithdrawal.amount += _wad;
@@ -174,6 +187,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     delete _pendingWithdrawals[msg.sender];
 
     stakedBalances[msg.sender] += _withdrawalAmount; // use stored amount
+
+    totalStaked += _withdrawalAmount;
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
@@ -332,7 +347,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       uint256 _newRewards = _balance - _rewardType.rewardRemaining;
       // If there are new rewards and there are existing stakers
       if (_supply > 0) {
-        _rewardType.rewardIntegral += (_newRewards * 1e18) / _supply;
+        _rewardType.rewardIntegral += (_newRewards * WAD) / _supply;
         _rewardType.rewardRemaining = _balance;
       }
     }
@@ -348,7 +363,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
         if (_isClaim) {
           // Calculate total receiveable rewards
           uint256 _receiveable = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
 
           if (_receiveable > 0) {
             // Reset claimable rewards to 0
@@ -364,11 +379,10 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
         } else {
           // Just accumulate rewards without claiming
           _rewardType.claimableReward[_accounts[_i]] = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / 1e18;
-
-          // Update user's reward integral
-          _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
+            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
         }
+        // Update user's reward integral
+        _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
       }
     }
 
@@ -381,8 +395,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _checkpoint(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
-    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]);
-    _depositedBalance[1] = stakingToken.balanceOf(_accounts[1]);
+    _depositedBalance[0] = stakedBalances[_accounts[0]];
+    _depositedBalance[1] = stakedBalances[_accounts[1]];
 
     _claimManagerRewards();
 
@@ -394,7 +408,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _checkpointAndClaim(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
-    _depositedBalance[0] = stakingToken.balanceOf(_accounts[0]); //only do first slot
+    _depositedBalance[0] = stakedBalances[_accounts[0]]; //only do first slot
 
     _claimManagerRewards();
 
@@ -416,8 +430,11 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc Modifiable
   function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    uint256 _uint256 = _data.toUint256();
-    if (_param == 'cooldownPeriod') _params.cooldownPeriod = _uint256;
+    if (_param == 'cooldownPeriod') {
+      _params.cooldownPeriod = _data.toUint256();
+    } else {
+      revert UnrecognizedParam();
+    }
   }
 
   /// @inheritdoc Modifiable

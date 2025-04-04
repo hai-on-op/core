@@ -11,7 +11,7 @@ import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
 
 import {Encoding} from '@libraries/Encoding.sol';
 import {Assertions} from '@libraries/Assertions.sol';
-import {Math, RAY, WAD} from '@libraries/Math.sol';
+import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  RewardPool
@@ -21,8 +21,13 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   using Encoding for bytes;
   using Assertions for uint256;
   using Assertions for address;
-  using Math for uint256;
   using SafeERC20 for IERC20;
+
+  // --- Constants ---
+
+  /// @inheritdoc IRewardPool
+  // solhint-disable-next-line var-name-mixedcase
+  uint256 public constant RATIO_MULTIPLIER = 1000;
 
   // --- Registry ---
 
@@ -76,12 +81,14 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   constructor(
     address _rewardToken,
     address _stakingManager,
+    uint256 _initialStakedAmount,
     uint256 _duration,
     uint256 _newRewardRatio,
     address _deployer
   ) Authorizable(msg.sender) validParams {
     if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
     rewardToken = IERC20(_rewardToken);
+    _totalStaked = _initialStakedAmount;
     _params.stakingManager = _stakingManager;
     _params.duration = _duration;
     _params.newRewardRatio = _newRewardRatio;
@@ -97,6 +104,11 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
+  function setTotalStaked(uint256 _totalStakedUpdated) external isAuthorized {
+    _totalStaked = _totalStakedUpdated;
+  }
+
+  /// @inheritdoc IRewardPool
   function stake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_StakeNullAmount();
     _totalStaked += _wad;
@@ -104,14 +116,14 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function increaseStake(uint256 _wad) external isAuthorized {
+  function increaseStake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_IncreaseStakeNullAmount();
     _totalStaked += _wad;
     emit RewardPoolIncreaseStake(msg.sender, _wad);
   }
 
   /// @inheritdoc IRewardPool
-  function decreaseStake(uint256 _wad) external isAuthorized {
+  function decreaseStake(uint256 _wad) external updateReward isAuthorized {
     if (_wad == 0) revert RewardPool_DecreaseStakeNullAmount();
     if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
     _totalStaked -= _wad;
@@ -147,12 +159,12 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function rewardPerToken() public view returns (uint256 _rewardPerToken) {
     if (_totalStaked == 0) return rewardPerTokenStored;
     uint256 _timeElapsed = lastTimeRewardApplicable() - lastUpdateTime;
-    return rewardPerTokenStored + ((_timeElapsed * rewardRate * 1e18) / _totalStaked);
+    return rewardPerTokenStored + ((_timeElapsed * rewardRate * WAD) / _totalStaked);
   }
 
   /// @inheritdoc IRewardPool
   function earned() public view returns (uint256 _earned) {
-    return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / 1e18) + rewards;
+    return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / WAD) + rewards;
   }
 
   /// @inheritdoc IRewardPool
@@ -164,10 +176,12 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
       queuedRewards = 0;
       return;
     }
-
+    if (block.timestamp + _params.duration < periodFinish) {
+      revert RewardPool_NewPeriodWillFinishTooSoon();
+    }
     uint256 _elapsedTime = block.timestamp - (periodFinish - _params.duration);
     uint256 _currentAtNow = rewardRate * _elapsedTime;
-    uint256 _queuedRatio = (_currentAtNow * 1000) / _totalRewards;
+    uint256 _queuedRatio = (_currentAtNow * RATIO_MULTIPLIER) / _totalRewards;
 
     if (_queuedRatio < _params.newRewardRatio) {
       notifyRewardAmount(_totalRewards);
