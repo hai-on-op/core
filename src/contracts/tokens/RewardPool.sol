@@ -23,6 +23,12 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   using Assertions for address;
   using SafeERC20 for IERC20;
 
+  // --- Constants ---
+
+  /// @inheritdoc IRewardPool
+  // solhint-disable-next-line var-name-mixedcase
+  uint256 public immutable RATIO_MULTIPLIER = 1000;
+
   // --- Registry ---
 
   /// @inheritdoc IRewardPool
@@ -175,7 +181,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
     }
     uint256 _elapsedTime = block.timestamp - (periodFinish - _params.duration);
     uint256 _currentAtNow = rewardRate * _elapsedTime;
-    uint256 _queuedRatio = (_currentAtNow * 1000) / _totalRewards;
+    uint256 _queuedRatio = (_currentAtNow * RATIO_MULTIPLIER) / _totalRewards;
 
     if (_queuedRatio < _params.newRewardRatio) {
       notifyRewardAmount(_totalRewards);

@@ -95,6 +95,14 @@ interface IRewardPool is IAuthorizable, IModifiable {
     uint256 newRewardRatio; // Ratio for accepting new rewards
   }
 
+  // --- Constants ---
+  /**
+   * @notice Getter for the ratio multiplier
+   * @return _ratioMultiplier The ratio multiplier
+   */
+  // solhint-disable-next-line func-name-mixedcase
+  function RATIO_MULTIPLIER() external view returns (uint256 _ratioMultiplier);
+
   // --- Params ---
 
   /**
