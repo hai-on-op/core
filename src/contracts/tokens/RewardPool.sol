@@ -27,7 +27,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
 
   /// @inheritdoc IRewardPool
   // solhint-disable-next-line var-name-mixedcase
-  uint256 public immutable RATIO_MULTIPLIER = 1000;
+  uint256 public constant RATIO_MULTIPLIER = 1000;
 
   // --- Registry ---
 
