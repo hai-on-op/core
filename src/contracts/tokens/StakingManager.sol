@@ -59,6 +59,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   uint256 public totalStaked;
 
   /// @inheritdoc IStakingManager
+  uint256 public totalStakedRaw;
+
+  /// @inheritdoc IStakingManager
   // solhint-disable-next-line private-vars-leading-underscore
   mapping(address _account => PendingWithdrawal) public _pendingWithdrawals;
 
@@ -124,6 +127,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     totalStaked += _wad;
 
+    totalStakedRaw += _wad;
     // Mint stKITE
     stakingToken.mint(_account, _wad);
 
@@ -215,6 +219,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
 
     uint256 _withdrawalAmount = _existingWithdrawal.amount; // Store amount first
+
+    totalStakedRaw -= _withdrawalAmount;
 
     delete _pendingWithdrawals[msg.sender];
 
@@ -340,15 +346,25 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     if (!_rewardType.isActive) return;
 
-    uint256 _balance = IERC20(_rewardType.rewardToken).balanceOf(address(this));
+    uint256 _rewardTokenBalance;
+    // Get the balance of the reward token in the contract
+    uint256 _baseRewardTokenBalance = IERC20(_rewardType.rewardToken).balanceOf(address(this));
+
+    // Check if reward token is the protocol token
+    if (_rewardType.rewardToken == address(protocolToken)) {
+      // If the reward token is the protocol token, we need to subtract the amount of staked tokens
+      _rewardTokenBalance = _baseRewardTokenBalance - totalStakedRaw;
+    } else {
+      _rewardTokenBalance = _baseRewardTokenBalance;
+    }
 
     // Checks if new rewards have been added by comparing current balance with rewardRemaining
-    if (_balance > _rewardType.rewardRemaining) {
-      uint256 _newRewards = _balance - _rewardType.rewardRemaining;
+    if (_rewardTokenBalance > _rewardType.rewardRemaining) {
+      uint256 _newRewards = _rewardTokenBalance - _rewardType.rewardRemaining;
       // If there are new rewards and there are existing stakers
       if (_supply > 0) {
         _rewardType.rewardIntegral += (_newRewards * WAD) / _supply;
-        _rewardType.rewardRemaining = _balance;
+        _rewardType.rewardRemaining = _rewardTokenBalance;
       }
     }
 
@@ -374,7 +390,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
             emit StakingManagerRewardPaid(_accounts[_i], _rewardType.rewardToken, _receiveable, _accounts[_i + 1]);
             // Update the remaining balance
-            _balance = _balance - _receiveable;
+            _rewardTokenBalance = _rewardTokenBalance - _receiveable;
           }
         } else {
           // Just accumulate rewards without claiming
@@ -387,8 +403,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     }
 
     // Update remaining reward here since balance could have changed if claiming
-    if (_balance != _rewardType.rewardRemaining) {
-      _rewardType.rewardRemaining = uint256(_balance);
+    if (_rewardTokenBalance != _rewardType.rewardRemaining) {
+      _rewardType.rewardRemaining = uint256(_rewardTokenBalance);
     }
   }
 

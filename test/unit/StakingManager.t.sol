@@ -10,6 +10,7 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
 import {Assertions} from '@libraries/Assertions.sol';
+import {console2} from 'forge-std/console2.sol';
 
 abstract contract Base is HaiTest {
   address deployer = label('deployer');
@@ -28,7 +29,11 @@ abstract contract Base is HaiTest {
   IRewardPool mockSecondRewardPool = IRewardPool(mockContract('SecondRewardPool'));
   IERC20 mockSecondRewardToken = IERC20(mockContract('SecondRewardToken'));
 
+  IRewardPool mockProtocolTokenRewardPool = IRewardPool(mockContract('ProtocolTokenRewardPool'));
+
   StakingManagerForTest stakingManager;
+
+  StakingManagerForTest stakingManagerAlternate;
 
   uint256 constant COOLDOWN_PERIOD = 7 days;
 
@@ -1612,6 +1617,112 @@ contract Unit_StakingManager_GetReward is Base {
   }
 }
 
+contract Unit_StakingManager_CheckpointAndClaimProtocolTokenAsRewardToken is Base {
+  event StakingManagerRewardPaid(
+    address indexed _account, address indexed _rewardToken, uint256 _wad, address indexed _destination
+  );
+
+  uint256 constant REWARD_AMOUNT = 100 ether;
+  uint256 constant STAKE_AMOUNT = 50 ether;
+  uint256 rewardTypeId;
+  StakingManagerForTest stakingManagerTest;
+
+  function setUp() public override {
+    super.setUp();
+
+    vm.startPrank(deployer);
+    stakingManagerTest =
+      new StakingManagerForTest(address(mockProtocolToken), address(mockStakingToken), COOLDOWN_PERIOD);
+
+    stakingManagerTest.addAuthorization(authorizedAccount);
+    vm.stopPrank();
+
+    // Add a reward type
+    vm.prank(authorizedAccount);
+    stakingManagerTest.addRewardType(address(mockProtocolToken), address(mockProtocolTokenRewardPool));
+    rewardTypeId = stakingManagerTest.rewards() - 1;
+
+    // Setup initial stake
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
+    vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
+    vm.prank(user);
+    stakingManagerTest.stake(user, STAKE_AMOUNT);
+  }
+
+  function test_CheckpointAndClaim_ProtocolTokenAsRewardToken() public {
+    // Setup initial state for staking token
+    uint256 rewardAmount = 10e18;
+    address[2] memory accounts = [user, user];
+
+    vm.mockCall(
+      address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(STAKE_AMOUNT)
+    );
+    vm.mockCall(
+      address(mockStakingToken), abi.encodeWithSelector(IERC20.totalSupply.selector), abi.encode(STAKE_AMOUNT)
+    );
+
+    vm.mockCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManagerTest)),
+      abi.encode(rewardAmount + STAKE_AMOUNT)
+    );
+
+    // Mock initial user reward balance and get initial state
+    vm.mockCall(address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(0));
+    uint256 initialUserRewardBalance = mockRewardToken.balanceOf(user);
+    uint256 stakingManagerProtocolTokenBalance = mockProtocolToken.balanceOf(address(stakingManagerTest));
+
+    console2.log('initialUserRewardBalance', initialUserRewardBalance);
+
+    console2.log(
+      'mockProtocolToken.balanceOf(stakingManagerTest)', mockProtocolToken.balanceOf(address(stakingManagerTest))
+    );
+
+    // Mock reward pool calls
+    vm.mockCall(
+      address(mockProtocolTokenRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode()
+    );
+
+    // Mock reward token transfer
+    vm.mockCall(
+      address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector, user, rewardAmount), abi.encode(true)
+    );
+
+    // Mock final reward token balance after transfer
+    vm.mockCall(
+      address(mockRewardToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(rewardAmount)
+    );
+
+    // Expect reward paid event
+    vm.expectEmit(true, true, true, true);
+    emit StakingManagerRewardPaid(user, address(mockProtocolToken), rewardAmount, user);
+
+    // Call checkpointAndClaim
+    vm.prank(user);
+    stakingManagerTest.checkpointAndClaim(accounts);
+
+    // Verify reward integral was updated
+    IStakingManager.RewardTypeInfo memory rewardType = stakingManagerTest.rewardTypes(rewardTypeId);
+    assertEq(rewardType.rewardIntegral, (rewardAmount * 1e18) / STAKE_AMOUNT, 'Reward integral not updated correctly');
+
+    // Verify rewards were transferred to user
+    uint256 finalUserRewardBalance = mockRewardToken.balanceOf(user);
+    assertEq(finalUserRewardBalance - initialUserRewardBalance, rewardAmount, 'Reward amount not transferred correctly');
+
+    vm.mockCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManagerTest)),
+      abi.encode(STAKE_AMOUNT)
+    );
+    uint256 finalStakingManagerProtocolTokenBalance = mockProtocolToken.balanceOf(address(stakingManagerTest));
+    assertEq(
+      finalStakingManagerProtocolTokenBalance,
+      stakingManagerProtocolTokenBalance - rewardAmount,
+      'Protocol token balance not updated correctly'
+    );
+  }
+}
+
 contract Unit_StakingManager_CheckpointAndClaim is Base {
   event StakingManagerRewardPaid(
     address indexed _account, address indexed _rewardToken, uint256 _wad, address indexed _destination
@@ -2042,7 +2153,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
     vm.mockCall(address(mockRewardPool), abi.encodeWithSelector(IRewardPool.getReward.selector), abi.encode());
     vm.mockCall(
       address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, user, rewardAmount * 2 / 3),
+      abi.encodeWithSelector(IERC20.transfer.selector, user, (rewardAmount * 2) / 3),
       abi.encode(true)
     );
 
@@ -2051,7 +2162,7 @@ contract Unit_StakingManager_CheckpointAndClaim is Base {
     vm.mockCall(
       address(mockRewardToken),
       abi.encodeWithSelector(IERC20.balanceOf.selector, user),
-      abi.encode(rewardAmount * 2 / 3) // Should get 2/3 of rewards (has 2/3 of total stake)
+      abi.encode((rewardAmount * 2) / 3) // Should get 2/3 of rewards (has 2/3 of total stake)
     );
     vm.prank(user);
     stakingManagerTest.checkpointAndClaim(firstUserAccounts);

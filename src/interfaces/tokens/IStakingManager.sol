@@ -203,8 +203,11 @@ interface IStakingManager is IAuthorizable, IModifiable {
 
   // --- Data ---
 
-  /// @notice The total amount of staked tokens
+  /// @notice The total amount of staked tokens (not including pending withdrawals)
   function totalStaked() external view returns (uint256 _totalStaked);
+
+  /// @notice The total amount of staked tokens in the contract
+  function totalStakedRaw() external view returns (uint256 _totalStakedRaw);
 
   /**
    * @notice The total amount of reward types
