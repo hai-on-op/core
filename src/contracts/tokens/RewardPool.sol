@@ -71,7 +71,7 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   /// @inheritdoc IRewardPool
   uint256 public rewardPerTokenPaid = 0;
   /// @inheritdoc IRewardPool
-  uint256 public rewards = 0;
+  uint256 public cumulativeStakingManagerRewards = 0;
 
   // --- Init ---
 
@@ -147,9 +147,9 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   function _getReward() internal {
-    uint256 _reward = earned();
+    uint256 _reward = cumulativeStakingManagerRewards;
     if (_reward > 0) {
-      rewards = 0;
+      cumulativeStakingManagerRewards = 0;
       rewardToken.safeTransfer(_params.stakingManager, _reward);
       emit RewardPoolRewardPaid(_params.stakingManager, _reward);
     }
@@ -159,12 +159,16 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   function rewardPerToken() public view returns (uint256 _rewardPerToken) {
     if (_totalStaked == 0) return rewardPerTokenStored;
     uint256 _timeElapsed = lastTimeRewardApplicable() - lastUpdateTime;
+    // Calculation includes previously stored value plus newly accrued based on time elapsed
     return rewardPerTokenStored + ((_timeElapsed * rewardRate * WAD) / _totalStaked);
   }
 
   /// @inheritdoc IRewardPool
   function earned() public view returns (uint256 _earned) {
-    return ((_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / WAD) + rewards;
+    // Calculate the potential rewards based on the current rewardPerToken and the last paid marker
+    uint256 _currentPotential = (_totalStaked * (rewardPerToken() - rewardPerTokenPaid)) / WAD;
+    // Add any rewards already calculated and stored in the accumulator
+    return _currentPotential + cumulativeStakingManagerRewards;
   }
 
   /// @inheritdoc IRewardPool
@@ -223,12 +227,16 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   // --- Modifiers ---
 
   modifier updateReward() {
-    rewardPerTokenStored = rewardPerToken();
-    lastUpdateTime = lastTimeRewardApplicable();
+    uint256 _currentRpt = rewardPerToken();
+    uint256 _lastApplicableTime = lastTimeRewardApplicable();
     if (msg.sender == _params.stakingManager) {
-      rewards = earned();
-      rewardPerTokenPaid = rewardPerTokenStored;
+      uint256 _newlyEarned = (_totalStaked * (_currentRpt - rewardPerTokenPaid)) / WAD;
+      cumulativeStakingManagerRewards += _newlyEarned;
+      rewardPerTokenPaid = _currentRpt;
     }
+
+    rewardPerTokenStored = _currentRpt;
+    lastUpdateTime = _lastApplicableTime;
     _;
   }
 

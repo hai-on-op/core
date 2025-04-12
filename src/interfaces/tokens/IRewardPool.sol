@@ -183,10 +183,10 @@ interface IRewardPool is IAuthorizable, IModifiable {
   function rewardPerTokenPaid() external view returns (uint256 _rewardPerTokenPaid);
 
   /**
-   * @notice Getter for the amount of rewards earned but not paid out yet
-   * @return _rewards amount of rewards earned but not paid out yet
+   * @notice Rewards accumulated by the StakingManager but not yet claimed from this pool.
+   * @return _cumulativeStakingManagerRewards cumulative staking manager rewards
    */
-  function rewards() external view returns (uint256 _rewards);
+  function cumulativeStakingManagerRewards() external view returns (uint256 _cumulativeStakingManagerRewards);
 
   // --- Methods ---
 
