@@ -123,6 +123,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     if (_account == address(0)) revert StakingManager_StakeNullReceiver();
     if (_wad == 0) revert StakingManager_StakeNullAmount();
 
+    _checkpoint([_account, msg.sender]);
+
     stakedBalances[_account] += _wad;
 
     totalStaked += _wad;
@@ -154,6 +156,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       revert StakingManager_WithdrawAmountExceedsBalance();
     }
 
+    _checkpoint([msg.sender, address(0)]);
+
     PendingWithdrawal storage _existingWithdrawal = _pendingWithdrawals[msg.sender];
     stakedBalances[msg.sender] -= _wad;
 
@@ -177,14 +181,16 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     emit StakingManagerWithdrawalInitiated(msg.sender, _wad);
   }
-  /// @inheritdoc IStakingManager
 
+  /// @inheritdoc IStakingManager
   function cancelWithdrawal() external {
     PendingWithdrawal storage _existingWithdrawal = _pendingWithdrawals[msg.sender];
 
     if (_existingWithdrawal.amount == 0) {
       revert StakingManager_NoPendingWithdrawal();
     }
+
+    _checkpoint([msg.sender, address(0)]);
 
     uint256 _withdrawalAmount = _existingWithdrawal.amount; // Store the amount before deleting
 
@@ -248,8 +254,6 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     if (_wad == 0) revert StakingManager_WithdrawNullAmount();
 
     IERC20(_rewardTypes[_id].rewardToken).safeTransfer(_rescueReceiver, _wad);
-
-    // protocolToken.safeTransfer(_rescueReceiver, _wad);
 
     emit StakingManagerEmergencyRewardWithdrawal(_rescueReceiver, _rewardTypes[_id].rewardToken, _wad);
   }
@@ -334,7 +338,6 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     return _claimable;
   }
 
-  // TODO: Check decimals
   function _calcRewardIntegral(
     uint256 _id,
     address[2] memory _accounts,
@@ -346,65 +349,80 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     if (!_rewardType.isActive) return;
 
-    uint256 _rewardTokenBalance;
-    // Get the balance of the reward token in the contract
-    uint256 _baseRewardTokenBalance = IERC20(_rewardType.rewardToken).balanceOf(address(this));
+    // --- Start: Adjusted Balance Calculation ---
+    uint256 _currentRewardBalance;
+    // Get the total balance of the reward token in the contract
+    uint256 _contractTokenBalance = IERC20(_rewardType.rewardToken).balanceOf(address(this));
 
     // Check if reward token is the protocol token
     if (_rewardType.rewardToken == address(protocolToken)) {
-      // If the reward token is the protocol token, we need to subtract the amount of staked tokens
-      _rewardTokenBalance = _baseRewardTokenBalance - totalStakedRaw;
+      // If yes, subtract the *raw* staked principal amount (totalStakedRaw)
+      // Ensure non-negative result
+      _currentRewardBalance = _contractTokenBalance > totalStakedRaw ? _contractTokenBalance - totalStakedRaw : 0;
     } else {
-      _rewardTokenBalance = _baseRewardTokenBalance;
+      // If not, the entire balance is potential rewards
+      _currentRewardBalance = _contractTokenBalance;
     }
 
-    // Checks if new rewards have been added by comparing current balance with rewardRemaining
-    if (_rewardTokenBalance > _rewardType.rewardRemaining) {
-      uint256 _newRewards = _rewardTokenBalance - _rewardType.rewardRemaining;
-      // If there are new rewards and there are existing stakers
+    // Calculate new rewards based on the difference from remaining
+    if (_currentRewardBalance > _rewardType.rewardRemaining) {
+      uint256 _newRewards = _currentRewardBalance - _rewardType.rewardRemaining;
       if (_supply > 0) {
+        // Update integral with new rewards
         _rewardType.rewardIntegral += (_newRewards * WAD) / _supply;
-        _rewardType.rewardRemaining = _rewardTokenBalance;
       }
+      // Update remaining rewards to current calculated balance
+      _rewardType.rewardRemaining = _currentRewardBalance;
+    } else if (_currentRewardBalance < _rewardType.rewardRemaining) {
+      // If current balance is less than remaining (e.g., due to direct transfer out), adjust remaining down.
+      // This prevents rewardRemaining from staying artificially high.
+      _rewardType.rewardRemaining = _currentRewardBalance;
     }
+    // --- End: Adjusted Balance Calculation ---
 
     for (uint256 _i = 0; _i < _accounts.length; _i++) {
       if (_accounts[_i] == address(0)) continue;
-      if (_isClaim && _i != 0) continue; //only update/claim for first address and use second as forwarding
+      if (_isClaim && _i != 0) continue; // only update/claim for first address and use second as forwarding
 
       uint256 _userBalance = _balances[_i];
       uint256 _userIntegral = _rewardType.rewardIntegralFor[_accounts[_i]];
+      uint256 _rewardAccrued = 0;
 
-      if (_isClaim || _userIntegral < _rewardType.rewardIntegral) {
-        if (_isClaim) {
-          // Calculate total receiveable rewards
-          uint256 _receiveable = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
+      // Calculate rewards accrued since last checkpoint for the user
+      if (_rewardType.rewardIntegral > _userIntegral) {
+        _rewardAccrued = (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
+      }
 
-          if (_receiveable > 0) {
-            // Reset claimable rewards to 0
-            _rewardType.claimableReward[_accounts[_i]] = 0;
+      if (_isClaim) {
+        uint256 _claimablePreviously = _rewardType.claimableReward[_accounts[_i]];
+        uint256 _totalReceivable = _claimablePreviously + _rewardAccrued;
 
-            // Transfer rewards to the next address in the array (forwarding address)
-            IERC20(_rewardType.rewardToken).safeTransfer(_accounts[_i + 1], _receiveable);
-
-            emit StakingManagerRewardPaid(_accounts[_i], _rewardType.rewardToken, _receiveable, _accounts[_i + 1]);
-            // Update the remaining balance
-            _rewardTokenBalance = _rewardTokenBalance - _receiveable;
+        if (_totalReceivable > 0) {
+          // Cap receivable amount by the available remaining rewards
+          if (_totalReceivable > _rewardType.rewardRemaining) {
+            _totalReceivable = _rewardType.rewardRemaining;
           }
+
+          // Update state *before* transfer
+          _rewardType.claimableReward[_accounts[_i]] = 0; // Reset claimable
+          _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral; // Update integral
+          _rewardType.rewardRemaining -= _totalReceivable; // Decrease remaining
+
+          // Transfer rewards
+          IERC20(_rewardType.rewardToken).safeTransfer(_accounts[_i + 1], _totalReceivable);
+
+          emit StakingManagerRewardPaid(_accounts[_i], _rewardType.rewardToken, _totalReceivable, _accounts[_i + 1]);
         } else {
-          // Just accumulate rewards without claiming
-          _rewardType.claimableReward[_accounts[_i]] = _rewardType.claimableReward[_accounts[_i]]
-            + (_userBalance * (_rewardType.rewardIntegral - _userIntegral)) / WAD;
+          // If no rewards to claim, still update the integral
+          _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
         }
+      } else {
+        // Not claiming, just checkpointing
+        // Add newly accrued rewards to the user's claimable balance
+        _rewardType.claimableReward[_accounts[_i]] += _rewardAccrued;
         // Update user's reward integral
         _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral;
       }
-    }
-
-    // Update remaining reward here since balance could have changed if claiming
-    if (_rewardTokenBalance != _rewardType.rewardRemaining) {
-      _rewardType.rewardRemaining = uint256(_rewardTokenBalance);
     }
   }
 
@@ -424,7 +442,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _checkpointAndClaim(address[2] memory _accounts) internal {
     uint256 _supply = stakingToken.totalSupply();
     uint256[2] memory _depositedBalance;
-    _depositedBalance[0] = stakedBalances[_accounts[0]]; //only do first slot
+    _depositedBalance[0] = stakedBalances[_accounts[0]]; // only do first slot
 
     _claimManagerRewards();
 
@@ -436,8 +454,10 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   function _claimManagerRewards() internal {
     for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
-      IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
       if (!_rewardType.isActive) continue;
+
+      IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
+
       _rewardPool.getReward();
     }
   }

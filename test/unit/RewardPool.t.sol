@@ -346,7 +346,7 @@ contract Unit_RewardPool_Withdraw is Base {
     // Test expected reward pool values
     assertEq(rewardPool.currentRewards(), _rewardAmount);
     // Is 0 because no fn() w/ updateReward modifier has been called yet
-    assertEq(rewardPool.rewards(), 0);
+    assertEq(rewardPool.earned(), 0);
     assertEq(rewardPool.historicalRewards(), _rewardAmount);
     assertEq(rewardPool.rewardRate(), _rewardAmount / DURATION);
     assertEq(rewardPool.lastUpdateTime(), block.timestamp);
@@ -369,11 +369,6 @@ contract Unit_RewardPool_Withdraw is Base {
       rewardPerTokenStored
         + ((rewardPool.lastTimeRewardApplicable() - rewardPool.lastUpdateTime()) * rewardPool.rewardRate() * 1e18)
           / _stakeAmount
-    );
-
-    assertEq(
-      rewardPool.earned(),
-      ((_stakeAmount * (rewardPool.rewardPerToken() - rewardPool.rewardPerTokenPaid())) / 1e18) + rewardPool.rewards()
     );
 
     // Start the recorder
@@ -445,7 +440,6 @@ contract Unit_RewardPool_GetReward is Base {
 
     // Verify state after reward claim
     assertEq(rewardPool.earned(), 0);
-    assertEq(rewardPool.rewards(), 0);
   }
 }
 
@@ -1242,7 +1236,7 @@ contract Unit_RewardPool_UpdateReward is Base {
   function test_UpdateReward_StakingManager() public {
     vm.startPrank(address(mockStakingManager));
 
-    uint256 _initialRewards = rewardPool.rewards();
+    uint256 _initialRewards = rewardPool.earned();
     uint256 _initialRewardPerTokenPaid = rewardPool.rewardPerTokenPaid();
 
     // Warp time to simulate rewards accumulation
@@ -1251,7 +1245,7 @@ contract Unit_RewardPool_UpdateReward is Base {
     rewardPool.updateRewardHelper();
 
     // Check staking manager specific updates
-    assertGt(rewardPool.rewards(), _initialRewards);
+    assertGt(rewardPool.earned(), _initialRewards);
     assertGt(rewardPool.rewardPerTokenPaid(), _initialRewardPerTokenPaid);
     assertEq(rewardPool.rewardPerTokenPaid(), rewardPool.rewardPerTokenStored());
   }
