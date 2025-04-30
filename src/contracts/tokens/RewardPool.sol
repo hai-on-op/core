@@ -7,6 +7,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
+import {IStakingManager} from '@interfaces/tokens/IStakingManager.sol';
 import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
 
 import {Encoding} from '@libraries/Encoding.sol';
@@ -81,14 +82,16 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   constructor(
     address _rewardToken,
     address _stakingManager,
-    uint256 _initialStakedAmount,
     uint256 _duration,
     uint256 _newRewardRatio,
     address _deployer
   ) Authorizable(msg.sender) validParams {
     if (_rewardToken == address(0)) revert RewardPool_InvalidRewardToken();
+    if (_stakingManager == address(0)) {
+      revert RewardPool_InvalidStakingManager();
+    }
     rewardToken = IERC20(_rewardToken);
-    _totalStaked = _initialStakedAmount;
+    _totalStaked = IStakingManager(_stakingManager).totalStaked();
     _params.stakingManager = _stakingManager;
     _params.duration = _duration;
     _params.newRewardRatio = _newRewardRatio;
@@ -131,28 +134,18 @@ contract RewardPool is Authorizable, Modifiable, IRewardPool {
   }
 
   /// @inheritdoc IRewardPool
-  function withdraw(uint256 _wad, bool _claim) external updateReward isAuthorized {
-    if (_wad == 0) revert RewardPool_WithdrawNullAmount();
-    if (_wad > _totalStaked) revert RewardPool_InsufficientBalance();
-    if (_claim) {
-      _getReward();
-    }
-    _totalStaked -= _wad;
-    emit RewardPoolWithdrawn(msg.sender, _wad);
+  function getReward() external updateReward isAuthorized returns (uint256 _rewardAmount) {
+    return _getReward();
   }
 
-  /// @inheritdoc IRewardPool
-  function getReward() external updateReward isAuthorized {
-    _getReward();
-  }
-
-  function _getReward() internal {
+  function _getReward() internal returns (uint256 _rewardAmount) {
     uint256 _reward = cumulativeStakingManagerRewards;
     if (_reward > 0) {
       cumulativeStakingManagerRewards = 0;
       rewardToken.safeTransfer(_params.stakingManager, _reward);
       emit RewardPoolRewardPaid(_params.stakingManager, _reward);
     }
+    return _reward;
   }
 
   /// @inheritdoc IRewardPool

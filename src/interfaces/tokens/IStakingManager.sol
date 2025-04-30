@@ -203,6 +203,9 @@ interface IStakingManager is IAuthorizable, IModifiable {
 
   // --- Data ---
 
+  /// @notice The total amount of rewards available to be claimed
+  function totalKiteRewardsAvailable() external view returns (uint256 _totalKiteRewardsAvailable);
+
   /// @notice The total amount of staked tokens (not including pending withdrawals)
   function totalStaked() external view returns (uint256 _totalStaked);
 

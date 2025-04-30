@@ -56,6 +56,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   mapping(address => uint256) public stakedBalances;
 
   /// @inheritdoc IStakingManager
+  uint256 public totalKiteRewardsAvailable;
+
+  /// @inheritdoc IStakingManager
   uint256 public totalStaked;
 
   /// @inheritdoc IStakingManager
@@ -255,6 +258,10 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     IERC20(_rewardTypes[_id].rewardToken).safeTransfer(_rescueReceiver, _wad);
 
+    if (_rewardTypes[_id].rewardToken == address(protocolToken)) {
+      totalKiteRewardsAvailable -= _wad;
+    }
+
     emit StakingManagerEmergencyRewardWithdrawal(_rescueReceiver, _rewardTypes[_id].rewardToken, _wad);
   }
 
@@ -358,7 +365,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     if (_rewardType.rewardToken == address(protocolToken)) {
       // If yes, subtract the *raw* staked principal amount (totalStakedRaw)
       // Ensure non-negative result
-      _currentRewardBalance = _contractTokenBalance > totalStakedRaw ? _contractTokenBalance - totalStakedRaw : 0;
+      _currentRewardBalance = totalKiteRewardsAvailable;
     } else {
       // If not, the entire balance is potential rewards
       _currentRewardBalance = _contractTokenBalance;
@@ -408,6 +415,10 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
           _rewardType.rewardIntegralFor[_accounts[_i]] = _rewardType.rewardIntegral; // Update integral
           _rewardType.rewardRemaining -= _totalReceivable; // Decrease remaining
 
+          if (_rewardType.rewardToken == address(protocolToken)) {
+            totalKiteRewardsAvailable -= _totalReceivable;
+          }
+
           // Transfer rewards
           IERC20(_rewardType.rewardToken).safeTransfer(_accounts[_i + 1], _totalReceivable);
 
@@ -427,7 +438,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   }
 
   function _checkpoint(address[2] memory _accounts) internal {
-    uint256 _supply = stakingToken.totalSupply();
+    uint256 _supply = totalStaked;
     uint256[2] memory _depositedBalance;
     _depositedBalance[0] = stakedBalances[_accounts[0]];
     _depositedBalance[1] = stakedBalances[_accounts[1]];
@@ -440,7 +451,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   }
 
   function _checkpointAndClaim(address[2] memory _accounts) internal {
-    uint256 _supply = stakingToken.totalSupply();
+    uint256 _supply = totalStaked;
     uint256[2] memory _depositedBalance;
     _depositedBalance[0] = stakedBalances[_accounts[0]]; // only do first slot
 
@@ -458,7 +469,10 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
       IRewardPool _rewardPool = IRewardPool(_rewardType.rewardPool);
 
-      _rewardPool.getReward();
+      uint256 _reward = _rewardPool.getReward();
+      if (_rewardType.rewardToken == address(protocolToken)) {
+        totalKiteRewardsAvailable += _reward;
+      }
     }
   }
 
