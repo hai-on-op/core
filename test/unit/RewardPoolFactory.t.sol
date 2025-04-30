@@ -69,7 +69,6 @@ contract Unit_RewardPoolFactory_DeployRewardPool is Base {
     address indexed _rewardPool,
     address indexed _rewardToken,
     address indexed _stakingManager,
-    uint256 _initialStaked,
     uint256 _duration,
     uint256 _newRewardRatio
   );
@@ -83,26 +82,29 @@ contract Unit_RewardPoolFactory_DeployRewardPool is Base {
     vm.startPrank(user);
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
     rewardPoolFactory.deployRewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO
     );
   }
 
   function test_Revert_NullRewardToken() public happyPath {
     vm.expectRevert(IRewardPoolFactory.RewardPoolFactory_NullRewardToken.selector);
 
-    rewardPoolFactory.deployRewardPool(
-      address(0), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO
-    );
+    rewardPoolFactory.deployRewardPool(address(0), address(mockStakingManager), DURATION, NEW_REWARD_RATIO);
   }
 
   function test_Revert_NullStakingManager() public happyPath {
     vm.expectRevert(IRewardPoolFactory.RewardPoolFactory_NullStakingManager.selector);
-    rewardPoolFactory.deployRewardPool(address(mockRewardToken), address(0), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO);
+    rewardPoolFactory.deployRewardPool(address(mockRewardToken), address(0), DURATION, NEW_REWARD_RATIO);
   }
 
   function test_Deploy_RewardPoolChild() public happyPath {
+    vm.mockCall(
+      address(mockStakingManager),
+      abi.encodeWithSelector(IStakingManager.totalStaked.selector),
+      abi.encode(uint256(0)) // Return 0 for total staked
+    );
     rewardPoolFactory.deployRewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO
     );
 
     // params
@@ -112,8 +114,11 @@ contract Unit_RewardPoolFactory_DeployRewardPool is Base {
   }
 
   function test_Set_RewardPools() public happyPath {
+    vm.mockCall(
+      address(mockStakingManager), abi.encodeWithSelector(IStakingManager.totalStaked.selector), abi.encode(uint256(0))
+    );
     rewardPoolFactory.deployRewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO
     );
 
     assertEq(rewardPoolFactory.rewardPoolsList()[0], address(rewardPoolChild));
@@ -130,17 +135,15 @@ contract Unit_RewardPoolFactory_DeployRewardPool is Base {
   }
 
   function test_Emit_DeployRewardPool() public happyPath {
+    vm.mockCall(
+      address(mockStakingManager), abi.encodeWithSelector(IStakingManager.totalStaked.selector), abi.encode(uint256(0))
+    );
     vm.expectEmit();
     emit DeployRewardPool(
-      address(rewardPoolChild),
-      address(mockRewardToken),
-      address(mockStakingManager),
-      INITIAL_STAKED,
-      DURATION,
-      NEW_REWARD_RATIO
+      address(rewardPoolChild), address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO
     );
     rewardPoolFactory.deployRewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO
     );
   }
 }
