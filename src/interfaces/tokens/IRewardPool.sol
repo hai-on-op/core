@@ -66,6 +66,9 @@ interface IRewardPool is IAuthorizable, IModifiable {
   /// @notice Throws when reward token address is invalid
   error RewardPool_InvalidRewardToken();
 
+  /// @notice Throws when staking manager address is invalid
+  error RewardPool_InvalidStakingManager();
+
   /// @notice Throws when attempting to stake zero tokens
   error RewardPool_StakeNullAmount();
 
@@ -183,10 +186,10 @@ interface IRewardPool is IAuthorizable, IModifiable {
   function rewardPerTokenPaid() external view returns (uint256 _rewardPerTokenPaid);
 
   /**
-   * @notice Getter for the amount of rewards earned but not paid out yet
-   * @return _rewards amount of rewards earned but not paid out yet
+   * @notice Rewards accumulated by the StakingManager but not yet claimed from this pool.
+   * @return _cumulativeStakingManagerRewards cumulative staking manager rewards
    */
-  function rewards() external view returns (uint256 _rewards);
+  function cumulativeStakingManagerRewards() external view returns (uint256 _cumulativeStakingManagerRewards);
 
   // --- Methods ---
 
@@ -220,11 +223,8 @@ interface IRewardPool is IAuthorizable, IModifiable {
   /// @notice Decrease staked amount
   function decreaseStake(uint256 _amount) external;
 
-  /// @notice Withdraw staked tokens
-  function withdraw(uint256 _amount, bool _claim) external;
-
   /// @notice Claim earned rewards
-  function getReward() external;
+  function getReward() external returns (uint256 _rewardAmount);
 
   /// @notice Queue new rewards for distribution
   function queueNewRewards(uint256 _amount) external;
