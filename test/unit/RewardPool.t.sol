@@ -25,7 +25,6 @@ abstract contract Base is HaiTest {
   // RewardPool params
   uint256 constant DURATION = 365 days;
   uint256 constant NEW_REWARD_RATIO = 420;
-  uint256 constant INITIAL_STAKED = 0;
 
   IRewardPool.RewardPoolParams rewardPoolParams;
 
@@ -38,13 +37,15 @@ abstract contract Base is HaiTest {
       newRewardRatio: NEW_REWARD_RATIO
     });
 
-    rewardPool = new RewardPool(
-      address(mockRewardToken),
+    // Mock the totalStaked call expected by the constructor
+    vm.mockCall(
       address(mockStakingManager),
-      INITIAL_STAKED,
-      DURATION,
-      NEW_REWARD_RATIO,
-      address(factoryDeployer)
+      abi.encodeWithSelector(IStakingManager.totalStaked.selector),
+      abi.encode(uint256(0)) // Assume initial totalStaked is 0
+    );
+
+    rewardPool = new RewardPool(
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(factoryDeployer)
     );
     label(address(rewardPool), 'RewardPool');
 
@@ -103,19 +104,22 @@ contract Unit_RewardPool_Constructor is Base {
   }
 
   function test_Set_InitialStaked() public happyPath {
-    assertEq(rewardPool.totalStaked(), INITIAL_STAKED);
+    assertEq(rewardPool.totalStaked(), mockStakingManager.totalStaked());
   }
 
   function test_Set_InitialStakedNonZero() public happyPath {
     uint256 _initialStakedNonZero = 100e18;
+
+    // Mock the totalStaked call expected by the constructor
+    vm.mockCall(
+      address(mockStakingManager),
+      abi.encodeWithSelector(IStakingManager.totalStaked.selector),
+      abi.encode(_initialStakedNonZero)
+    );
+
     RewardPool rp;
     rp = new RewardPool(
-      address(mockRewardToken),
-      address(mockStakingManager),
-      _initialStakedNonZero,
-      DURATION,
-      NEW_REWARD_RATIO,
-      address(factoryDeployer)
+      address(mockRewardToken), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(factoryDeployer)
     );
     assertEq(rp.totalStaked(), _initialStakedNonZero);
   }
@@ -130,28 +134,23 @@ contract Unit_RewardPool_Constructor is Base {
 
   function test_Revert_NullAddress_RewardToken() public {
     vm.expectRevert(IRewardPool.RewardPool_InvalidRewardToken.selector);
-    new RewardPool(
-      address(0), address(mockStakingManager), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO, address(deployer)
-    );
+    new RewardPool(address(0), address(mockStakingManager), DURATION, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAddress_StakingManager() public {
-    vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
-    new RewardPool(address(mockRewardToken), address(0), INITIAL_STAKED, DURATION, NEW_REWARD_RATIO, address(deployer));
+    vm.expectRevert(IRewardPool.RewardPool_InvalidStakingManager.selector);
+
+    new RewardPool(address(mockRewardToken), address(0), DURATION, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAmount_Duration() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, 0, NEW_REWARD_RATIO, address(deployer)
-    );
+    new RewardPool(address(mockRewardToken), address(mockStakingManager), 0, NEW_REWARD_RATIO, address(deployer));
   }
 
   function test_Revert_NullAmount_NewRewardRatio() public {
     vm.expectRevert(Assertions.NullAmount.selector);
-    new RewardPool(
-      address(mockRewardToken), address(mockStakingManager), INITIAL_STAKED, DURATION, 0, address(deployer)
-    );
+    new RewardPool(address(mockRewardToken), address(mockStakingManager), DURATION, 0, address(deployer));
   }
 }
 
@@ -272,137 +271,6 @@ contract Unit_RewardPool_DecreaseStake is Base {
   }
 }
 
-contract Unit_RewardPool_Withdraw is Base {
-  event RewardPoolWithdrawn(address indexed _account, uint256 _amount);
-  event RewardPoolRewardPaid(address indexed _account, uint256 _reward);
-
-  modifier happyPath() {
-    vm.startPrank(address(mockStakingManager));
-    _;
-  }
-
-  function test_Revert_Unauthorized() public {
-    vm.expectRevert(IAuthorizable.Unauthorized.selector);
-    rewardPool.withdraw(1, false);
-  }
-
-  function test_Revert_NullAmount() public happyPath {
-    vm.expectRevert(IRewardPool.RewardPool_WithdrawNullAmount.selector);
-    rewardPool.withdraw(0, false);
-  }
-
-  function test_Revert_InsufficientBalance() public happyPath {
-    vm.expectRevert(IRewardPool.RewardPool_InsufficientBalance.selector);
-    rewardPool.withdraw(1, false);
-  }
-
-  function test_Withdraw_WithoutClaim(uint256 _stakeAmount, uint256 _withdrawAmount) public happyPath {
-    vm.assume(_stakeAmount > 0 && _withdrawAmount > 0 && _withdrawAmount <= _stakeAmount);
-
-    // First stake some amount
-    rewardPool.stake(_stakeAmount);
-    assertEq(rewardPool.totalStaked(), _stakeAmount);
-
-    // Then withdraw without claiming rewards
-    vm.expectEmit();
-    emit RewardPoolWithdrawn(address(mockStakingManager), _withdrawAmount);
-
-    rewardPool.withdraw(_withdrawAmount, false);
-    assertEq(rewardPool.totalStaked(), _stakeAmount - _withdrawAmount);
-  }
-
-  function test_Withdraw_WithClaim(
-    uint256 _stakeAmount,
-    uint256 _withdrawAmount,
-    uint256 _rewardAmount
-  ) public happyPath {
-    _stakeAmount = bound(_stakeAmount, 1e18, 1_000_000e18);
-    _withdrawAmount = bound(_withdrawAmount, 1e18, 1_000_000e18);
-    _rewardAmount = bound(_rewardAmount, 1e18, 1_000_000e18);
-
-    vm.assume(_stakeAmount > 0 && _withdrawAmount > 0 && _withdrawAmount <= _stakeAmount);
-
-    // Transfer reward token to the reward pool
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, address(rewardPool), _rewardAmount),
-      abi.encode(true)
-    );
-    // Mock balanceOf call to return the transferred amount
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.balanceOf.selector, address(rewardPool)),
-      abi.encode(_rewardAmount)
-    );
-
-    uint256 balance = IERC20(mockRewardToken).balanceOf(address(rewardPool));
-
-    // Test reward pool token balance
-    assertEq(balance, _rewardAmount);
-
-    // Notify reward amount
-    rewardPool.notifyRewardAmount(_rewardAmount);
-
-    // Test expected reward pool values
-    assertEq(rewardPool.currentRewards(), _rewardAmount);
-    // Is 0 because no fn() w/ updateReward modifier has been called yet
-    assertEq(rewardPool.rewards(), 0);
-    assertEq(rewardPool.historicalRewards(), _rewardAmount);
-    assertEq(rewardPool.rewardRate(), _rewardAmount / DURATION);
-    assertEq(rewardPool.lastUpdateTime(), block.timestamp);
-    assertEq(rewardPool.periodFinish(), block.timestamp + DURATION);
-
-    // First stake some amount
-    rewardPool.stake(_stakeAmount);
-    // Test total staked
-    assertEq(rewardPool.totalStaked(), _stakeAmount);
-
-    vm.warp(block.timestamp + 7 days);
-
-    assertEq(rewardPool.lastTimeRewardApplicable(), block.timestamp);
-
-    uint256 rewardPerTokenStored = rewardPool.rewardPerTokenStored();
-    assertEq(rewardPerTokenStored, 0);
-    assertEq(rewardPool.rewardPerTokenPaid(), 0);
-    assertEq(
-      rewardPool.rewardPerToken(),
-      rewardPerTokenStored
-        + ((rewardPool.lastTimeRewardApplicable() - rewardPool.lastUpdateTime()) * rewardPool.rewardRate() * 1e18)
-          / _stakeAmount
-    );
-
-    assertEq(
-      rewardPool.earned(),
-      ((_stakeAmount * (rewardPool.rewardPerToken() - rewardPool.rewardPerTokenPaid())) / 1e18) + rewardPool.rewards()
-    );
-
-    // Start the recorder
-    vm.recordLogs();
-
-    rewardPool.withdraw(_withdrawAmount, true);
-
-    VmSafe.Log[] memory entries = vm.getRecordedLogs();
-
-    assertEq(entries.length, 2);
-
-    assertEq(entries[0].topics[0], keccak256('RewardPoolRewardPaid(address,uint256)'));
-    assertEq(entries[0].topics[1], bytes32(uint256(uint160(address(mockStakingManager)))));
-    uint256 amountPaid = abi.decode(entries[0].data, (uint256));
-
-    assertEq(entries[1].topics[0], keccak256('RewardPoolWithdrawn(address,uint256)'));
-    assertEq(entries[1].topics[1], bytes32(uint256(uint160(address(mockStakingManager)))));
-    assertEq(abi.decode(entries[1].data, (uint256)), _withdrawAmount);
-
-    assertEq(rewardPool.earned(), 0);
-
-    uint256 rewardPerTokenPaid = rewardPool.rewardPerTokenPaid();
-
-    assertEq(rewardPool.totalStaked(), _stakeAmount - _withdrawAmount);
-
-    assertEq(amountPaid, (rewardPerTokenPaid * _stakeAmount) / 1e18);
-  }
-}
-
 contract Unit_RewardPool_GetReward is Base {
   event RewardPoolRewardPaid(address indexed _account, uint256 _reward);
 
@@ -445,7 +313,6 @@ contract Unit_RewardPool_GetReward is Base {
 
     // Verify state after reward claim
     assertEq(rewardPool.earned(), 0);
-    assertEq(rewardPool.rewards(), 0);
   }
 }
 
@@ -767,69 +634,6 @@ contract Unit_RewardPool_Earned is Base {
     // Final earned should be greater than initial earned
     uint256 finalEarned = rewardPool.earned();
     assertGt(finalEarned, earnedBeforeSecondStake);
-  }
-
-  function test_Earned_AfterWithdraw(uint256 _stakeAmount, uint256 _rewardAmount) public happyPath {
-    // Bound inputs to reasonable values
-    _stakeAmount = bound(_stakeAmount, 1e18, 1_000_000e18);
-    _rewardAmount = bound(_rewardAmount, 1e18, 1_000_000e18);
-
-    // First stake
-    rewardPool.stake(_stakeAmount);
-
-    // Setup rewards
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, address(rewardPool), _rewardAmount),
-      abi.encode(true)
-    );
-
-    rewardPool.notifyRewardAmount(_rewardAmount);
-
-    // Move time forward
-    vm.warp(block.timestamp + 7 days);
-
-    // Get earned before withdrawal
-    uint256 earnedBeforeWithdraw = rewardPool.earned();
-
-    // Mock the reward transfer that will happen during withdraw
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, address(mockStakingManager), earnedBeforeWithdraw),
-      abi.encode(true)
-    );
-
-    // Withdraw all stake with getReward = false to keep rewards
-    rewardPool.withdraw(_stakeAmount, false);
-
-    // Earned amount should remain the same after withdrawal when not claiming rewards
-    assertEq(rewardPool.earned(), earnedBeforeWithdraw);
-
-    // Now test withdrawal with getReward = true
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, address(mockStakingManager), earnedBeforeWithdraw),
-      abi.encode(true)
-    );
-
-    // Stake again to test withdrawal with reward claim
-    rewardPool.stake(_stakeAmount);
-
-    // Move time forward to accrue some rewards
-    vm.warp(block.timestamp + 7 days);
-
-    uint256 newEarnedAmount = rewardPool.earned();
-
-    // Mock the reward transfer
-    vm.mockCall(
-      address(mockRewardToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, address(mockStakingManager), newEarnedAmount),
-      abi.encode(true)
-    );
-
-    // Withdraw with getReward = true should reset earned to 0
-    rewardPool.withdraw(_stakeAmount, true);
-    assertEq(rewardPool.earned(), 0);
   }
 }
 
@@ -1242,7 +1046,7 @@ contract Unit_RewardPool_UpdateReward is Base {
   function test_UpdateReward_StakingManager() public {
     vm.startPrank(address(mockStakingManager));
 
-    uint256 _initialRewards = rewardPool.rewards();
+    uint256 _initialRewards = rewardPool.earned();
     uint256 _initialRewardPerTokenPaid = rewardPool.rewardPerTokenPaid();
 
     // Warp time to simulate rewards accumulation
@@ -1251,7 +1055,7 @@ contract Unit_RewardPool_UpdateReward is Base {
     rewardPool.updateRewardHelper();
 
     // Check staking manager specific updates
-    assertGt(rewardPool.rewards(), _initialRewards);
+    assertGt(rewardPool.earned(), _initialRewards);
     assertGt(rewardPool.rewardPerTokenPaid(), _initialRewardPerTokenPaid);
     assertEq(rewardPool.rewardPerTokenPaid(), rewardPool.rewardPerTokenStored());
   }
