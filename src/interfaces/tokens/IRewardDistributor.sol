@@ -62,6 +62,12 @@ interface IRewardDistributor is IAuthorizable, IModifiable {
   /// @notice Throws when the transfer fails
   error RewardDistributor_TransferFailed();
 
+  /// @notice Throws when the initial epoch has already been started
+  error RewardDistributor_InitialEpochAlreadyStarted();
+
+  /// @notice Throws when the initial epoch has not been started
+  error RewardDistributor_InitialEpochNotStarted();
+
   // --- Data ---
 
   /**
@@ -77,10 +83,16 @@ interface IRewardDistributor is IAuthorizable, IModifiable {
   function epochDuration() external view returns (uint256 _epochDuration);
 
   /**
-   * @notice Timestamp of the last time the merkle roots were updated
-   * @return _lastUpdatedTime Timestamp of the last time the merkle roots were updated
+   * @notice Duration of the buffer for calculating most recent epoch
+   * @return _bufferDuration Duration of the buffer
    */
-  function lastUpdatedTime() external view returns (uint256 _lastUpdatedTime);
+  function bufferDuration() external view returns (uint256 _bufferDuration);
+
+  /**
+   * @notice Timestamp of the start of the first epoch
+   * @return _startTimestamp Timestamp of the start of the first epoch
+   */
+  function startTimestamp() external view returns (uint256 _startTimestamp);
 
   /**
    * @notice Address of the account that can set the merkle root
