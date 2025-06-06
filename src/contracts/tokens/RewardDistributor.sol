@@ -27,7 +27,9 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
   /// @inheritdoc IRewardDistributor
   uint256 public epochDuration;
   /// @inheritdoc IRewardDistributor
-  uint256 public lastUpdatedTime;
+  uint256 public bufferDuration;
+  /// @inheritdoc IRewardDistributor
+  uint256 public startTimestamp;
   /// @inheritdoc IRewardDistributor
   address public rootSetter;
 
@@ -37,13 +39,22 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
   mapping(bytes32 _root => mapping(address _account => bool _hasClaimed)) public isClaimed;
 
   // --- Init ---
-  constructor(uint256 _epochDuration, address _rootSetter) Authorizable(msg.sender) {
+  constructor(uint256 _epochDuration, uint256 _bufferDuration, address _rootSetter) Authorizable(msg.sender) {
     epochDuration = _epochDuration;
+    bufferDuration = _bufferDuration;
     epochCounter = 0;
     rootSetter = _rootSetter;
   }
 
   // --- Methods ---
+
+  function startInitialEpoch() external isAuthorized {
+    if (epochCounter > 0) {
+      revert RewardDistributor_InitialEpochAlreadyStarted();
+    }
+    startTimestamp = block.timestamp;
+    epochCounter = 1;
+  }
 
   /// @inheritdoc IRewardDistributor
   function pause() external isAuthorized {
@@ -57,7 +68,10 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
 
   /// @inheritdoc IRewardDistributor
   function updateMerkleRoots(address[] calldata _tokens, bytes32[] calldata _merkleRoots) external {
-    if (block.timestamp - lastUpdatedTime < epochDuration) {
+    if (epochCounter == 0) {
+      revert RewardDistributor_InitialEpochNotStarted();
+    }
+    if (block.timestamp < startTimestamp + (epochDuration * epochCounter) + (bufferDuration * (epochCounter - 1))) {
       revert RewardDistributor_TooSoonEpochNotElapsed();
     }
     if (msg.sender != rootSetter) revert RewardDistributor_NotRootSetter();
@@ -75,7 +89,6 @@ contract RewardDistributor is Authorizable, Modifiable, Pausable, IRewardDistrib
       merkleRoots[_tokens[_i]] = _merkleRoots[_i];
       emit RewardDistributorMerkleRootUpdated(_tokens[_i], _merkleRoots[_i], epochCounter);
     }
-    lastUpdatedTime = block.timestamp;
     epochCounter++;
   }
 

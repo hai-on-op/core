@@ -36,18 +36,20 @@ abstract contract Base is HaiTest {
   uint256 constant REWARD_AMOUNT_A = 1;
   uint256 constant REWARD_AMOUNT_B = 2;
   uint256 constant RESCUE_AMOUNT = 10;
-  uint256 constant EPOCH_DURATION = 1 days;
+  uint256 constant EPOCH_DURATION = 22 hours;
+  uint256 constant BUFFER_DURATION = 2 hours;
 
   function setUp() public virtual {
     vm.startPrank(deployer);
 
-    rewardDistributor = new RewardDistributor(EPOCH_DURATION, rootSetter);
+    rewardDistributor = new RewardDistributor(EPOCH_DURATION, BUFFER_DURATION, rootSetter);
     label(address(rewardDistributor), 'RewardDistributor');
 
     mockRewardToken = new ERC20ForTest();
     mockSecondRewardToken = new ERC20ForTest();
 
     rewardDistributor.addAuthorization(authorizedAccount);
+    rewardDistributor.addAuthorization(rootSetter);
     rewardDistributor.modifyParameters('rootSetter', abi.encode(rootSetter));
 
     mockRewardToken.mint(address(rewardDistributor), 100);
@@ -93,6 +95,10 @@ contract Unit_RewardDistributor_Constructor is Base {
     assertEq(rewardDistributor.epochDuration(), EPOCH_DURATION);
   }
 
+  function test_Set_BufferDuration() public {
+    assertEq(rewardDistributor.bufferDuration(), BUFFER_DURATION);
+  }
+
   function test_Set_EpochCounter() public {
     assertEq(rewardDistributor.epochCounter(), 0);
   }
@@ -102,10 +108,31 @@ contract Unit_RewardDistributor_Constructor is Base {
   }
 }
 
+contract Unit_RewardDistributor_StartInitialEpoch is Base {
+  function test_StartInitialEpoch() public authorized {
+    rewardDistributor.startInitialEpoch();
+    assertEq(rewardDistributor.epochCounter(), 1);
+  }
+
+  function test_Revert_StartInitialEpoch_AlreadyStarted() public authorized {
+    rewardDistributor.startInitialEpoch();
+    vm.expectRevert(IRewardDistributor.RewardDistributor_InitialEpochAlreadyStarted.selector);
+    rewardDistributor.startInitialEpoch();
+  }
+}
+
 contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
   event RewardDistributorMerkleRootUpdated(address indexed _rewardToken, bytes32 _merkleRoot, uint256 _epochCounter);
 
+  function test_UpdateMerkleRootsInitialEpochNotStarted() public rootSetterModifier {
+    vm.expectRevert(IRewardDistributor.RewardDistributor_InitialEpochNotStarted.selector);
+    rewardDistributor.updateMerkleRoots(new address[](0), new bytes32[](0));
+  }
+
   function test_UpdateMerkleRootsSingleToken() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
+
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
@@ -113,11 +140,14 @@ contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
     roots[0] = merkleRootA;
 
     vm.expectEmit(true, true, true, true);
-    emit RewardDistributorMerkleRootUpdated(address(mockRewardToken), merkleRootA, 0);
+    emit RewardDistributorMerkleRootUpdated(address(mockRewardToken), merkleRootA, 1);
     rewardDistributor.updateMerkleRoots(tokens, roots);
   }
 
   function test_UpdateMerkleRootsMultipleTokens() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
+
     address[] memory tokens = new address[](2);
     tokens[0] = address(mockRewardToken);
     tokens[1] = address(mockSecondRewardToken);
@@ -126,10 +156,21 @@ contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
     roots[0] = merkleRootA;
     roots[1] = merkleRootB;
 
+    vm.expectEmit(true, true, true, true);
+
+    emit RewardDistributorMerkleRootUpdated(address(mockRewardToken), merkleRootA, 1);
+
+    vm.expectEmit(true, true, true, true);
+
+    emit RewardDistributorMerkleRootUpdated(address(mockSecondRewardToken), merkleRootB, 1);
+
     rewardDistributor.updateMerkleRoots(tokens, roots);
   }
 
-  function test_Revert_UpdateMerkleRoots_NotRootSetter() public {
+  function test_Revert_UpdateMerkleRoots_NotRootSetter() public authorized {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
+
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
@@ -141,6 +182,8 @@ contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
   }
 
   function test_Revert_UpdateMerkleRoots_ArrayLengthsMustMatch() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
@@ -153,6 +196,8 @@ contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
   }
 
   function test_Revert_UpdateMerkleRoots_InvalidTokenAddress() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
     address[] memory tokens = new address[](1);
     tokens[0] = address(0);
 
@@ -164,17 +209,14 @@ contract Unit_RewardDistributor_UpdateMerkleRoots is Base {
   }
 
   function test_Revert_UpdateMerkleRoots_TooSoonEpochNotElapsed() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION - 1);
     // Do initial update to set lastUpdatedTime
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
     bytes32[] memory roots = new bytes32[](1);
     roots[0] = merkleRootA;
-
-    rewardDistributor.updateMerkleRoots(tokens, roots);
-
-    // Try to update again before epoch duration has passed
-    vm.warp(block.timestamp + EPOCH_DURATION - 1);
 
     vm.expectRevert(IRewardDistributor.RewardDistributor_TooSoonEpochNotElapsed.selector);
     rewardDistributor.updateMerkleRoots(tokens, roots);
@@ -185,6 +227,8 @@ contract Unit_RewardDistributor_Claim is Base {
   event RewardDistributorRewardClaimed(address indexed _account, address indexed _rewardToken, uint256 _wad);
 
   function test_Claim() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
@@ -204,7 +248,9 @@ contract Unit_RewardDistributor_Claim is Base {
     rewardDistributor.claim(address(mockRewardToken), REWARD_AMOUNT_A, proof);
   }
 
-  function test_Revert_Claim_AlreadyClaimed() public {
+  function test_Revert_Claim_AlreadyClaimed() public authorized {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
     // First set the merkle root as rootSetter
     vm.startPrank(rootSetter);
     address[] memory tokens = new address[](1);
@@ -231,6 +277,8 @@ contract Unit_RewardDistributor_Claim is Base {
   }
 
   function test_Revert_Claim_InvalidMerkleProof() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
     address[] memory tokens = new address[](1);
     tokens[0] = address(mockRewardToken);
 
@@ -337,7 +385,7 @@ contract Unit_RewardDistributor_ViewFunctions is Base {
   function test_ViewFunctions() public {
     assertEq(rewardDistributor.epochCounter(), 0);
     assertEq(rewardDistributor.epochDuration(), EPOCH_DURATION);
-    assertEq(rewardDistributor.lastUpdatedTime(), 0);
+    assertEq(rewardDistributor.bufferDuration(), BUFFER_DURATION);
     assertEq(rewardDistributor.rootSetter(), rootSetter);
     assertEq(rewardDistributor.merkleRoots(address(mockRewardToken)), bytes32(0));
     assertEq(rewardDistributor.isClaimed(merkleRootA, address(this)), false);
@@ -346,6 +394,9 @@ contract Unit_RewardDistributor_ViewFunctions is Base {
 
 contract Unit_RewardDistributor_MultiClaim is Base {
   function test_MultiClaim() public rootSetterModifier {
+    rewardDistributor.startInitialEpoch();
+    vm.warp(block.timestamp + EPOCH_DURATION);
+
     address[] memory tokens = new address[](2);
     tokens[0] = address(mockRewardToken);
     tokens[1] = address(mockSecondRewardToken);
