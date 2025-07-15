@@ -5,7 +5,7 @@ import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {Ownable2Step, Ownable} from '@openzeppelin/contracts/access/Ownable2Step.sol';
 import {IYearnVaultV2} from '@interfaces/external/IYearnVaultV2.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
-import {IChainLinkOracle} from '@interfaces/external/IChainLinkOracle.sol';
+import {IChainlinkOracle} from '@interfaces/oracles/IChainlinkOracle.sol';
 import {ShareValueHelper} from '@libraries/ShareValueHelper.sol';
 import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 
@@ -49,7 +49,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
   /// @notice Chainlink feed to check that Optimism's sequencer is online.
   /// @dev This prevents transactions sent while the sequencer is down from being executed when it comes back online.
-  IChainLinkOracle public constant sequencerUptimeFeed = IChainLinkOracle(0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389);
+  IChainlinkOracle public constant sequencerUptimeFeed = IChainlinkOracle(0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389);
 
   /// @notice Check if an address can update our LP pricing.
   /// @dev May only be updated by owner.
@@ -146,11 +146,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert NoChainlinkOracle();
     }
 
-    if (_token0Feed != address(0) && IChainLinkOracle(_token0Feed).decimals() != 8) {
+    if (_token0Feed != address(0) && IChainlinkOracle(_token0Feed).decimals() != 8) {
       revert NotChainlinkDecimals();
     }
 
-    if (_token1Feed != address(0) && IChainLinkOracle(_token1Feed).decimals() != 8) {
+    if (_token1Feed != address(0) && IChainlinkOracle(_token1Feed).decimals() != 8) {
       revert NotChainlinkDecimals();
     }
 
@@ -195,9 +195,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    */
   function chainlinkPriceLastUpdated(uint256 _tokenIndex) external view returns (uint256 updatedAt) {
     if (_tokenIndex == 0) {
-      (,,, updatedAt,) = IChainLinkOracle(token0Feed).latestRoundData();
+      (,,, updatedAt,) = IChainlinkOracle(token0Feed).latestRoundData();
     } else {
-      (,,, updatedAt,) = IChainLinkOracle(token1Feed).latestRoundData();
+      (,,, updatedAt,) = IChainlinkOracle(token1Feed).latestRoundData();
     }
   }
 
@@ -281,7 +281,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     }
 
     // pull latest data
-    (, int256 price,, uint256 updatedAt,) = IChainLinkOracle(feedAddress).latestRoundData();
+    (, int256 price,, uint256 updatedAt,) = IChainlinkOracle(feedAddress).latestRoundData();
 
     // if a price is older than our preset heartbeat, we're in trouble
     if (block.timestamp - updatedAt > heartbeat) {
