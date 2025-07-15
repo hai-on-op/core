@@ -69,7 +69,7 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     uint256 _veloLpBalance = _baseTokenBalance.wmul(_getPricePerFullShare());
 
     // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(address(veloPool));
+    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(true);
 
     uint256 _price = (_veloLpBalance * _veloLpPrice) / 1e8;
 
