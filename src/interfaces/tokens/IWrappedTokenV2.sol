@@ -28,9 +28,9 @@ interface IWrappedTokenV2 is IERC20Metadata, IERC20Permit, IAuthorizable {
    * @notice Emitted when a user deposits a veNFT and mints wrapped tokens
    * @param _account Address of the user depositing the base tokens
    * @param _tokenId ID of the veNFT being deposited
-   * @param _balance Amount of veNFT being deposited
+   * @param _wad Amount of locked velo in veNFT being deposited
    */
-  event WrappedTokenV2NFTDeposit(address indexed _account, uint256 _tokenId, uint256 _balance);
+  event WrappedTokenV2NFTDeposit(address indexed _account, uint256 _tokenId, uint256 _wad);
 
   /**
    * @notice Emitted when a user migrates wrapped tokens v1 to v2
@@ -64,6 +64,12 @@ interface IWrappedTokenV2 is IERC20Metadata, IERC20Permit, IAuthorizable {
 
   /// @notice Throws when wrapped token v1 is null
   error WrappedTokenV2_NullWrappedTokenV1();
+
+  /// @notice Throws when trying to deposit a balance of 0
+  error WrappedTokenV2_BalanceIsZero();
+
+  /// @notice Throws when trying to deposit an empty array of token ids
+  error WrappedTokenV2_EmptyTokenIds();
 
   // --- Registry ---
 
@@ -106,9 +112,9 @@ interface IWrappedTokenV2 is IERC20Metadata, IERC20Permit, IAuthorizable {
   /**
    * @notice Deposit a veNFT and mint wrapped tokens
    * @param _account Account that will receive the wrapped tokens
-   * @param _tokenId ID of the veNFT being deposited
+   * @param _tokenIds IDs of the veNFTs being deposited
    */
-  function depositNFT(address _account, uint256 _tokenId) external;
+  function depositNFTs(address _account, uint256[] memory _tokenIds) external;
 
   /**
    * @notice Migrate wrapped tokens v1 to v2

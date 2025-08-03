@@ -9,7 +9,6 @@ import {ERC20Permit, IERC20Permit} from '@openzeppelin/contracts/token/ERC20/ext
 
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
-// import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {IVotingEscrow} from '@interfaces/external/IVotingEscrow.sol';
 
 import {IWrappedToken} from '@interfaces/tokens/IWrappedToken.sol';
@@ -49,7 +48,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
   /// @inheritdoc IWrappedTokenV2
   // solhint-disable-next-line var-name-mixedcase
-  address public immutable BURN_ADDRESS = 0x0000000000000000000000000000000000000000;
+  address public immutable BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
   // --- Registry ---
 
@@ -102,20 +101,25 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
   }
 
   /// @inheritdoc IWrappedTokenV2
-  function depositNFT(address _account, uint256 _tokenId) external {
+  function depositNFTs(address _account, uint256[] memory _tokenIds) external {
     if (_account == address(0)) revert WrappedTokenV2_NullReceiver();
-    if (_tokenId == 0) revert WrappedTokenV2_NullTokenId();
+    if (_tokenIds.length == 0) revert WrappedTokenV2_EmptyTokenIds();
 
-    uint256 balance = BASE_TOKEN_NFT.balanceOfNFT(_tokenId);
-    if (balance == 0) {
-      revert WrappedTokenV2_TokenIdDoesNotExistOrBalanceIsZero();
+    uint256 _balance = 0;
+    for (uint256 i = 0; i < _tokenIds.length; i++) {
+      _balance += uint256(uint128(BASE_TOKEN_NFT.locked(_tokenIds[i]).amount));
     }
 
-    BASE_TOKEN_NFT.safeTransferFrom(msg.sender, baseTokenManager, _tokenId);
+    if (_balance == 0) {
+      revert WrappedTokenV2_BalanceIsZero();
+    }
 
-    _mint(_account, balance);
+    for (uint256 i = 0; i < _tokenIds.length; i++) {
+      BASE_TOKEN_NFT.safeTransferFrom(msg.sender, baseTokenManager, _tokenIds[i]);
+      emit WrappedTokenV2NFTDeposit(_account, _tokenIds[i], _balance);
+    }
 
-    emit WrappedTokenV2NFTDeposit(_account, _tokenId, balance);
+    _mint(_account, _balance);
   }
 
   /// @inheritdoc IWrappedTokenV2
