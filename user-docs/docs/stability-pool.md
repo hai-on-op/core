@@ -45,7 +45,7 @@ This real-time system simplifies liquidation exposure and rewards:
 
 ### 3. Sustainable, Aligned Incentives
 - **KITE emissions** reward sHAI holders.
-- Your position grows in yield and potential governance alignmen since sHAI is more than a pass-through token
+- Your position grows in yield and potential governance alignment since sHAI is more than a pass-through token
 - These layers ensure Stability Pool participants are central to HAI’s durability and growth.
 
 ---
