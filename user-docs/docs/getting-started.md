@@ -58,7 +58,7 @@ For details, see [How to Mint HAI](./minting-hai).
 After minting, you can:
 
 - Provide HAI liquidity on supported DEXes to earn fees and incentives.
-- Stake KITE to boost your haiVELO rewards.
+- Stake KITE to boost your native rewards.
 - Contribute to the [Stability Pool](./stability-pool) for liquidation yield.
 
 ---

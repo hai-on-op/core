@@ -2,7 +2,7 @@
 
 KITE staking is the mechanism that rewards long-term supporters of the HAI Protocol while helping them maximize their returns from haiVELO deposits and HAI minting incentives.
 
-When you stake KITE, you receive **boosts** on rewards for certain collateral types and earn a share of protocol fees — all paid in the HAI stablecoin.
+When you stake KITE, you receive **boosts** on rewards for certain collateral types and earn a share of protocol fees - all paid in the HAI stablecoin.
 
 ---
 
@@ -20,7 +20,7 @@ By staking KITE, you:
   Staked KITE holders receive a share of the protocol’s fees, paid in HAI stablecoins.
 
 - **No governance requirement**  
-  KITE staking does not give voting power — it’s purely a rewards and fee-sharing mechanism.
+  KITE staking does not give voting power - it’s purely a rewards and fee-sharing mechanism.
 
 ---
 
@@ -67,5 +67,5 @@ You can unstake your KITE at any time, but doing so will reduce your boost multi
 
 - Staking KITE **increases** your rewards for haiVELO deposits and certain HAI minting activities.
 - You also earn a share of **protocol fees** in HAI stablecoins.
-- Staking is **non-governance** — your KITE remains focused on yield boosting and fee sharing.
+- Staking is **non-governance** - your KITE remains focused on yield boosting and fee sharing.
 - The more KITE you stake (up to the cap), the greater your boost.

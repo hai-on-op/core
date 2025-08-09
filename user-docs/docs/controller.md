@@ -17,7 +17,7 @@ HAI is **not** hard-pegged to $1. Instead, it has a **floating target price** (�
 Every few seconds, the Controller:
 1. Reads HAI’s **market price** from oracles.
 2. Compares it to the **redemption price** (the current target).
-3. Updates the **redemption rate** — the per-second interest rate applied to all active HAI debt.
+3. Updates the **redemption rate** - the per-second interest rate applied to all active HAI debt.
 
 By raising or lowering the redemption rate, the Controller changes the incentive to mint or repay HAI:
 - **Price above target** → Borrowing cost decreases → More HAI is minted → Supply expands → Price drifts down.
@@ -41,9 +41,9 @@ This setup focuses on long-term, sustained deviations rather than short-term vol
 
 ## Why iRate Works for HAI
 
-- **No overreaction** — By ignoring momentary price noise, the system avoids unnecessary swings in borrowing costs.
-- **Gradual correction** — Sustained deviations cause stronger adjustments, while brief ones fade away.
-- **Market-driven** — Borrowing incentives are adjusted automatically without requiring governance votes or manual intervention.
+- **No overreaction** - By ignoring momentary price noise, the system avoids unnecessary swings in borrowing costs.
+- **Gradual correction** - Sustained deviations cause stronger adjustments, while brief ones fade away.
+- **Market-driven** - Borrowing incentives are adjusted automatically without requiring governance votes or manual intervention.
 
 ---
 
@@ -60,10 +60,10 @@ This setup focuses on long-term, sustained deviations rather than short-term vol
 ## Key Parameters (Simplified)
 
 While the contract has several tunable settings, the most important for the iRate are:
-- **`integralGain`** — How strongly the iRate responds to accumulated deviation.
-- **`perSecondCumulativeLeak`** — How quickly past deviations fade from memory.
-- **`noiseBarrier`** — Ignores tiny deviations so the rate doesn’t change unnecessarily.
-- **Bounds** — Hard limits on how high or low the redemption rate can move.
+- **`integralGain`** - How strongly the iRate responds to accumulated deviation.
+- **`perSecondCumulativeLeak`** - How quickly past deviations fade from memory.
+- **`noiseBarrier`** - Ignores tiny deviations so the rate doesn’t change unnecessarily.
+- **Bounds** - Hard limits on how high or low the redemption rate can move.
 
 ---
 

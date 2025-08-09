@@ -33,15 +33,15 @@ As an sHAI holder, you can:
 - Collect **liquidation profits**
 - Accumulate **KITE emissions**
 - Maintain exposure to redemption rate (RR) directionality  
- And your sHAI remains usable across DeFi ecosystems :contentReference[oaicite:1]{index=1}.
+- And your sHAI remains usable across DeFi ecosystems.
 
 ### 2. Automated Liquidation Profit Sharing (ALPS)
 This real-time system simplifies liquidation exposure and rewards:
 
 - Liquidated collateral is auctioned at fixed discounts.
 - Protocol automatically buys this collateral with Stability Pool HAI.
-- Gains are auto-sold back into the pool—rewarding depositors instantly in HAI.
-- Public auctions only open if the pool lacks enough HAI :contentReference[oaicite:2]{index=2}.
+- Gains are auto-sold back into the pool, rewarding depositors instantly in HAI.
+- Public auctions only open if the pool lacks enough HAI.
 
 ### 3. Sustainable, Aligned Incentives
 - **KITE emissions** reward sHAI holders.
