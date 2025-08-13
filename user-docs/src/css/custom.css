@@ -1,0 +1,66 @@
+/**
+ * Any CSS included here will be global. The classic template
+ * bundles Infima by default. Infima is a CSS framework designed to
+ * work well for content-centric websites.
+ */
+
+/* You can override the default Infima variables here. */
+/**
+ * HAI-styled global CSS overrides
+ */
+
+/**
+ * HAI pastel theme customization
+ */
+
+/* ==== LIGHT MODE (Default) ==== */
+:root {
+    --ifm-background-color: #ffffff;
+    --ifm-font-color-base: #000000;
+    --ifm-color-primary: #000000;
+    --ifm-color-link: #000000;
+    --ifm-navbar-background-color: #ffffff;
+    --ifm-navbar-link-color: #000000;
+    --ifm-footer-background-color: #000000;
+    --ifm-footer-color: #ffffff;
+}
+
+/* ==== DARK MODE ==== */
+[data-theme='dark'] {
+    --ifm-background-color: #000000;
+    --ifm-font-color-base: #ffffff;
+    --ifm-color-primary: #ffffff;
+    --ifm-color-link: #ffffff;
+    --ifm-navbar-background-color: #000000;
+    --ifm-navbar-link-color: #ffffff;
+    --ifm-footer-background-color: #ffffff;
+    --ifm-footer-color: #000000;
+}
+
+/* Apply font color globally */
+body {
+    color: var(--ifm-font-color-base);
+}
+
+/* Footer override (enforces styles) */
+.footer {
+    background-color: var(--ifm-footer-background-color) !important;
+    color: var(--ifm-footer-color) !important;
+}
+
+    .footer a {
+        color: var(--ifm-footer-color) !important;
+    }
+
+/* === FORCE FOOTER STYLING === */
+.footer {
+    background-color: #000000 !important;
+    color: #ffffff !important;
+}
+
+    .footer a,
+    .footer a:hover,
+    .footer a:visited {
+        color: #ffffff !important;
+        text-decoration: none;
+    }
