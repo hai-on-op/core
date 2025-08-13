@@ -1,3 +1,4 @@
+@pythnetwork/pyth-sdk-solidity/=node_modules/@pythnetwork/pyth-sdk-solidity
 @defi-wonderland/solidity-utils/=node_modules/@defi-wonderland/solidity-utils/solidity/
 @openzeppelin/=node_modules/@openzeppelin/
 @uniswap/=node_modules/@uniswap/
