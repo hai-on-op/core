@@ -48,7 +48,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
   /// @inheritdoc IWrappedTokenV2
   // solhint-disable-next-line var-name-mixedcase
-  address public immutable BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+  address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
   // --- Registry ---
 
