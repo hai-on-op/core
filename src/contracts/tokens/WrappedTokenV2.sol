@@ -97,7 +97,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
     _mint(_account, _wad);
 
-    emit WrappedTokenV2Deposit(_account, _wad);
+    emit WrappedTokenV2Deposit(msg.sender, _wad);
   }
 
   /// @inheritdoc IWrappedTokenV2
