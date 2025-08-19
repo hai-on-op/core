@@ -420,6 +420,16 @@ contract Unit_WrappedToken_DepositNFTs is Base {
 
     wrappedTokenV2.depositNFTs(user, tokenIds);
   }
+
+  function test_Revert_DuplicateTokenIds() public happyPath(user) {
+    uint256[] memory tokenIds = new uint256[](2);
+    tokenIds[0] = tokenIdA;
+    tokenIds[1] = tokenIdA;
+
+    vm.expectRevert(IWrappedTokenV2.WrappedTokenV2_DuplicateTokenIds.selector);
+
+    wrappedTokenV2.depositNFTs(user, tokenIds);
+  }
 }
 
 contract Unit_WrappedToken_DepositNFTs_ERC20_Events is Base {
