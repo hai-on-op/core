@@ -114,12 +114,12 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
       revert WrappedTokenV2_BalanceIsZero();
     }
 
+    _mint(_account, _balance);
+
     for (uint256 i = 0; i < _tokenIds.length; i++) {
       BASE_TOKEN_NFT.safeTransferFrom(msg.sender, baseTokenManager, _tokenIds[i]);
       emit WrappedTokenV2NFTDeposit(_account, _tokenIds[i], _balance);
     }
-
-    _mint(_account, _balance);
   }
 
   /// @inheritdoc IWrappedTokenV2
