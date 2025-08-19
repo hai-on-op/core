@@ -115,8 +115,13 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
     }
 
     uint256 _balance = 0;
+
+    uint256[] memory _tokenIdBalances = new uint256[](_tokenIds.length);
+
     for (uint256 i = 0; i < _tokenIds.length; i++) {
-      _balance += uint256(uint128(BASE_TOKEN_NFT.locked(_tokenIds[i]).amount));
+      uint256 _b = uint256(uint128(BASE_TOKEN_NFT.locked(_tokenIds[i]).amount));
+      _tokenIdBalances[i] = _b;
+      _balance += _b;
     }
 
     if (_balance == 0) {
@@ -127,7 +132,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
     for (uint256 i = 0; i < _tokenIds.length; i++) {
       BASE_TOKEN_NFT.safeTransferFrom(msg.sender, baseTokenManager, _tokenIds[i]);
-      emit WrappedTokenV2NFTDeposit(_account, _tokenIds[i], _balance);
+      emit WrappedTokenV2NFTDeposit(_account, _tokenIds[i], _tokenIdBalances[i]);
     }
   }
 

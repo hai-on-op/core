@@ -369,7 +369,7 @@ contract Unit_WrappedToken_DepositNFTs is Base {
 
     LockedBalance memory _lockedBalanceBefore = mockBaseTokenNFT.locked(tokenIdA);
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
 
     emit WrappedTokenV2NFTDeposit(user, tokenIdA, uint256(int256(_lockedBalanceBefore.amount)));
 
@@ -390,14 +390,14 @@ contract Unit_WrappedToken_DepositNFTs is Base {
 
     LockedBalance memory _lockedBalanceBeforeC = mockBaseTokenNFT.locked(tokenIdC);
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
 
     emit WrappedTokenV2NFTDeposit(user, tokenIdA, uint256(int256(_lockedBalanceBeforeA.amount)));
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
     emit WrappedTokenV2NFTDeposit(user, tokenIdB, uint256(int256(_lockedBalanceBeforeB.amount)));
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
     emit WrappedTokenV2NFTDeposit(user, tokenIdC, uint256(int256(_lockedBalanceBeforeC.amount)));
 
     wrappedTokenV2.depositNFTs(user, tokenIds);
