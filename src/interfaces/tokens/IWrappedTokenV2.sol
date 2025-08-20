@@ -71,6 +71,9 @@ interface IWrappedTokenV2 is IERC20Metadata, IERC20Permit, IAuthorizable {
   /// @notice Throws when trying to deposit an empty array of token ids
   error WrappedTokenV2_EmptyTokenIds();
 
+  /// @notice Throws when trying to deposit duplicate token ids
+  error WrappedTokenV2_DuplicateTokenIds();
+
   // --- Registry ---
 
   /// @notice Address of the base token
