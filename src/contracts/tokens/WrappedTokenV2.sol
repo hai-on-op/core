@@ -48,7 +48,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
   /// @inheritdoc IWrappedTokenV2
   // solhint-disable-next-line var-name-mixedcase
-  address public immutable BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
+  address public constant BURN_ADDRESS = 0x000000000000000000000000000000000000dEaD;
 
   // --- Registry ---
 
@@ -97,7 +97,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
     _mint(_account, _wad);
 
-    emit WrappedTokenV2Deposit(_account, _wad);
+    emit WrappedTokenV2Deposit(msg.sender, _wad);
   }
 
   /// @inheritdoc IWrappedTokenV2
@@ -105,21 +105,35 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
     if (_account == address(0)) revert WrappedTokenV2_NullReceiver();
     if (_tokenIds.length == 0) revert WrappedTokenV2_EmptyTokenIds();
 
+    // Revert on duplicates
+    for (uint256 i = 0; i < _tokenIds.length - 1; i++) {
+      for (uint256 j = i + 1; j < _tokenIds.length; j++) {
+        if (_tokenIds[i] == _tokenIds[j]) {
+          revert WrappedTokenV2_DuplicateTokenIds();
+        }
+      }
+    }
+
     uint256 _balance = 0;
+
+    uint256[] memory _tokenIdBalances = new uint256[](_tokenIds.length);
+
     for (uint256 i = 0; i < _tokenIds.length; i++) {
-      _balance += uint256(uint128(BASE_TOKEN_NFT.locked(_tokenIds[i]).amount));
+      uint256 _b = uint256(uint128(BASE_TOKEN_NFT.locked(_tokenIds[i]).amount));
+      _tokenIdBalances[i] = _b;
+      _balance += _b;
     }
 
     if (_balance == 0) {
       revert WrappedTokenV2_BalanceIsZero();
     }
 
+    _mint(_account, _balance);
+
     for (uint256 i = 0; i < _tokenIds.length; i++) {
       BASE_TOKEN_NFT.safeTransferFrom(msg.sender, baseTokenManager, _tokenIds[i]);
-      emit WrappedTokenV2NFTDeposit(_account, _tokenIds[i], _balance);
+      emit WrappedTokenV2NFTDeposit(msg.sender, _tokenIds[i], _tokenIdBalances[i]);
     }
-
-    _mint(_account, _balance);
   }
 
   /// @inheritdoc IWrappedTokenV2
@@ -131,7 +145,7 @@ contract WrappedTokenV2 is ERC20, ERC20Permit, Authorizable, Modifiable, IWrappe
 
     _mint(_account, _wad);
 
-    emit WrappedTokenV2MigrateV1toV2(_account, _wad);
+    emit WrappedTokenV2MigrateV1toV2(msg.sender, _wad);
   }
 
   // --- Overrides ---

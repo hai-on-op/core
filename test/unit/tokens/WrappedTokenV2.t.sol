@@ -369,7 +369,7 @@ contract Unit_WrappedToken_DepositNFTs is Base {
 
     LockedBalance memory _lockedBalanceBefore = mockBaseTokenNFT.locked(tokenIdA);
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
 
     emit WrappedTokenV2NFTDeposit(user, tokenIdA, uint256(int256(_lockedBalanceBefore.amount)));
 
@@ -390,14 +390,14 @@ contract Unit_WrappedToken_DepositNFTs is Base {
 
     LockedBalance memory _lockedBalanceBeforeC = mockBaseTokenNFT.locked(tokenIdC);
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
 
     emit WrappedTokenV2NFTDeposit(user, tokenIdA, uint256(int256(_lockedBalanceBeforeA.amount)));
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
     emit WrappedTokenV2NFTDeposit(user, tokenIdB, uint256(int256(_lockedBalanceBeforeB.amount)));
 
-    vm.expectEmit(true, true, true, false);
+    vm.expectEmit(true, true, true, true);
     emit WrappedTokenV2NFTDeposit(user, tokenIdC, uint256(int256(_lockedBalanceBeforeC.amount)));
 
     wrappedTokenV2.depositNFTs(user, tokenIds);
@@ -417,6 +417,16 @@ contract Unit_WrappedToken_DepositNFTs is Base {
     emit Transfer(user, baseTokenManager, tokenIdB);
     vm.expectEmit(true, true, true, false);
     emit Transfer(user, baseTokenManager, tokenIdC);
+
+    wrappedTokenV2.depositNFTs(user, tokenIds);
+  }
+
+  function test_Revert_DuplicateTokenIds() public happyPath(user) {
+    uint256[] memory tokenIds = new uint256[](2);
+    tokenIds[0] = tokenIdA;
+    tokenIds[1] = tokenIdA;
+
+    vm.expectRevert(IWrappedTokenV2.WrappedTokenV2_DuplicateTokenIds.selector);
 
     wrappedTokenV2.depositNFTs(user, tokenIds);
   }
