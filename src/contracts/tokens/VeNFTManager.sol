@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IERC721Receiver} from '@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {EnumerableSet} from '@openzeppelin/contracts/utils/structs/EnumerableSet.sol';
@@ -13,7 +14,6 @@ import {IRootVotingRewardsFactory} from '@interfaces/external/IRootVotingRewards
 import {IRewardsDistributor} from '@interfaces/external/IRewardsDistributor.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
-import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
 import {Encoding} from '@libraries/Encoding.sol';
 
@@ -21,7 +21,7 @@ import {Encoding} from '@libraries/Encoding.sol';
  * @title  VeNFTManager
  * @notice This contract is used to the protocol veNFTs
  */
-contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
+contract VeNFTManager is Authorizable, IVeNFTManager, IERC721Receiver {
   using SafeERC20 for IERC20;
   using EnumerableSet for EnumerableSet.UintSet;
   using Encoding for bytes;
@@ -111,12 +111,15 @@ contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
     address _rootVotingRewardsFactory,
     address _rootMessageBridge,
     address _rewardsDistributor
-  ) Authorizable(msg.sender) validParams {
+  ) Authorizable(msg.sender) {
     if (_secondaryManager == address(0)) {
       revert VeNFTManager_NullSecondaryManager();
     }
     if (_tertiaryManager == address(0)) {
       revert VeNFTManager_NullTertiaryManager();
+    }
+    if (_veNFT == address(0)) {
+      revert VeNFTManager_NullVeNFT();
     }
     if (_voter == address(0)) {
       revert VeNFTManager_NullVoter();
@@ -145,6 +148,15 @@ contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
   /// @inheritdoc IVeNFTManager
   function depositVeNFTs(uint256[] memory _tokenIds) external onlySecondary {
     if (_tokenIds.length == 0) revert VeNFTManager_EmptyTokenIds();
+
+    // Revert on duplicates
+    for (uint256 i = 0; i < _tokenIds.length - 1; i++) {
+      for (uint256 j = i + 1; j < _tokenIds.length; j++) {
+        if (_tokenIds[i] == _tokenIds[j]) {
+          revert VeNFTManager_DuplicateTokenIds();
+        }
+      }
+    }
 
     for (uint256 i = 0; i < _tokenIds.length; i++) {
       VE_NFT.safeTransferFrom(msg.sender, address(this), _tokenIds[i]);
@@ -218,6 +230,13 @@ contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
     address[][] memory _tokens,
     uint256 _tokenId
   ) external onlySecondaryOrTertiary {
+    if (_tokenId == 0) revert VeNFTManager_NullTokenId();
+    if (_fees.length == 0) revert VeNFTManager_EmptyFees();
+    if (_tokens.length == 0) revert VeNFTManager_EmptyTokens();
+    if (_fees.length != _tokens.length) {
+      revert VeNFTManager_UnequalLengths();
+    }
+
     voter.claimFees(_fees, _tokens, _tokenId);
 
     emit VeNFTManagerFeeClaim(_fees, _tokens, _tokenId);
@@ -234,6 +253,10 @@ contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
 
   /// @inheritdoc IVeNFTManager
   function setSuperchainRecipient(uint256 _chainId, address _recipient) external onlySecondaryOrTertiary {
+    if (_chainId == 0) revert VeNFTManager_NullChainId();
+    if (_recipient == address(0)) {
+      revert VeNFTManager_NullRecipient();
+    }
     rootVotingRewardsFactory.setRecipient(_chainId, _recipient);
     emit VeNFTManagerSuperchainRecipientSet(_chainId, _recipient);
   }
@@ -288,14 +311,7 @@ contract VeNFTManager is Authorizable, Modifiable, IVeNFTManager {
     }
   }
 
-  // --- Administration ---
-
-  /// @inheritdoc Modifiable
-  function _modifyParameters(bytes32 _param, bytes memory _data) internal override {
-    if (_param == 'secondaryManager') {
-      secondaryManager = _data.toAddress();
-    } else {
-      revert UnrecognizedParam();
-    }
+  function onERC721Received(address, address, uint256, bytes calldata) external pure returns (bytes4) {
+    return IERC721Receiver.onERC721Received.selector;
   }
 }

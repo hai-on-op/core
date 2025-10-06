@@ -2,14 +2,13 @@
 pragma solidity 0.8.20;
 
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
-import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 import {IVotingEscrow} from '@interfaces/external/IVotingEscrow.sol';
 import {IVoter} from '@interfaces/external/IVoter.sol';
 import {IRootVotingRewardsFactory} from '@interfaces/external/IRootVotingRewardsFactory.sol';
 import {IRewardsDistributor} from '@interfaces/external/IRewardsDistributor.sol';
 
-interface IVeNFTManager is IAuthorizable, IModifiable {
+interface IVeNFTManager is IAuthorizable {
   // --- Events ---
 
   /// @notice Emitted when veNFTs are transferred out of the veNFTManager
@@ -112,6 +111,9 @@ interface IVeNFTManager is IAuthorizable, IModifiable {
   /// @notice Throws when trying to claim bribes with an empty array of bribes
   error VeNFTManager_EmptyBribes();
 
+  /// @notice Throws when trying to claim fees with an empty array of fees
+  error VeNFTManager_EmptyFees();
+
   /// @notice Throws when trying to transfer a token with a balance of 0
   error VeNFTManager_TokenBalanceIsZero();
 
@@ -126,6 +128,12 @@ interface IVeNFTManager is IAuthorizable, IModifiable {
 
   /// @notice Throws when trying to vote with a null token id
   error VeNFTManager_NullTokenId();
+
+  /// @notice Throws when trying to set a null recipient
+  error VeNFTManager_NullRecipient();
+
+  /// @notice Throws when trying to set a null chain id
+  error VeNFTManager_NullChainId();
 
   // --- Registry ---
 
