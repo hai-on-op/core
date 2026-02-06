@@ -12,7 +12,10 @@ interface ISwapStrategy {
    * @param  _collateralAmount Amount of collateral to swap [wad]
    * @return _estimatedHai Estimated amount of HAI that would be received [wad]
    */
-  function estimateSwapToHai(bytes32 _collateralType, uint256 _collateralAmount) external view returns (uint256 _estimatedHai);
+  function estimateSwapToHai(
+    bytes32 _collateralType,
+    uint256 _collateralAmount
+  ) external view returns (uint256 _estimatedHai);
 
   /**
    * @notice Swaps collateral to HAI
@@ -29,4 +32,3 @@ interface ISwapStrategy {
    */
   function canHandle(bytes32 _collateralType) external view returns (bool _canHandle);
 }
-
