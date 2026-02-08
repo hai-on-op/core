@@ -18,11 +18,11 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
   // --- Registry ---
 
   /// @inheritdoc ICurveStableSwapNGRelayer
-  ICurveStableSwapNG public immutable pool;
+  ICurveStableSwapNG public pool;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  address public immutable baseToken;
+  address public baseToken;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  address public immutable quoteToken;
+  address public quoteToken;
 
   // --- Data ---
 
@@ -30,11 +30,11 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
   string public symbol;
 
   /// @inheritdoc ICurveStableSwapNGRelayer
-  uint256 public immutable baseIndex;
+  uint256 public baseIndex;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  uint256 public immutable quoteIndex;
+  uint256 public quoteIndex;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  bool public immutable inverted;
+  bool public inverted;
 
   // --- Init ---
 
