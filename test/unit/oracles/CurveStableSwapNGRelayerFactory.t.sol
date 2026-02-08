@@ -35,11 +35,9 @@ abstract contract Base is HaiTest {
     vm.stopPrank();
   }
 
-  function _mockCoins(uint256 _oracleIndex) internal {
-    vm.mockCall(address(mockPool), abi.encodeCall(mockPool.coins, (0)), abi.encode(address(mockQuoteToken)));
-    vm.mockCall(
-      address(mockPool), abi.encodeCall(mockPool.coins, (_oracleIndex + 1)), abi.encode(address(mockBaseToken))
-    );
+  function _mockCoins(uint256 _baseIndex, uint256 _quoteIndex) internal {
+    vm.mockCall(address(mockPool), abi.encodeCall(mockPool.coins, (_baseIndex)), abi.encode(address(mockBaseToken)));
+    vm.mockCall(address(mockPool), abi.encodeCall(mockPool.coins, (_quoteIndex)), abi.encode(address(mockQuoteToken)));
   }
 
   function _mockSymbol(string memory _symbol) internal {
@@ -66,78 +64,97 @@ contract Unit_CurveStableSwapNGRelayerFactory_Constructor is Base {
 
 contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is Base {
   event NewCurveStableSwapNGRelayer(
-    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _oracleIndex, bool _inverted
+    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _baseIndex, uint256 _quoteIndex, bool _inverted
   );
 
-  modifier happyPath(uint256 _oracleIndex, bool _inverted, string memory _symbol) {
+  modifier happyPath(uint256 _baseIndex, uint256 _quoteIndex, bool _inverted, string memory _symbol) {
     vm.startPrank(authorizedAccount);
 
-    _assumeHappyPath(_oracleIndex);
-    _mockValues(_oracleIndex, _symbol);
+    _assumeHappyPath(_baseIndex, _quoteIndex);
+    _mockValues(_baseIndex, _quoteIndex, _symbol);
     _;
   }
 
-  function _assumeHappyPath(uint256 _oracleIndex) internal pure {
-    vm.assume(_oracleIndex < type(uint256).max);
+  function _assumeHappyPath(uint256 _baseIndex, uint256 _quoteIndex) internal pure {
+    vm.assume(_baseIndex < type(uint256).max);
+    vm.assume(_quoteIndex < type(uint256).max);
+    vm.assume(_baseIndex != _quoteIndex);
   }
 
-  function _mockValues(uint256 _oracleIndex, string memory _symbol) internal {
-    _mockCoins(_oracleIndex);
+  function _mockValues(uint256 _baseIndex, uint256 _quoteIndex, string memory _symbol) internal {
+    _mockCoins(_baseIndex, _quoteIndex);
     _mockSymbol(_symbol);
   }
 
-  function test_Revert_Unauthorized(uint256 _oracleIndex, bool _inverted) public {
+  function test_Revert_Unauthorized(uint256 _baseIndex, uint256 _quoteIndex, bool _inverted) public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
 
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _oracleIndex, _inverted);
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
+      address(mockPool), _baseIndex, _quoteIndex, _inverted
+    );
   }
 
   function test_Deploy_CurveStableSwapNGRelayerChild(
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted,
     string memory _symbol
-  ) public happyPath(_oracleIndex, _inverted, _symbol) {
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _oracleIndex, _inverted);
+  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
+      address(mockPool), _baseIndex, _quoteIndex, _inverted
+    );
 
     assertEq(address(curveStableSwapNGRelayerChild).code, type(CurveStableSwapNGRelayerChild).runtimeCode);
 
     // params
     assertEq(address(curveStableSwapNGRelayerChild.pool()), address(mockPool));
-    assertEq(curveStableSwapNGRelayerChild.oracleIndex(), _oracleIndex);
+    assertEq(curveStableSwapNGRelayerChild.baseIndex(), _baseIndex);
+    assertEq(curveStableSwapNGRelayerChild.quoteIndex(), _quoteIndex);
     assertEq(curveStableSwapNGRelayerChild.inverted(), _inverted);
     assertEq(curveStableSwapNGRelayerChild.baseToken(), address(mockBaseToken));
     assertEq(curveStableSwapNGRelayerChild.quoteToken(), address(mockQuoteToken));
   }
 
   function test_Set_CurveStableSwapNGRelayers(
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted,
     string memory _symbol
-  ) public happyPath(_oracleIndex, _inverted, _symbol) {
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _oracleIndex, _inverted);
+  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
+      address(mockPool), _baseIndex, _quoteIndex, _inverted
+    );
 
     assertEq(curveStableSwapNGRelayerFactory.curveStableSwapNGRelayersList()[0], address(curveStableSwapNGRelayerChild));
   }
 
   function test_Emit_NewCurveStableSwapNGRelayer(
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted,
     string memory _symbol
-  ) public happyPath(_oracleIndex, _inverted, _symbol) {
+  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
     vm.expectEmit();
-    emit NewCurveStableSwapNGRelayer(address(curveStableSwapNGRelayerChild), address(mockPool), _oracleIndex, _inverted);
+    emit NewCurveStableSwapNGRelayer(
+      address(curveStableSwapNGRelayerChild), address(mockPool), _baseIndex, _quoteIndex, _inverted
+    );
 
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _oracleIndex, _inverted);
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
+      address(mockPool), _baseIndex, _quoteIndex, _inverted
+    );
   }
 
   function test_Return_CurveStableSwapNGRelayer(
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted,
     string memory _symbol
-  ) public happyPath(_oracleIndex, _inverted, _symbol) {
+  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
     assertEq(
       address(
-        curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _oracleIndex, _inverted)
+        curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
+          address(mockPool), _baseIndex, _quoteIndex, _inverted
+        )
       ),
       address(curveStableSwapNGRelayerChild)
     );

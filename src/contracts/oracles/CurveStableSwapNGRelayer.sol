@@ -5,22 +5,24 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {ICurveStableSwapNGRelayer} from '@interfaces/oracles/ICurveStableSwapNGRelayer.sol';
 import {ICurveStableSwapNG} from '@interfaces/external/ICurveStableSwapNG.sol';
 import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
-import {WAD} from '@libraries/Math.sol';
+import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  CurveStableSwapNGRelayer
  * @notice This contract consults a Curve StableSwap-NG EMA oracle and transforms the result into a standard IBaseOracle feed
- * @dev    The EMA oracle returns a 1e18 price for coin i+1 vs coin0 (price_oracle(i))
+ * @dev    The EMA oracle returns a 1e18 price for coin i+1 vs coin0 (price_oracle(i));
+ *         this relayer can price any pair using coin0 as the common denominator
  */
 contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
+  using Math for uint256;
   // --- Registry ---
 
   /// @inheritdoc ICurveStableSwapNGRelayer
-  ICurveStableSwapNG public pool;
+  ICurveStableSwapNG public immutable pool;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  address public baseToken;
+  address public immutable baseToken;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  address public quoteToken;
+  address public immutable quoteToken;
 
   // --- Data ---
 
@@ -28,28 +30,39 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
   string public symbol;
 
   /// @inheritdoc ICurveStableSwapNGRelayer
-  uint256 public oracleIndex;
+  uint256 public immutable baseIndex;
   /// @inheritdoc ICurveStableSwapNGRelayer
-  bool public inverted;
+  uint256 public immutable quoteIndex;
+  /// @inheritdoc ICurveStableSwapNGRelayer
+  bool public immutable inverted;
 
   // --- Init ---
 
   /**
    * @param  _pool The Curve StableSwapNG pool address
-   * @param  _oracleIndex The index used for price_oracle(i) (prices coin i+1 vs coin0)
+   * @param  _baseIndex Index of the base token in the pool (0 = coin0)
+   * @param  _quoteIndex Index of the quote token in the pool (0 = coin0)
    * @param  _inverted Whether to invert the oracle output (quote/base instead of base/quote)
    */
-  constructor(address _pool, uint256 _oracleIndex, bool _inverted) {
+  constructor(address _pool, uint256 _baseIndex, uint256 _quoteIndex, bool _inverted) {
     if (_pool == address(0)) revert CurveStableSwapNGRelayer_NullPool();
+    if (_baseIndex == _quoteIndex) {
+      revert CurveStableSwapNGRelayer_InvalidOracleIndex();
+    }
 
     pool = ICurveStableSwapNG(_pool);
-    oracleIndex = _oracleIndex;
+    baseIndex = _baseIndex;
+    quoteIndex = _quoteIndex;
     inverted = _inverted;
 
     // price_oracle(i) prices coin i+1 vs coin0
-    quoteToken = pool.coins(0);
-    try pool.coins(_oracleIndex + 1) returns (address _baseToken) {
+    try pool.coins(_baseIndex) returns (address _baseToken) {
       baseToken = _baseToken;
+    } catch {
+      revert CurveStableSwapNGRelayer_InvalidOracleIndex();
+    }
+    try pool.coins(_quoteIndex) returns (address _quoteToken) {
+      quoteToken = _quoteToken;
     } catch {
       revert CurveStableSwapNGRelayer_InvalidOracleIndex();
     }
@@ -67,16 +80,20 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
 
   /// @inheritdoc IBaseOracle
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
-    uint256 _price = pool.price_oracle(oracleIndex);
-    if (_price == 0) return (0, false);
+    uint256 _priceBase = baseIndex == 0 ? WAD : pool.price_oracle(baseIndex - 1);
+    uint256 _priceQuote = quoteIndex == 0 ? WAD : pool.price_oracle(quoteIndex - 1);
+    if (_priceBase == 0 || _priceQuote == 0) return (0, false);
+    uint256 _price = _priceBase.wdiv(_priceQuote);
     _result = _parseResult(_price);
     _validity = true;
   }
 
   /// @inheritdoc IBaseOracle
   function read() external view returns (uint256 _result) {
-    uint256 _price = pool.price_oracle(oracleIndex);
-    if (_price == 0) revert InvalidPriceFeed();
+    uint256 _priceBase = baseIndex == 0 ? WAD : pool.price_oracle(baseIndex - 1);
+    uint256 _priceQuote = quoteIndex == 0 ? WAD : pool.price_oracle(quoteIndex - 1);
+    if (_priceBase == 0 || _priceQuote == 0) revert InvalidPriceFeed();
+    uint256 _price = _priceBase.wdiv(_priceQuote);
     _result = _parseResult(_price);
   }
 
@@ -85,6 +102,6 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
   /// @notice Parses the oracle result into 18 decimals format (inverts if needed)
   function _parseResult(uint256 _price) internal view returns (uint256 _result) {
     if (!inverted) return _price;
-    return (WAD * WAD) / _price;
+    return WAD.wdiv(_price);
   }
 }

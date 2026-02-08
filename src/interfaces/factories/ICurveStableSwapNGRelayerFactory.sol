@@ -11,11 +11,12 @@ interface ICurveStableSwapNGRelayerFactory is IAuthorizable {
    * @notice Emitted when a new CurveStableSwapNGRelayer contract is deployed
    * @param _curveStableSwapNGRelayer Address of the deployed CurveStableSwapNGRelayer contract
    * @param _pool Address of the CurveStableSwapNG pool
-   * @param _oracleIndex Index used for Curve's price_oracle(i) (prices coin i+1 vs coin0)
+   * @param _baseIndex Index of the base token in the pool (0 = coin0)
+   * @param _quoteIndex Index of the quote token in the pool (0 = coin0)
    * @param _inverted Whether to invert the oracle output (quote/base instead of base/quote)
    */
   event NewCurveStableSwapNGRelayer(
-    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _oracleIndex, bool _inverted
+    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _baseIndex, uint256 _quoteIndex, bool _inverted
   );
 
   // --- Methods ---
@@ -23,13 +24,15 @@ interface ICurveStableSwapNGRelayerFactory is IAuthorizable {
   /**
    * @notice Deploys a new CurveStableSwapNGRelayer contract
    * @param _pool Address of the CurveStableSwapNG pool
-   * @param _oracleIndex Index used for Curve's price_oracle(i) (prices coin i+1 vs coin0)
+   * @param _baseIndex Index of the base token in the pool (0 = coin0)
+   * @param _quoteIndex Index of the quote token in the pool (0 = coin0)
    * @param _inverted Whether to invert the oracle output (quote/base instead of base/quote)
    * @return _curveStableSwapNGRelayer Address of the deployed CurveStableSwapNGRelayer contract
    */
   function deployCurveStableSwapNGRelayer(
     address _pool,
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted
   ) external returns (IBaseOracle _curveStableSwapNGRelayer);
 

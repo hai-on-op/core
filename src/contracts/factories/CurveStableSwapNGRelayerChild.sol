@@ -16,12 +16,14 @@ contract CurveStableSwapNGRelayerChild is CurveStableSwapNGRelayer, FactoryChild
 
   /**
    * @param  _pool Address of the CurveStableSwapNG pool
-   * @param  _oracleIndex Index used for Curve's price_oracle(i) (prices coin i+1 vs coin0)
+   * @param  _baseIndex Index of the base token in the pool (0 = coin0)
+   * @param  _quoteIndex Index of the quote token in the pool (0 = coin0)
    * @param  _inverted Whether to invert the oracle output (quote/base instead of base/quote)
    */
   constructor(
     address _pool,
-    uint256 _oracleIndex,
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
     bool _inverted
-  ) CurveStableSwapNGRelayer(_pool, _oracleIndex, _inverted) {}
+  ) CurveStableSwapNGRelayer(_pool, _baseIndex, _quoteIndex, _inverted) {}
 }

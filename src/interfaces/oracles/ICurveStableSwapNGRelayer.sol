@@ -26,8 +26,11 @@ interface ICurveStableSwapNGRelayer is IBaseOracle {
 
   // --- Data ---
 
-  /// @notice Index used for Curve's price_oracle(i) (prices coin i+1 vs coin0)
-  function oracleIndex() external view returns (uint256 _oracleIndex);
+  /// @notice Index of the base token in the pool (0 = coin0)
+  function baseIndex() external view returns (uint256 _baseIndex);
+
+  /// @notice Index of the quote token in the pool (0 = coin0)
+  function quoteIndex() external view returns (uint256 _quoteIndex);
 
   /// @notice Whether the oracle output is inverted (quote/base instead of base/quote)
   function inverted() external view returns (bool _inverted);
