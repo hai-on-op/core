@@ -33,12 +33,11 @@ contract CurveStableSwapNGRelayerFactory is Authorizable, ICurveStableSwapNGRela
   function deployCurveStableSwapNGRelayer(
     address _pool,
     uint256 _baseIndex,
-    uint256 _quoteIndex,
-    bool _inverted
+    uint256 _quoteIndex
   ) external isAuthorized returns (IBaseOracle _curveStableSwapNGRelayer) {
-    _curveStableSwapNGRelayer = new CurveStableSwapNGRelayerChild(_pool, _baseIndex, _quoteIndex, _inverted);
+    _curveStableSwapNGRelayer = new CurveStableSwapNGRelayerChild(_pool, _baseIndex, _quoteIndex);
     _curveStableSwapNGRelayers.add(address(_curveStableSwapNGRelayer));
-    emit NewCurveStableSwapNGRelayer(address(_curveStableSwapNGRelayer), _pool, _baseIndex, _quoteIndex, _inverted);
+    emit NewCurveStableSwapNGRelayer(address(_curveStableSwapNGRelayer), _pool, _baseIndex, _quoteIndex);
   }
 
   // --- Views ---
