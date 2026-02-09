@@ -44,6 +44,11 @@ abstract contract Base is HaiTest {
     vm.mockCall(address(mockBaseToken), abi.encodeCall(mockBaseToken.symbol, ()), abi.encode(_symbol));
     vm.mockCall(address(mockQuoteToken), abi.encodeCall(mockQuoteToken.symbol, ()), abi.encode(_symbol));
   }
+
+  function _mockDecimals() internal {
+    vm.mockCall(address(mockBaseToken), abi.encodeCall(mockBaseToken.decimals, ()), abi.encode(uint8(18)));
+    vm.mockCall(address(mockQuoteToken), abi.encodeCall(mockQuoteToken.decimals, ()), abi.encode(uint8(18)));
+  }
 }
 
 contract Unit_CurveStableSwapNGRelayerFactory_Constructor is Base {
@@ -64,10 +69,10 @@ contract Unit_CurveStableSwapNGRelayerFactory_Constructor is Base {
 
 contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is Base {
   event NewCurveStableSwapNGRelayer(
-    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _baseIndex, uint256 _quoteIndex, bool _inverted
+    address indexed _curveStableSwapNGRelayer, address _pool, uint256 _baseIndex, uint256 _quoteIndex
   );
 
-  modifier happyPath(uint256 _baseIndex, uint256 _quoteIndex, bool _inverted, string memory _symbol) {
+  modifier happyPath(uint256 _baseIndex, uint256 _quoteIndex, string memory _symbol) {
     vm.startPrank(authorizedAccount);
 
     _assumeHappyPath(_baseIndex, _quoteIndex);
@@ -84,25 +89,21 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
   function _mockValues(uint256 _baseIndex, uint256 _quoteIndex, string memory _symbol) internal {
     _mockCoins(_baseIndex, _quoteIndex);
     _mockSymbol(_symbol);
+    _mockDecimals();
   }
 
-  function test_Revert_Unauthorized(uint256 _baseIndex, uint256 _quoteIndex, bool _inverted) public {
+  function test_Revert_Unauthorized(uint256 _baseIndex, uint256 _quoteIndex) public {
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
 
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
-      address(mockPool), _baseIndex, _quoteIndex, _inverted
-    );
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
   }
 
   function test_Deploy_CurveStableSwapNGRelayerChild(
     uint256 _baseIndex,
     uint256 _quoteIndex,
-    bool _inverted,
     string memory _symbol
-  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
-      address(mockPool), _baseIndex, _quoteIndex, _inverted
-    );
+  ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
 
     assertEq(address(curveStableSwapNGRelayerChild).code, type(CurveStableSwapNGRelayerChild).runtimeCode);
 
@@ -110,7 +111,6 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
     assertEq(address(curveStableSwapNGRelayerChild.pool()), address(mockPool));
     assertEq(curveStableSwapNGRelayerChild.baseIndex(), _baseIndex);
     assertEq(curveStableSwapNGRelayerChild.quoteIndex(), _quoteIndex);
-    assertEq(curveStableSwapNGRelayerChild.inverted(), _inverted);
     assertEq(curveStableSwapNGRelayerChild.baseToken(), address(mockBaseToken));
     assertEq(curveStableSwapNGRelayerChild.quoteToken(), address(mockQuoteToken));
   }
@@ -118,12 +118,9 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
   function test_Set_CurveStableSwapNGRelayers(
     uint256 _baseIndex,
     uint256 _quoteIndex,
-    bool _inverted,
     string memory _symbol
-  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
-      address(mockPool), _baseIndex, _quoteIndex, _inverted
-    );
+  ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
 
     assertEq(curveStableSwapNGRelayerFactory.curveStableSwapNGRelayersList()[0], address(curveStableSwapNGRelayerChild));
   }
@@ -131,30 +128,24 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
   function test_Emit_NewCurveStableSwapNGRelayer(
     uint256 _baseIndex,
     uint256 _quoteIndex,
-    bool _inverted,
     string memory _symbol
-  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
+  ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
     vm.expectEmit();
     emit NewCurveStableSwapNGRelayer(
-      address(curveStableSwapNGRelayerChild), address(mockPool), _baseIndex, _quoteIndex, _inverted
+      address(curveStableSwapNGRelayerChild), address(mockPool), _baseIndex, _quoteIndex
     );
 
-    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
-      address(mockPool), _baseIndex, _quoteIndex, _inverted
-    );
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
   }
 
   function test_Return_CurveStableSwapNGRelayer(
     uint256 _baseIndex,
     uint256 _quoteIndex,
-    bool _inverted,
     string memory _symbol
-  ) public happyPath(_baseIndex, _quoteIndex, _inverted, _symbol) {
+  ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
     assertEq(
       address(
-        curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(
-          address(mockPool), _baseIndex, _quoteIndex, _inverted
-        )
+        curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex)
       ),
       address(curveStableSwapNGRelayerChild)
     );

@@ -32,6 +32,10 @@ interface ICurveStableSwapNGRelayer is IBaseOracle {
   /// @notice Index of the quote token in the pool (0 = coin0)
   function quoteIndex() external view returns (uint256 _quoteIndex);
 
-  /// @notice Whether the oracle output is inverted (quote/base instead of base/quote)
-  function inverted() external view returns (bool _inverted);
+  /// @notice The base token's rate_multiplier: 10**(36 - decimals), used to isolate oracle rates from stored_rates
+  function baseRateMultiplier() external view returns (uint256 _baseRateMultiplier);
+
+  /// @notice The quote token's rate_multiplier: 10**(36 - decimals), used to isolate oracle rates from stored_rates
+  function quoteRateMultiplier() external view returns (uint256 _quoteRateMultiplier);
+
 }
