@@ -83,8 +83,12 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
     uint256 _priceBase = baseIndex == 0 ? WAD : pool.price_oracle(baseIndex - 1);
     uint256 _priceQuote = quoteIndex == 0 ? WAD : pool.price_oracle(quoteIndex - 1);
     if (_priceBase == 0 || _priceQuote == 0) return (0, false);
+
+    (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _ratesValid) = _getOracleRates();
+    if (!_ratesValid) return (0, false);
+
     uint256 _price = _priceBase.wdiv(_priceQuote);
-    _price = _adjustForOracleRates(_price);
+    _price = _adjustForOracleRates(_price, _baseOracleRate, _quoteOracleRate);
     _result = _parseResult(_price);
     _validity = true;
   }
@@ -94,8 +98,12 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
     uint256 _priceBase = baseIndex == 0 ? WAD : pool.price_oracle(baseIndex - 1);
     uint256 _priceQuote = quoteIndex == 0 ? WAD : pool.price_oracle(quoteIndex - 1);
     if (_priceBase == 0 || _priceQuote == 0) revert InvalidPriceFeed();
+
+    (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _ratesValid) = _getOracleRates();
+    if (!_ratesValid) revert InvalidPriceFeed();
+
     uint256 _price = _priceBase.wdiv(_priceQuote);
-    _price = _adjustForOracleRates(_price);
+    _price = _adjustForOracleRates(_price, _baseOracleRate, _quoteOracleRate);
     _result = _parseResult(_price);
   }
 
@@ -110,10 +118,20 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
    *                                      / (stored_rate[quote] / rate_multiplier[quote])
    *         For plain tokens (no oracle), oracle_rate = 1e18, so the adjustment is a no-op.
    */
-  function _adjustForOracleRates(uint256 _price) internal view returns (uint256) {
+  function _getOracleRates() internal view returns (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _validity) {
     uint256[] memory _rates = pool.stored_rates();
-    uint256 _baseOracleRate = _rates[baseIndex] * WAD / baseRateMultiplier;
-    uint256 _quoteOracleRate = _rates[quoteIndex] * WAD / quoteRateMultiplier;
+    if (_rates.length <= baseIndex || _rates.length <= quoteIndex) return (0, 0, false);
+
+    _baseOracleRate = _rates[baseIndex] * WAD / baseRateMultiplier;
+    _quoteOracleRate = _rates[quoteIndex] * WAD / quoteRateMultiplier;
+    _validity = _baseOracleRate > 0 && _quoteOracleRate > 0;
+  }
+
+  function _adjustForOracleRates(
+    uint256 _price,
+    uint256 _baseOracleRate,
+    uint256 _quoteOracleRate
+  ) internal pure returns (uint256) {
     return _price.wmul(_baseOracleRate).wdiv(_quoteOracleRate);
   }
 

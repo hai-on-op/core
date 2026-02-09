@@ -208,6 +208,20 @@ contract Unit_CurveStableSwapNGRelayer_Read is Base {
     vm.expectRevert(IBaseOracle.InvalidPriceFeed.selector);
     relayer.read();
   }
+
+  function test_Revert_ZeroBaseOracleRate() public {
+    _mockValues(WAD, 0, 1e18);
+
+    vm.expectRevert(IBaseOracle.InvalidPriceFeed.selector);
+    relayer.read();
+  }
+
+  function test_Revert_ZeroQuoteOracleRate() public {
+    _mockValues(WAD, 1e18, 0);
+
+    vm.expectRevert(IBaseOracle.InvalidPriceFeed.selector);
+    relayer.read();
+  }
 }
 
 // --- getResultWithValidity() ---
@@ -237,6 +251,20 @@ contract Unit_CurveStableSwapNGRelayer_GetResultWithValidity is Base {
   function test_GetResultWithValidity_ZeroPrice_Invalid() public {
     _mockValues(0, 1e18, 1e18);
 
+    (uint256 _result, bool _validity) = relayer.getResultWithValidity();
+    assertFalse(_validity);
+    assertEq(_result, 0);
+  }
+
+  function test_GetResultWithValidity_ZeroBaseOracleRate_Invalid() public {
+    _mockValues(WAD, 0, 1e18);
+    (uint256 _result, bool _validity) = relayer.getResultWithValidity();
+    assertFalse(_validity);
+    assertEq(_result, 0);
+  }
+
+  function test_GetResultWithValidity_ZeroQuoteOracleRate_Invalid() public {
+    _mockValues(WAD, 1e18, 0);
     (uint256 _result, bool _validity) = relayer.getResultWithValidity();
     assertFalse(_validity);
     assertEq(_result, 0);
