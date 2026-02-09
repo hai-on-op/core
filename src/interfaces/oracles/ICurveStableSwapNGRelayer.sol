@@ -37,5 +37,4 @@ interface ICurveStableSwapNGRelayer is IBaseOracle {
 
   /// @notice The quote token's rate_multiplier: 10**(36 - decimals), used to isolate oracle rates from stored_rates
   function quoteRateMultiplier() external view returns (uint256 _quoteRateMultiplier);
-
 }

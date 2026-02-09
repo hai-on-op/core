@@ -131,9 +131,7 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
     string memory _symbol
   ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
     vm.expectEmit();
-    emit NewCurveStableSwapNGRelayer(
-      address(curveStableSwapNGRelayerChild), address(mockPool), _baseIndex, _quoteIndex
-    );
+    emit NewCurveStableSwapNGRelayer(address(curveStableSwapNGRelayerChild), address(mockPool), _baseIndex, _quoteIndex);
 
     curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
   }
