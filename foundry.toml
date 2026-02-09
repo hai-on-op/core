@@ -14,7 +14,7 @@ src ='src' # root_path variable in build-docs.sh
 
 [profile.default]
 solc = '0.8.20'
-evm_version = 'paris'
+evm_version = 'shanghai'
 src = 'src'
 test = 'test'
 out = 'out'
