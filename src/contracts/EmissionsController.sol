@@ -3,16 +3,14 @@ pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import {Math} from '@libraries/Math.sol';
+import {Math, WAD, YEAR, HOUR} from '@libraries/Math.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
-import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 
 /**
  * @title EmissionsController
- * @notice Distributes KITE over 1 year, splitting emissions between StabilityPool and minting incentives
- * @dev Uses hybrid streaming mechanism with checkpoint-based reward tracking
+ * @notice Distributes KITE over 1 year, splitting emissions between stability and minting incentives
  */
 contract EmissionsController is Authorizable, IEmissionsController {
   using SafeERC20 for IERC20;
@@ -26,9 +24,6 @@ contract EmissionsController is Authorizable, IEmissionsController {
   /// @notice Contract providing market/redemption prices
   IOracleRelayer public immutable oracleRelayer;
 
-  /// @notice Address of StabilityPool contract
-  IStabilityPool public immutable stabilityPool;
-
   /// @notice Total KITE to distribute over 1 year
   uint256 public immutable totalKiteAmount;
 
@@ -38,7 +33,10 @@ contract EmissionsController is Authorizable, IEmissionsController {
   /// @notice When emissions end (startTime + 1 year)
   uint256 public immutable emissionEndTime;
 
-  /// @notice Percentage (0-100) going to stability pool
+  /// @inheritdoc IEmissionsController
+  address public stabilityRewardsReceiver;
+
+  /// @notice Percentage (0-100) going to stability pool side
   uint256 public stabilityPoolSplit;
 
   /// @notice Percentage (0-100) going to minting (100 - stabilityPoolSplit)
@@ -50,12 +48,10 @@ contract EmissionsController is Authorizable, IEmissionsController {
   /// @notice Last time split was updated (for rate limiting)
   uint256 public lastSplitUpdateTime;
 
-  // --- Hybrid Streaming Mechanism ---
-
   /// @notice Last time rewards were checkpointed
   uint256 public lastCheckpointTime;
 
-  /// @notice Cumulative KITE emitted to stability pool up to last checkpoint
+  /// @notice Cumulative KITE emitted to stability side up to last checkpoint
   uint256 public stabilityPoolCumulativeRewards;
 
   /// @notice Cumulative KITE emitted to minting up to last checkpoint
@@ -64,7 +60,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
   /// @notice Last amount of minting rewards that were distributed (checkpoint for off-chain script)
   uint256 public mintingRewardsLastDistributed;
 
-  /// @notice Current per-second emission rate for stability pool [wad per second]
+  /// @notice Current per-second emission rate for stability side [wad per second]
   uint256 public currentStabilityPoolRate;
 
   /// @notice Current per-second emission rate for minting [wad per second]
@@ -77,21 +73,23 @@ contract EmissionsController is Authorizable, IEmissionsController {
 
   /**
    * @param  _kiteToken Address of the KITE token
-   * @param  _oracleRelayer Address of the OracleRelayer contract
-   * @param  _stabilityPool Address of the StabilityPool contract
+   * @param  _oracleRelayer Address of the OracleRelayer
+   * @param  _stabilityRewardsReceiver Address receiving stability-side emissions
    * @param  _totalKiteAmount Total KITE to distribute over 1 year [wad]
    * @param  _deviationLimit Upper/lower limit for deviation (10% = 0.1e18) [wad]
    */
   constructor(
     IERC20 _kiteToken,
     IOracleRelayer _oracleRelayer,
-    IStabilityPool _stabilityPool,
+    address _stabilityRewardsReceiver,
     uint256 _totalKiteAmount,
     uint256 _deviationLimit
   ) Authorizable(msg.sender) {
+    if (_stabilityRewardsReceiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
+
     kiteToken = _kiteToken;
     oracleRelayer = _oracleRelayer;
-    stabilityPool = _stabilityPool;
+    stabilityRewardsReceiver = _stabilityRewardsReceiver;
     totalKiteAmount = _totalKiteAmount;
     deviationLimit = _deviationLimit;
 
@@ -114,21 +112,17 @@ contract EmissionsController is Authorizable, IEmissionsController {
 
   // --- Split Update Logic ---
 
-  /**
-   * @notice Updates the reward split ratio based on price deviation
-   * @dev    Can be called by anyone, max once per hour
-   */
+  /// @inheritdoc IEmissionsController
   function updateRewardSplit() external {
     // Rate limit: max once per hour
     if (block.timestamp < lastSplitUpdateTime + HOUR) {
       revert EmissionsController_SplitUpdateTooFrequent();
     }
 
-    // Checkpoint rewards up to now
     _checkpointRewards();
 
-    // Get prices (both in RAY)
     uint256 _redemptionPrice = oracleRelayer.calcRedemptionPrice();
+    if (_redemptionPrice == 0) revert EmissionsController_InvalidRedemptionPrice();
     uint256 _marketPrice = oracleRelayer.marketPrice();
 
     // Calculate deviation: (redemptionPrice - marketPrice) / redemptionPrice
@@ -161,12 +155,10 @@ contract EmissionsController is Authorizable, IEmissionsController {
       }
     }
 
-    // Update splits
     stabilityPoolSplit = _newStabilityPoolSplit;
     mintingSplit = 100 - _newStabilityPoolSplit;
 
-    // Update rates
-    uint256 _totalRate = totalKiteAmount / YEAR; // Total per-second rate
+    uint256 _totalRate = totalKiteAmount / YEAR;
     currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / 100;
     currentMintingRate = (_totalRate * mintingSplit) / 100;
     currentRateStartTime = block.timestamp;
@@ -203,41 +195,46 @@ contract EmissionsController is Authorizable, IEmissionsController {
 
   // --- Reward Claiming ---
 
-  /**
-   * @notice Claims accrued KITE rewards for the stability pool
-   * @dev    Can only be called by the StabilityPool contract
-   * @return _amount Amount of KITE claimed [wad]
-   */
+  /// @inheritdoc IEmissionsController
   function claimRewardsForStabilityPool() external returns (uint256 _amount) {
-    if (msg.sender != address(stabilityPool)) {
-      revert(); // Only StabilityPool can call
+    if (msg.sender != stabilityRewardsReceiver) {
+      revert EmissionsController_OnlyStabilityRewardsReceiver();
     }
 
     if (block.timestamp < emissionStartTime) {
       revert EmissionsController_EmissionsNotStarted();
     }
 
-    // Checkpoint rewards up to now (will cap at emissionEndTime)
     _checkpointRewards();
-
-    // Calculate accrued rewards
     _amount = stabilityPoolCumulativeRewards;
 
     if (_amount > 0) {
       // Reset cumulative rewards (they've been claimed)
       stabilityPoolCumulativeRewards = 0;
-
-      // Transfer KITE to StabilityPool
-      kiteToken.safeTransfer(address(stabilityPool), _amount);
-
+      kiteToken.safeTransfer(stabilityRewardsReceiver, _amount);
       emit ClaimRewardsForStabilityPool(_amount);
     }
   }
 
-  /**
-   * @notice Returns the accrued KITE rewards for the stability pool
-   * @return _amount Amount of accrued KITE [wad]
-   */
+  /// @inheritdoc IEmissionsController
+  function setStabilityRewardsReceiver(address _receiver) external isAuthorized {
+    if (_receiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
+
+    _checkpointRewards();
+
+    address _oldReceiver = stabilityRewardsReceiver;
+    if (_oldReceiver != address(0) && _oldReceiver != _receiver && stabilityPoolCumulativeRewards > 0) {
+      uint256 _accrued = stabilityPoolCumulativeRewards;
+      stabilityPoolCumulativeRewards = 0;
+      kiteToken.safeTransfer(_oldReceiver, _accrued);
+      emit ClaimRewardsForStabilityPool(_accrued);
+    }
+
+    stabilityRewardsReceiver = _receiver;
+    emit SetStabilityRewardsReceiver(_oldReceiver, _receiver);
+  }
+
+  /// @inheritdoc IEmissionsController
   function getAccruedRewardsForStabilityPool() external view returns (uint256 _amount) {
     // Calculate current cumulative rewards (including uncheckpointed time)
     uint256 _currentTime = block.timestamp > emissionEndTime ? emissionEndTime : block.timestamp;
@@ -247,10 +244,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
     _amount = stabilityPoolCumulativeRewards + _stabilityPoolRewards;
   }
 
-  /**
-   * @notice Returns the accumulated minting rewards since last distribution
-   * @return _amount Amount of minting rewards to distribute [wad]
-   */
+  /// @inheritdoc IEmissionsController
   function getMintingRewardsToDistribute() external view returns (uint256 _amount) {
     // Calculate current cumulative rewards (including uncheckpointed time)
     uint256 _currentTime = block.timestamp > emissionEndTime ? emissionEndTime : block.timestamp;
@@ -267,23 +261,18 @@ contract EmissionsController is Authorizable, IEmissionsController {
     }
   }
 
-  /**
-   * @notice Marks minting rewards as distributed (resets counter)
-   * @param  _amount Amount of minting rewards that were distributed [wad]
-   */
-  function markMintingRewardsDistributed(uint256 _amount) external {
-    // Checkpoint rewards first
+  /// @inheritdoc IEmissionsController
+  function markMintingRewardsDistributed(uint256 _amount) external isAuthorized {
     _checkpointRewards();
 
     // Update last distributed checkpoint
     uint256 _currentMintingRewards = mintingCumulativeRewards;
-    if (_amount > _currentMintingRewards - mintingRewardsLastDistributed) {
-      // Can't mark more than what's available
-      _amount = _currentMintingRewards - mintingRewardsLastDistributed;
+    uint256 _available = _currentMintingRewards - mintingRewardsLastDistributed;
+    if (_amount > _available) {
+      _amount = _available;
     }
 
     mintingRewardsLastDistributed += _amount;
-
     emit MarkMintingRewardsDistributed(_amount);
   }
 }
