@@ -80,11 +80,11 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
 
   /// @inheritdoc IBaseOracle
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
-    uint256 _priceBase = baseIndex == 0 ? WAD : pool.price_oracle(baseIndex - 1);
-    uint256 _priceQuote = quoteIndex == 0 ? WAD : pool.price_oracle(quoteIndex - 1);
-    if (_priceBase == 0 || _priceQuote == 0) return (0, false);
+    (uint256 _priceBase, bool _basePriceValid) = _getPriceWithValidity(baseIndex);
+    (uint256 _priceQuote, bool _quotePriceValid) = _getPriceWithValidity(quoteIndex);
+    if (!_basePriceValid || !_quotePriceValid || _priceBase == 0 || _priceQuote == 0) return (0, false);
 
-    (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _ratesValid) = _getOracleRates();
+    (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _ratesValid) = _getOracleRatesWithValidity();
     if (!_ratesValid) return (0, false);
 
     uint256 _price = _priceBase.wdiv(_priceQuote);
@@ -119,7 +119,36 @@ contract CurveStableSwapNGRelayer is IBaseOracle, ICurveStableSwapNGRelayer {
    *         For plain tokens (no oracle), oracle_rate = 1e18, so the adjustment is a no-op.
    */
   function _getOracleRates() internal view returns (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _validity) {
-    uint256[] memory _rates = pool.stored_rates();
+    return _parseOracleRates(pool.stored_rates());
+  }
+
+  function _getPriceWithValidity(uint256 _index) internal view returns (uint256 _price, bool _validity) {
+    if (_index == 0) return (WAD, true);
+
+    try pool.price_oracle(_index - 1) returns (uint256 _poolPrice) {
+      return (_poolPrice, true);
+    } catch {
+      return (0, false);
+    }
+  }
+
+  function _getOracleRatesWithValidity()
+    internal
+    view
+    returns (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _validity)
+  {
+    try pool.stored_rates() returns (uint256[] memory _rates) {
+      return _parseOracleRates(_rates);
+    } catch {
+      return (0, 0, false);
+    }
+  }
+
+  function _parseOracleRates(uint256[] memory _rates)
+    internal
+    view
+    returns (uint256 _baseOracleRate, uint256 _quoteOracleRate, bool _validity)
+  {
     if (_rates.length <= baseIndex || _rates.length <= quoteIndex) return (0, 0, false);
 
     _baseOracleRate = _rates[baseIndex] * WAD / baseRateMultiplier;
