@@ -148,4 +148,20 @@ contract Unit_CurveStableSwapNGRelayerFactory_DeployCurveStableSwapNGRelayer is 
       address(curveStableSwapNGRelayerChild)
     );
   }
+
+  function test_Return_True_IsCurveStableSwapNGRelayer(
+    uint256 _baseIndex,
+    uint256 _quoteIndex,
+    string memory _symbol
+  ) public happyPath(_baseIndex, _quoteIndex, _symbol) {
+    curveStableSwapNGRelayerFactory.deployCurveStableSwapNGRelayer(address(mockPool), _baseIndex, _quoteIndex);
+
+    assertTrue(curveStableSwapNGRelayerFactory.isCurveStableSwapNGRelayer(address(curveStableSwapNGRelayerChild)));
+  }
+
+  function test_Return_False_IsCurveStableSwapNGRelayer(address _relayer) public {
+    vm.assume(_relayer != address(curveStableSwapNGRelayerChild));
+
+    assertFalse(curveStableSwapNGRelayerFactory.isCurveStableSwapNGRelayer(_relayer));
+  }
 }

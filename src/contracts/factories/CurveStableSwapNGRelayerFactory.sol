@@ -46,4 +46,13 @@ contract CurveStableSwapNGRelayerFactory is Authorizable, ICurveStableSwapNGRela
   function curveStableSwapNGRelayersList() external view returns (address[] memory _curveStableSwapNGRelayersList) {
     return _curveStableSwapNGRelayers.values();
   }
+
+  /// @inheritdoc ICurveStableSwapNGRelayerFactory
+  function isCurveStableSwapNGRelayer(address _curveStableSwapNGRelayer)
+    external
+    view
+    returns (bool _isCurveStableSwapNGRelayer)
+  {
+    return _curveStableSwapNGRelayers.contains(_curveStableSwapNGRelayer);
+  }
 }
