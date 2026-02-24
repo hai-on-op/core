@@ -40,4 +40,14 @@ interface ICurveStableSwapNGRelayerFactory is IAuthorizable {
    * @return _curveStableSwapNGRelayersList List of CurveStableSwapNGRelayer contracts
    */
   function curveStableSwapNGRelayersList() external view returns (address[] memory _curveStableSwapNGRelayersList);
+
+  /**
+   * @notice Checks whether an address was deployed by this factory
+   * @param _curveStableSwapNGRelayer Address to check
+   * @return _isCurveStableSwapNGRelayer True if address belongs to this factory
+   */
+  function isCurveStableSwapNGRelayer(address _curveStableSwapNGRelayer)
+    external
+    view
+    returns (bool _isCurveStableSwapNGRelayer);
 }

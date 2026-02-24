@@ -45,8 +45,24 @@ abstract contract Base is HaiTest {
     vm.mockCall(address(mockPool), abi.encodeCall(mockPool.price_oracle, (_index)), abi.encode(_price));
   }
 
+  function _mockPriceOracleRevert(uint256 _index) internal {
+    vm.mockCallRevert(
+      address(mockPool),
+      abi.encodeCall(mockPool.price_oracle, (_index)),
+      abi.encodeWithSignature('Error(string)', 'price_oracle revert')
+    );
+  }
+
   function _mockStoredRates(uint256[] memory _rates) internal {
     vm.mockCall(address(mockPool), abi.encodeCall(mockPool.stored_rates, ()), abi.encode(_rates));
+  }
+
+  function _mockStoredRatesRevert() internal {
+    vm.mockCallRevert(
+      address(mockPool),
+      abi.encodeCall(mockPool.stored_rates, ()),
+      abi.encodeWithSignature('Error(string)', 'stored_rates revert')
+    );
   }
 
   function _buildRates(uint256 _baseRate, uint256 _quoteRate) internal pure returns (uint256[] memory _rates) {
@@ -265,6 +281,23 @@ contract Unit_CurveStableSwapNGRelayer_GetResultWithValidity is Base {
 
   function test_GetResultWithValidity_ZeroQuoteOracleRate_Invalid() public {
     _mockValues(WAD, 1e18, 0);
+    (uint256 _result, bool _validity) = relayer.getResultWithValidity();
+    assertFalse(_validity);
+    assertEq(_result, 0);
+  }
+
+  function test_GetResultWithValidity_PriceOracleRevert_Invalid() public {
+    _mockPriceOracleRevert(0);
+
+    (uint256 _result, bool _validity) = relayer.getResultWithValidity();
+    assertFalse(_validity);
+    assertEq(_result, 0);
+  }
+
+  function test_GetResultWithValidity_StoredRatesRevert_Invalid() public {
+    _mockPriceOracle(0, WAD);
+    _mockStoredRatesRevert();
+
     (uint256 _result, bool _validity) = relayer.getResultWithValidity();
     assertFalse(_validity);
     assertEq(_result, 0);
