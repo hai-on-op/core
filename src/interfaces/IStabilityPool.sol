@@ -89,6 +89,12 @@ interface IStabilityPool is IERC4626 {
    */
   event KiteRewardsDeactivated(uint256 _finalIntegral, uint256 _remainingKite);
 
+  /**
+   * @notice Emitted when internal SAFEEngine coin is exited to external HAI
+   * @param  _exitedWad Amount exited from internal coin balance [wad]
+   */
+  event SweepInternalCoin(uint256 _exitedWad);
+
   // --- Errors ---
 
   /// @notice Throws when trying to execute/preview with no configured strategy steps
@@ -115,6 +121,8 @@ interface IStabilityPool is IERC4626 {
   error StabilityPool_RewardsInactive();
   /// @notice Throws when a strategy step delegatecall fails without bubbling a revert reason
   error StabilityPool_DelegatecallFailed();
+  /// @notice Throws when trying to sweep internal coin before the cooldown elapsed
+  error StabilityPool_InternalCoinSweepTooFrequent();
 
   // --- Structs ---
 
@@ -175,6 +183,9 @@ interface IStabilityPool is IERC4626 {
   /// @notice Whether KITE reward accrual is active
   function kiteRewardsActive() external view returns (bool _kiteRewardsActive);
 
+  /// @notice Last timestamp when internal coin was swept to external HAI
+  function lastInternalCoinSweepTime() external view returns (uint256 _lastInternalCoinSweepTime);
+
   /**
    * @notice Whether a strategy step address is whitelisted
    * @param  _step Address of the strategy step
@@ -234,6 +245,13 @@ interface IStabilityPool is IERC4626 {
 
   /// @notice Enables one-way transferability for sHAI and deactivates KITE accrual
   function enableTransfers() external;
+
+  /**
+   * @notice Exits available SAFEEngine internal coin to external HAI
+   * @dev    Callable by anyone and rate-limited to once per hour
+   * @return _exitedWad Amount of internal coin exited [wad]
+   */
+  function sweepInternalCoin() external returns (uint256 _exitedWad);
 
   /**
    * @notice Sets the ordered strategy step pipeline for a collateral type

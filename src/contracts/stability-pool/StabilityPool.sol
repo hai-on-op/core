@@ -20,7 +20,7 @@ import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 
-import {Math, WAD, RAY} from '@libraries/Math.sol';
+import {Math, WAD, RAY, HOUR} from '@libraries/Math.sol';
 
 /**
  * @title StabilityPool
@@ -95,6 +95,9 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   /// @inheritdoc IStabilityPool
   mapping(bytes32 => uint16) public stepTypeSlippageBps;
 
+  /// @inheritdoc IStabilityPool
+  uint256 public lastInternalCoinSweepTime;
+
   // --- Init ---
 
   /**
@@ -119,6 +122,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     emissionsController = IEmissionsController(_emissionsController);
     coinJoin = ICoinJoin(_coinJoin);
     collateralJoinFactory = ICollateralJoinFactory(_collateralJoinFactory);
+    lastInternalCoinSweepTime = block.timestamp;
     kiteRewardsActive = true;
   }
 
@@ -177,6 +181,24 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
 
     emit KiteRewardsDeactivated(kiteRewardIntegral, kiteRewardRemaining);
     emit TransfersEnabled();
+  }
+
+  /// @inheritdoc IStabilityPool
+  function sweepInternalCoin() external returns (uint256 _exitedWad) {
+    if (block.timestamp < lastInternalCoinSweepTime + HOUR) {
+      revert StabilityPool_InternalCoinSweepTooFrequent();
+    }
+
+    ISAFEEngine _safeEngine = coinJoin.safeEngine();
+    uint256 _internalRad = _safeEngine.coinBalance(address(this));
+    _exitedWad = _internalRad / RAY;
+    if (_exitedWad > 0) {
+      _safeEngine.approveSAFEModification(address(coinJoin));
+      coinJoin.exit(address(this), _exitedWad);
+    }
+
+    lastInternalCoinSweepTime = block.timestamp;
+    emit SweepInternalCoin(_exitedWad);
   }
 
   // --- Strategy Configuration ---

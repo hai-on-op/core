@@ -8,6 +8,7 @@ import {EmissionsController} from '@contracts/stability-pool/EmissionsController
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 import {ICollateralAuctionHouse} from '@interfaces/ICollateralAuctionHouse.sol';
+import {ITaxCollector} from '@interfaces/ITaxCollector.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {ICollateralJoin} from '@interfaces/utils/ICollateralJoin.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
@@ -245,6 +246,49 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     stabilityPool.coverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, WETH_CTYPE);
   }
 
+  function test_stability_fee_routed_to_pool_accrues_internal_coin() public {
+    _routeWethSecondaryTaxToStabilityPool();
+    _openSafeAndGenerateDebt(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, true);
+
+    uint256 _internalCoinBefore = safeEngine.coinBalance(address(stabilityPool));
+
+    vm.warp(block.timestamp + 30 days);
+    taxCollector.taxSingle(WETH_CTYPE);
+
+    uint256 _internalCoinAfter = safeEngine.coinBalance(address(stabilityPool));
+    assertGt(_internalCoinAfter, _internalCoinBefore);
+  }
+
+  function test_sweep_internal_coin_exits_to_hai_and_rate_limits() public {
+    _routeWethSecondaryTaxToStabilityPool();
+    _openSafeAndGenerateDebt(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, true);
+
+    vm.warp(block.timestamp + 30 days);
+    taxCollector.taxSingle(WETH_CTYPE);
+
+    uint256 _internalCoinBefore = safeEngine.coinBalance(address(stabilityPool));
+    assertGt(_internalCoinBefore, 0);
+
+    uint256 _expectedExitedWad = _internalCoinBefore / 1e27;
+    uint256 _haiBefore = systemCoin.balanceOf(address(stabilityPool));
+
+    vm.prank(keeper);
+    uint256 _exitedWad = stabilityPool.sweepInternalCoin();
+
+    assertEq(_exitedWad, _expectedExitedWad);
+    assertEq(systemCoin.balanceOf(address(stabilityPool)), _haiBefore + _expectedExitedWad);
+    assertEq(safeEngine.coinBalance(address(stabilityPool)), _internalCoinBefore - (_expectedExitedWad * 1e27));
+
+    vm.expectRevert(IStabilityPool.StabilityPool_InternalCoinSweepTooFrequent.selector);
+    vm.prank(keeper);
+    stabilityPool.sweepInternalCoin();
+
+    vm.warp(block.timestamp + 1 hours + 1);
+    vm.prank(keeper);
+    uint256 _secondExitedWad = stabilityPool.sweepInternalCoin();
+    assertEq(_secondExitedWad, 0);
+  }
+
   function test_cover_and_repay_debt_yv_velo_aleth_weth_step_override_slippage_precedence() public {
     vm.prank(testDeployer);
     stabilityPool.setCollateralSlippageBps(YV_VELO_ALETH_WETH_CTYPE, 10_000);
@@ -354,6 +398,45 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   function _setStrategySteps(bytes32 _cType, IStabilityPool.StepConfig[] memory _steps) internal {
     vm.prank(testDeployer);
     stabilityPool.setStrategySteps(_cType, _steps);
+  }
+
+  function _routeWethSecondaryTaxToStabilityPool() internal {
+    address[] memory _secondaryReceivers = taxCollector.secondaryReceiversList();
+    address _receiverToReplace = address(0);
+    uint256 _taxPercentage;
+    bool _canTakeBackTax;
+
+    for (uint256 _i = 0; _i < _secondaryReceivers.length; _i++) {
+      ITaxCollector.TaxReceiver memory _receiverData =
+        taxCollector.secondaryTaxReceivers(WETH_CTYPE, _secondaryReceivers[_i]);
+      if (_receiverData.taxPercentage > 0) {
+        _receiverToReplace = _secondaryReceivers[_i];
+        _taxPercentage = _receiverData.taxPercentage;
+        _canTakeBackTax = _receiverData.canTakeBackTax;
+        break;
+      }
+    }
+
+    assertTrue(_receiverToReplace != address(0), 'no secondary receiver configured');
+
+    vm.startPrank(address(timelock));
+    taxCollector.modifyParameters(
+      WETH_CTYPE,
+      'secondaryTaxReceiver',
+      abi.encode(ITaxCollector.TaxReceiver({receiver: _receiverToReplace, canTakeBackTax: _canTakeBackTax, taxPercentage: 0}))
+    );
+    taxCollector.modifyParameters(
+      WETH_CTYPE,
+      'secondaryTaxReceiver',
+      abi.encode(
+        ITaxCollector.TaxReceiver({
+          receiver: address(stabilityPool),
+          canTakeBackTax: _canTakeBackTax,
+          taxPercentage: _taxPercentage
+        })
+      )
+    );
+    vm.stopPrank();
   }
 
   function _startAuction(

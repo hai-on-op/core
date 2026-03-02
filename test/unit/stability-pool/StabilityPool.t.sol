@@ -395,6 +395,7 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
 contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
   bytes32 internal constant CTYPE = bytes32('WETH');
   bytes32 internal constant OTHER_CTYPE = bytes32('OTHER');
+  uint256 internal constant SWEEP_COOLDOWN = 1 hours;
 
   address internal deployer = label('deployer');
   address internal user = label('user');
@@ -722,5 +723,64 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
     assertEq(coinJoin.joinCalls(), 0);
+  }
+
+  function test_Revert_SweepInternalCoin_TooFrequent() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InternalCoinSweepTooFrequent.selector);
+    stabilityPool.sweepInternalCoin();
+  }
+
+  function test_SweepInternalCoin_ExitsAllAvailableWad_Permissionless() public {
+    safeEngine.setCoinBalance(address(stabilityPool), 13e18 * RAY);
+
+    uint256 _haiBefore = systemCoin.balanceOf(address(stabilityPool));
+    vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
+
+    vm.prank(user);
+    uint256 _exited = stabilityPool.sweepInternalCoin();
+
+    assertEq(_exited, 13e18);
+    assertEq(systemCoin.balanceOf(address(stabilityPool)), _haiBefore + 13e18);
+    assertEq(safeEngine.coinBalance(address(stabilityPool)), 0);
+    assertEq(coinJoin.exitCalls(), 1);
+    assertEq(coinJoin.lastExitWad(), 13e18);
+  }
+
+  function test_SweepInternalCoin_LeavesRadDust() public {
+    safeEngine.setCoinBalance(address(stabilityPool), 5e18 * RAY + 7);
+
+    vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
+    uint256 _exited = stabilityPool.sweepInternalCoin();
+
+    assertEq(_exited, 5e18);
+    assertEq(safeEngine.coinBalance(address(stabilityPool)), 7);
+    assertEq(coinJoin.lastExitWad(), 5e18);
+  }
+
+  function test_SweepInternalCoin_ZeroBalance_UpdatesCooldown() public {
+    vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
+    uint256 _exited = stabilityPool.sweepInternalCoin();
+
+    assertEq(_exited, 0);
+    assertEq(stabilityPool.lastInternalCoinSweepTime(), block.timestamp);
+    assertEq(coinJoin.exitCalls(), 0);
+
+    vm.expectRevert(IStabilityPool.StabilityPool_InternalCoinSweepTooFrequent.selector);
+    stabilityPool.sweepInternalCoin();
+  }
+
+  function test_SweepInternalCoin_CooldownResetsAfterSuccessfulCall() public {
+    safeEngine.setCoinBalance(address(stabilityPool), 1e18 * RAY);
+    vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
+    uint256 _firstExited = stabilityPool.sweepInternalCoin();
+    assertEq(_firstExited, 1e18);
+
+    vm.expectRevert(IStabilityPool.StabilityPool_InternalCoinSweepTooFrequent.selector);
+    stabilityPool.sweepInternalCoin();
+
+    safeEngine.setCoinBalance(address(stabilityPool), 2e18 * RAY);
+    vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
+    uint256 _secondExited = stabilityPool.sweepInternalCoin();
+    assertEq(_secondExited, 2e18);
   }
 }
