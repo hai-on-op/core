@@ -3,10 +3,13 @@ pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import {Math, WAD, YEAR, HOUR} from '@libraries/Math.sol';
+
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
+
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
+
+import {Math, WAD, YEAR, HOUR} from '@libraries/Math.sol';
 
 /**
  * @title EmissionsController
@@ -16,13 +19,15 @@ contract EmissionsController is Authorizable, IEmissionsController {
   using SafeERC20 for IERC20;
   using Math for uint256;
 
-  // --- State Variables ---
+  // --- Registry ---
 
   /// @notice The KITE token
   IERC20 public immutable kiteToken;
 
   /// @notice Contract providing market/redemption prices
   IOracleRelayer public immutable oracleRelayer;
+
+  // --- Params ---
 
   /// @notice Total KITE to distribute over 1 year
   uint256 public immutable totalKiteAmount;
@@ -32,6 +37,8 @@ contract EmissionsController is Authorizable, IEmissionsController {
 
   /// @notice When emissions end (startTime + 1 year)
   uint256 public immutable emissionEndTime;
+
+  // --- Data ---
 
   /// @inheritdoc IEmissionsController
   address public stabilityRewardsReceiver;
@@ -69,7 +76,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
   /// @notice When current rates started
   uint256 public currentRateStartTime;
 
-  // --- Constructor ---
+  // --- Init ---
 
   /**
    * @param  _kiteToken Address of the KITE token
@@ -110,7 +117,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
     lastSplitUpdateTime = block.timestamp;
   }
 
-  // --- Split Update Logic ---
+  // --- Methods ---
 
   /// @inheritdoc IEmissionsController
   function updateRewardSplit() external {
@@ -168,32 +175,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
     emit UpdateRewardSplit(stabilityPoolSplit, mintingSplit);
   }
 
-  // --- Reward Checkpointing ---
-
-  /**
-   * @notice Checkpoints rewards up to the current time
-   * @dev Updates cumulative rewards based on current rates and time elapsed
-   */
-  function _checkpointRewards() internal {
-    uint256 _currentTime = block.timestamp;
-    if (_currentTime <= lastCheckpointTime) return;
-
-    // Cap at emission end time
-    uint256 _checkpointTime = _currentTime > emissionEndTime ? emissionEndTime : _currentTime;
-    uint256 _timeElapsed = _checkpointTime - lastCheckpointTime;
-
-    // Calculate rewards accrued since last checkpoint
-    uint256 _stabilityPoolRewards = currentStabilityPoolRate * _timeElapsed;
-    uint256 _mintingRewards = currentMintingRate * _timeElapsed;
-
-    // Update cumulative rewards
-    stabilityPoolCumulativeRewards += _stabilityPoolRewards;
-    mintingCumulativeRewards += _mintingRewards;
-
-    lastCheckpointTime = _checkpointTime;
-  }
-
-  // --- Reward Claiming ---
+  // --- Rewards ---
 
   /// @inheritdoc IEmissionsController
   function claimRewardsForStabilityPool() external returns (uint256 _amount) {
@@ -274,5 +256,30 @@ contract EmissionsController is Authorizable, IEmissionsController {
 
     mintingRewardsLastDistributed += _amount;
     emit MarkMintingRewardsDistributed(_amount);
+  }
+
+  // --- Internal Methods ---
+
+  /**
+   * @notice Checkpoints rewards up to the current time
+   * @dev Updates cumulative rewards based on current rates and time elapsed
+   */
+  function _checkpointRewards() internal {
+    uint256 _currentTime = block.timestamp;
+    if (_currentTime <= lastCheckpointTime) return;
+
+    // Cap at emission end time
+    uint256 _checkpointTime = _currentTime > emissionEndTime ? emissionEndTime : _currentTime;
+    uint256 _timeElapsed = _checkpointTime - lastCheckpointTime;
+
+    // Calculate rewards accrued since last checkpoint
+    uint256 _stabilityPoolRewards = currentStabilityPoolRate * _timeElapsed;
+    uint256 _mintingRewards = currentMintingRate * _timeElapsed;
+
+    // Update cumulative rewards
+    stabilityPoolCumulativeRewards += _stabilityPoolRewards;
+    mintingCumulativeRewards += _mintingRewards;
+
+    lastCheckpointTime = _checkpointTime;
   }
 }

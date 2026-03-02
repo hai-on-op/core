@@ -5,7 +5,7 @@ import {ERC4626} from '@openzeppelin/contracts/token/ERC20/extensions/ERC4626.so
 import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import {Math, WAD, RAY} from '@libraries/Math.sol';
+
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
@@ -17,7 +17,10 @@ import {ICoinJoin} from '@interfaces/utils/ICoinJoin.sol';
 import {ICollateralJoin} from '@interfaces/utils/ICollateralJoin.sol';
 import {ICollateralJoinFactory} from '@interfaces/factories/ICollateralJoinFactory.sol';
 import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
+
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
+
+import {Math, WAD, RAY} from '@libraries/Math.sol';
 
 /**
  * @title StabilityPool
@@ -27,6 +30,8 @@ import {Authorizable} from '@contracts/utils/Authorizable.sol';
 contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   using SafeERC20 for IERC20;
   using Math for uint256;
+
+  // --- Data ---
 
   struct VirtualBalance {
     address token;
@@ -53,7 +58,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   /// @inheritdoc IStabilityPool
   ICollateralJoinFactory public collateralJoinFactory;
 
-  // --- Rewards ---
+  // --- Rewards Data ---
 
   /// @inheritdoc IStabilityPool
   uint256 public kiteRewardIntegral;
@@ -67,15 +72,19 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   /// @inheritdoc IStabilityPool
   mapping(address => uint256) public claimable;
 
+  // --- Strategy Data ---
+
+  mapping(bytes32 => StepConfig[]) internal _strategySteps;
+
+  mapping(address => bool) internal _safeApprovedAuctionHouse;
+
+  // --- Params ---
+
   /// @inheritdoc IStabilityPool
   bool public transfersEnabled;
 
   /// @inheritdoc IStabilityPool
   bool public kiteRewardsActive;
-
-  // --- Strategy Steps ---
-
-  mapping(bytes32 => StepConfig[]) internal _strategySteps;
 
   /// @inheritdoc IStabilityPool
   mapping(address => bool) public isWhitelistedStep;
@@ -85,8 +94,6 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
 
   /// @inheritdoc IStabilityPool
   mapping(bytes32 => uint16) public stepTypeSlippageBps;
-
-  mapping(address => bool) internal _safeApprovedAuctionHouse;
 
   // --- Init ---
 
@@ -115,7 +122,9 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     kiteRewardsActive = true;
   }
 
-  // --- Reward Methods ---
+  // --- Methods ---
+
+  // --- Rewards ---
 
   /// @inheritdoc IStabilityPool
   function claimRewardsFromEmissionsController() external returns (uint256 _amount) {
@@ -289,7 +298,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     emit CoverAndRepayDebt(_auctionId, _collateralType, _actualCollateralBought, _actualAdjustedBid, _haiReceived);
   }
 
-  // --- Internal: Rewards ---
+  // --- Internal Methods ---
 
   function _accrueKite() internal {
     if (!kiteRewardsActive) return;
@@ -329,7 +338,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     emit ClaimRewards(_user, _amount);
   }
 
-  // --- Internal: Strategy ---
+  // --- Strategy Helpers ---
 
   function _resolveSlippageBps(
     bytes32 _collateralType,
@@ -509,7 +518,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     return _length + 1;
   }
 
-  // --- ERC20 / ERC4626 Hooks ---
+  // --- Hooks ---
 
   function _update(address _from, address _to, uint256 _value) internal virtual override {
     if (!transfersEnabled && _from != address(0) && _to != address(0)) {

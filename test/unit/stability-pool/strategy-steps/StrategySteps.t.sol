@@ -3,86 +3,9 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
-import {VeloSwapStep} from '@contracts/strategySteps/VeloSwapStep.sol';
-import {VeloLPRemovalStep} from '@contracts/strategySteps/VeloLPRemovalStep.sol';
-
-contract MockVeloRouter {
-  uint256 public swapOutMultiplier = 2e18; // 2x in WAD
-  uint256 public removeAperLp = 5e18;
-  uint256 public removeBperLp = 10e18;
-
-  function setSwapOutMultiplier(uint256 _multiplier) external {
-    swapOutMultiplier = _multiplier;
-  }
-
-  function setRemovePerLp(uint256 _aPerLp, uint256 _bPerLp) external {
-    removeAperLp = _aPerLp;
-    removeBperLp = _bPerLp;
-  }
-
-  function getAmountOut(uint256 _amountIn, address, address) external view returns (uint256 _amountOut, bool _stable) {
-    _amountOut = (_amountIn * swapOutMultiplier) / 1e18;
-    _stable = false;
-  }
-
-  function swapExactTokensForTokensSimple(
-    uint256 _amountIn,
-    uint256 _amountOutMin,
-    address _tokenFrom,
-    address _tokenTo,
-    bool,
-    address _to,
-    uint256
-  ) external returns (uint256[] memory _amounts) {
-    ERC20ForTest(_tokenFrom).transferFrom(msg.sender, address(this), _amountIn);
-    uint256 _amountOut = (_amountIn * swapOutMultiplier) / 1e18;
-    require(_amountOut >= _amountOutMin, 'min-out');
-    ERC20ForTest(_tokenTo).mint(_to, _amountOut);
-
-    _amounts = new uint256[](2);
-    _amounts[0] = _amountIn;
-    _amounts[1] = _amountOut;
-  }
-
-  function removeLiquidity(
-    address _tokenA,
-    address _tokenB,
-    bool,
-    uint256 _liquidity,
-    uint256 _amountAMin,
-    uint256 _amountBMin,
-    address _to,
-    uint256
-  ) external returns (uint256 _amountA, uint256 _amountB) {
-    _amountA = (_liquidity * removeAperLp) / 1e18;
-    _amountB = (_liquidity * removeBperLp) / 1e18;
-    require(_amountA >= _amountAMin && _amountB >= _amountBMin, 'min-out');
-    ERC20ForTest(_tokenA).mint(_to, _amountA);
-    ERC20ForTest(_tokenB).mint(_to, _amountB);
-  }
-}
-
-contract MockVeloPair is ERC20ForTest {
-  address public token0;
-  address public token1;
-  uint256 public reserve0;
-  uint256 public reserve1;
-
-  constructor(address _token0, address _token1) {
-    token0 = _token0;
-    token1 = _token1;
-  }
-
-  function setState(uint256 _reserve0, uint256 _reserve1, uint256 _supply) external {
-    reserve0 = _reserve0;
-    reserve1 = _reserve1;
-    _mint(address(this), _supply);
-  }
-
-  function getReserves() external view returns (uint256 _reserve0, uint256 _reserve1, uint256 _timestampLast) {
-    return (reserve0, reserve1, block.timestamp);
-  }
-}
+import {VeloSwapStep} from '@contracts/stability-pool/strategy-steps/VeloSwapStep.sol';
+import {VeloLPRemovalStep} from '@contracts/stability-pool/strategy-steps/VeloLPRemovalStep.sol';
+import {MockVeloRouter, MockVeloPair} from '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
 
 abstract contract Base is HaiTest {
   MockVeloRouter router;
@@ -104,9 +27,10 @@ contract Unit_VeloSwapStep is Base {
     step = new VeloSwapStep();
   }
 
-  function test_Preview() public {
+  function test_Preview() public view {
     VeloSwapStep.Data memory _data = VeloSwapStep.Data({
       router: address(router),
+      factory: address(0),
       tokenIn: address(tokenA),
       tokenOut: address(tokenB),
       stable: false,
@@ -123,6 +47,7 @@ contract Unit_VeloSwapStep is Base {
 
     VeloSwapStep.Data memory _data = VeloSwapStep.Data({
       router: address(router),
+      factory: address(0),
       tokenIn: address(tokenA),
       tokenOut: address(tokenB),
       stable: false,
@@ -152,7 +77,7 @@ contract Unit_VeloLPRemovalStep is Base {
     lpToken.mint(address(step), 100e18);
   }
 
-  function test_Preview_MultiOutput() public {
+  function test_Preview_MultiOutput() public view {
     VeloLPRemovalStep.Data memory _data = VeloLPRemovalStep.Data({
       router: address(router),
       lpToken: address(lpToken),
