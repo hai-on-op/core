@@ -5,7 +5,11 @@ import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 import {StabilityPool} from '@contracts/stability-pool/StabilityPool.sol';
 import {EmissionsController} from '@contracts/stability-pool/EmissionsController.sol';
+import {StabilityPoolCoverJob} from '@contracts/jobs/StabilityPoolCoverJob.sol';
+import {StabilityPoolSweepJob} from '@contracts/jobs/StabilityPoolSweepJob.sol';
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
+import {IStabilityPoolCoverJob} from '@interfaces/jobs/IStabilityPoolCoverJob.sol';
+import {IStabilityPoolSweepJob} from '@interfaces/jobs/IStabilityPoolSweepJob.sol';
 import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 import {ICollateralAuctionHouse} from '@interfaces/ICollateralAuctionHouse.sol';
 import {ITaxCollector} from '@interfaces/ITaxCollector.sol';
@@ -77,6 +81,8 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
   EmissionsController internal emissionsController;
   StabilityPool internal stabilityPool;
+  StabilityPoolCoverJob internal stabilityPoolCoverJob;
+  StabilityPoolSweepJob internal stabilityPoolSweepJob;
 
   BalancerV3StablePoolMathSwapStep internal balancerV3Step;
   ERC4626WithdrawalStep internal erc4626Step;
@@ -124,6 +130,14 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     stabilityPool.setStepWhitelist(address(yearnStep), true);
     stabilityPool.setStepWhitelist(address(curveStep), true);
     stabilityPool.setStrategySteps(WETH_CTYPE, _wethPipeline());
+
+    stabilityPoolCoverJob = new StabilityPoolCoverJob(address(stabilityPool), address(stabilityFeeTreasury), 1e18);
+    stabilityPoolSweepJob = new StabilityPoolSweepJob(address(stabilityPool), address(stabilityFeeTreasury), 1e18);
+    vm.stopPrank();
+
+    vm.startPrank(address(timelock));
+    stabilityFeeTreasury.setTotalAllowance(address(stabilityPoolCoverJob), type(uint256).max);
+    stabilityFeeTreasury.setTotalAllowance(address(stabilityPoolSweepJob), type(uint256).max);
     vm.stopPrank();
 
     // Ensure OP has a non-empty strategy to hit collateral-type mismatch branch.
@@ -151,6 +165,55 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     (address _auctionHouse, uint256 _auctionId) =
       _startAuction(RETH_CTYPE, safeOwner, RETH, SAFE_RETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, LIQUIDATION_PRICE, false);
     _runCoverAndRepayFlow(_auctionHouse, _auctionId, RETH_CTYPE);
+  }
+
+  function test_cover_and_repay_debt_job_rewards_keeper_on_profitable_cover() public {
+    (address _auctionHouse, uint256 _auctionId) =
+      _startAuction(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, LIQUIDATION_PRICE, true);
+
+    uint256 _startTime = block.timestamp;
+    uint256[8] memory _ageOffsets =
+      [uint256(6 hours), 12 hours, 18 hours, 24 hours, 36 hours, 48 hours, 72 hours, 96 hours];
+    uint256 _bidAmount;
+    uint256 _estimatedAdjustedBid;
+    uint256 _expectedHai;
+    for (uint256 _i = 0; _i < _ageOffsets.length; _i++) {
+      vm.warp(_startTime + _ageOffsets[_i]);
+      (_bidAmount, _estimatedAdjustedBid, _expectedHai) = _findProfitableBid(_auctionHouse, _auctionId, WETH_CTYPE);
+      if (_estimatedAdjustedBid > 0) break;
+    }
+    if (_estimatedAdjustedBid == 0) revert('no profitable bid found');
+    assertGe(_expectedHai, _estimatedAdjustedBid);
+
+    uint256 _poolHaiBefore = systemCoin.balanceOf(address(stabilityPool));
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.prank(keeper);
+    int256 _profit = stabilityPoolCoverJob.workCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, WETH_CTYPE);
+
+    assertGt(_profit, 0);
+    assertEq(systemCoin.balanceOf(address(stabilityPool)), _poolHaiBefore + uint256(_profit));
+    assertGt(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
+  }
+
+  function test_cover_and_repay_debt_job_reverts_without_reward_on_non_positive_profit() public {
+    (address _auctionHouse, uint256 _auctionId) =
+      _startAuction(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, LIQUIDATION_PRICE, true);
+
+    uint256 _bidAmount = 1e18;
+    vm.mockCall(
+      _auctionHouse,
+      abi.encodeWithSelector(ICollateralAuctionHouse.getCollateralBought.selector, _auctionId, _bidAmount),
+      abi.encode(uint256(0), uint256(0))
+    );
+
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.expectRevert(IStabilityPoolCoverJob.StabilityPoolCoverJob_NonPositiveProfit.selector);
+    vm.prank(keeper);
+    stabilityPoolCoverJob.workCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, WETH_CTYPE);
+
+    assertEq(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
   }
 
   function test_cover_and_repay_debt_moo_velo_bold_lusd_auction_reverts_when_not_profitable() public {
@@ -289,6 +352,34 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     assertEq(_secondExitedWad, 0);
   }
 
+  function test_sweep_internal_coin_job_rewards_keeper() public {
+    _routeWethSecondaryTaxToStabilityPool();
+    _openSafeAndGenerateDebt(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, true);
+
+    vm.warp(block.timestamp + 30 days);
+    taxCollector.taxSingle(WETH_CTYPE);
+
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.prank(keeper);
+    uint256 _exitedWad = stabilityPoolSweepJob.workSweepInternalCoin();
+    assertGt(_exitedWad, 0);
+
+    assertGt(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
+  }
+
+  function test_sweep_internal_coin_job_reverts_without_reward_on_zero_sweep_amount() public {
+    vm.warp(block.timestamp + 1 hours + 1);
+
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.expectRevert(IStabilityPoolSweepJob.StabilityPoolSweepJob_NullSweepAmount.selector);
+    vm.prank(keeper);
+    stabilityPoolSweepJob.workSweepInternalCoin();
+
+    assertEq(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
+  }
+
   function test_cover_and_repay_debt_yv_velo_aleth_weth_step_override_slippage_precedence() public {
     vm.prank(testDeployer);
     stabilityPool.setCollateralSlippageBps(YV_VELO_ALETH_WETH_CTYPE, 10_000);
@@ -423,7 +514,9 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     taxCollector.modifyParameters(
       WETH_CTYPE,
       'secondaryTaxReceiver',
-      abi.encode(ITaxCollector.TaxReceiver({receiver: _receiverToReplace, canTakeBackTax: _canTakeBackTax, taxPercentage: 0}))
+      abi.encode(
+        ITaxCollector.TaxReceiver({receiver: _receiverToReplace, canTakeBackTax: _canTakeBackTax, taxPercentage: 0})
+      )
     );
     taxCollector.modifyParameters(
       WETH_CTYPE,

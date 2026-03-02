@@ -5,6 +5,7 @@ import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 import {StabilityPool} from '@contracts/stability-pool/StabilityPool.sol';
 import {EmissionsController} from '@contracts/stability-pool/EmissionsController.sol';
+import {EmissionsControllerJob} from '@contracts/jobs/EmissionsControllerJob.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
@@ -39,10 +40,12 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   address internal testDeployer = label('testDeployer');
   address internal user = label('user');
   address internal user2 = label('user2');
+  address internal keeper = label('keeper');
   address internal postCutoverRewardsReceiver = label('postCutoverRewardsReceiver');
 
   EmissionsController internal emissionsController;
   StabilityPool internal stabilityPool;
+  EmissionsControllerJob internal emissionsControllerJob;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -65,7 +68,12 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
+    emissionsControllerJob =
+      new EmissionsControllerJob(address(emissionsController), address(stabilityFeeTreasury), 1e18);
     vm.stopPrank();
+
+    vm.prank(address(timelock));
+    stabilityFeeTreasury.setTotalAllowance(address(emissionsControllerJob), type(uint256).max);
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
     deal(address(systemCoin), user, USER_HAI_BALANCE);
@@ -203,6 +211,32 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
 
     assertEq(emissionsController.stabilityPoolSplit(), _expectedSplit);
     assertEq(emissionsController.mintingSplit(), 100 - _expectedSplit);
+  }
+
+  function test_update_reward_split_job_rewards_keeper() public {
+    vm.warp(block.timestamp + HOUR + 1);
+
+    uint256 _redemptionPrice = oracleRelayer.calcRedemptionPrice();
+    uint256 _marketPrice = oracleRelayer.marketPrice();
+    uint256 _expectedSplit = _expectedSplitFromPrices(_redemptionPrice, _marketPrice);
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.prank(keeper);
+    emissionsControllerJob.workUpdateRewardSplit();
+
+    assertEq(emissionsController.stabilityPoolSplit(), _expectedSplit);
+    assertEq(emissionsController.mintingSplit(), 100 - _expectedSplit);
+    assertGt(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
+  }
+
+  function test_update_reward_split_job_reverts_without_reward_when_called_too_frequently() public {
+    uint256 _keeperInternalCoinBefore = safeEngine.coinBalance(keeper);
+
+    vm.expectRevert(IEmissionsController.EmissionsController_SplitUpdateTooFrequent.selector);
+    vm.prank(keeper);
+    emissionsControllerJob.workUpdateRewardSplit();
+
+    assertEq(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
   }
 
   function test_claim_rewards_for_stability_pool_reverts_when_not_receiver() public {
