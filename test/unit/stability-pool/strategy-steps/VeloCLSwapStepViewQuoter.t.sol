@@ -4,8 +4,10 @@ pragma solidity 0.8.20;
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
 import {VeloCLSwapStepViewQuoter} from '@contracts/stability-pool/strategy-steps/VeloCLSwapStepViewQuoter.sol';
-import {MockVeloCLRouterForTest, MockVeloCLPoolForTest} from
-  '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
+import {
+  MockVeloCLRouterForTest,
+  MockVeloCLPoolForTest
+} from '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
 
 abstract contract Base is HaiTest {
   VeloCLSwapStepViewQuoter internal step;
@@ -93,7 +95,10 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
     step.preview(
       abi.encode(
         _data(
-          address(tokenIn), address(tokenOut), 60, 79_228_162_514_264_337_593_543_950_336 // current sqrt price
+          address(tokenIn),
+          address(tokenOut),
+          60,
+          79_228_162_514_264_337_593_543_950_336 // current sqrt price
         )
       ),
       1e18
@@ -105,7 +110,10 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
     step.preview(
       abi.encode(
         _data(
-          address(tokenOut), address(tokenIn), 60, 79_228_162_514_264_337_593_543_950_336 // current sqrt price
+          address(tokenOut),
+          address(tokenIn),
+          60,
+          79_228_162_514_264_337_593_543_950_336 // current sqrt price
         )
       ),
       1e18

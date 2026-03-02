@@ -68,7 +68,7 @@ contract Unit_BalancerV3StablePoolMathSwapStep_Guards is Base {
 
     _vault.setSwapFeePercentage(0);
     _vault.setPoolTokenRates(1e12, 1e12, 2e18, 2e18);
-    _vault.setCurrentLiveBalances(1_000e18, 1_000e18);
+    _vault.setCurrentLiveBalances(1000e18, 1000e18);
     _pool.setOutMultiplier(1e18); // passthrough scaled amount
 
     BalancerV3StablePoolMathSwapStep.Data memory _data = BalancerV3StablePoolMathSwapStep.Data({

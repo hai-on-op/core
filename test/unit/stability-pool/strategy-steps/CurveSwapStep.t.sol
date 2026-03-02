@@ -20,8 +20,13 @@ abstract contract Base is HaiTest {
   }
 
   function _data() internal view returns (CurveSwapStep.Data memory _dataOut) {
-    _dataOut =
-      CurveSwapStep.Data({pool: address(pool), i: int128(0), j: int128(1), tokenIn: address(tokenIn), tokenOut: address(tokenOut)});
+    _dataOut = CurveSwapStep.Data({
+      pool: address(pool),
+      i: int128(0),
+      j: int128(1),
+      tokenIn: address(tokenIn),
+      tokenOut: address(tokenOut)
+    });
   }
 }
 

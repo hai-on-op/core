@@ -58,11 +58,11 @@ contract MockStabilityPoolStrategyStepForTest is IStrategyStep {
     _amountsOut[0] = _amountIn;
   }
 
-  function execute(bytes calldata, uint256 _amountIn, uint256[] calldata)
-    external
-    pure
-    returns (uint256[] memory _amountsOut)
-  {
+  function execute(
+    bytes calldata,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external pure returns (uint256[] memory _amountsOut) {
     _amountsOut = new uint256[](1);
     _amountsOut[0] = _amountIn;
   }

@@ -110,7 +110,7 @@ contract Unit_StrategyStep_Branches is Base {
       deadlineBuffer: 1 hours
     });
 
-    uint256 _expectedPreviewOut = 181818181818181818180;
+    uint256 _expectedPreviewOut = 181_818_181_818_181_818_180;
     uint256 _expectedExecuteOut = 200e18;
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 10e18);
@@ -240,8 +240,11 @@ contract Unit_StrategyStep_Branches is Base {
     ERC20ForTest _assetToken = new ERC20ForTest();
     MockERC4626VaultForTest _vault = new MockERC4626VaultForTest(address(_assetToken));
 
-    ERC4626WithdrawalStep.Data memory _data =
-      ERC4626WithdrawalStep.Data({vault: address(_vault), vaultToken: address(_vault), assetToken: address(_assetToken)});
+    ERC4626WithdrawalStep.Data memory _data = ERC4626WithdrawalStep.Data({
+      vault: address(_vault),
+      vaultToken: address(_vault),
+      assetToken: address(_assetToken)
+    });
     uint256[] memory _minOuts = new uint256[](1);
     _minOuts[0] = 1;
 

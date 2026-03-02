@@ -103,11 +103,10 @@ contract MockBalancerVaultForTest {
     _swapHooksEnabled = _swapHooksEnabled_;
   }
 
-  function getPoolTokenCountAndIndexOfToken(address, IERC20 _token)
-    external
-    view
-    returns (uint256 _tokenCount, uint256 _index)
-  {
+  function getPoolTokenCountAndIndexOfToken(
+    address,
+    IERC20 _token
+  ) external view returns (uint256 _tokenCount, uint256 _index) {
     _tokenCount = 2;
     if (address(_token) == address(_token0)) return (_tokenCount, 0);
     if (address(_token) == address(_token1)) return (_tokenCount, 1);

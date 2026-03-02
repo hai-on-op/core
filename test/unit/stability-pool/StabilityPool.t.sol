@@ -8,7 +8,10 @@ import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
-import {MockStabilityPoolEmissionsControllerForTest, MockStabilityPoolStrategyStepForTest} from '@test/mocks/stability-pool/core/StabilityPoolCoreForTest.sol';
+import {
+  MockStabilityPoolEmissionsControllerForTest,
+  MockStabilityPoolStrategyStepForTest
+} from '@test/mocks/stability-pool/core/StabilityPoolCoreForTest.sol';
 import {
   MockCollateralJoinFactoryForTest,
   MockCollateralJoinForTest,
@@ -240,7 +243,6 @@ contract Unit_StabilityPool_StrategyConfig is Base {
   }
 }
 
-
 contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
   bytes32 internal constant CTYPE = bytes32('WETH');
   bytes32 internal constant OTHER_CTYPE = bytes32('OP');
@@ -390,7 +392,6 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
   }
 }
 
-
 contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
   bytes32 internal constant CTYPE = bytes32('WETH');
   bytes32 internal constant OTHER_CTYPE = bytes32('OTHER');
@@ -436,8 +437,8 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
     vm.stopPrank();
 
-    systemCoin.mint(address(stabilityPool), 1_000e18);
-    systemCoin.mint(user, 1_000e18);
+    systemCoin.mint(address(stabilityPool), 1000e18);
+    systemCoin.mint(user, 1000e18);
   }
 
   function _setSingleStep(address _step, bytes memory _data, uint16 _slippageBps) internal {
@@ -451,11 +452,12 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     stabilityPool.setStrategySteps(CTYPE, _steps);
   }
 
-  function _mockData(address _tokenIn, address _tokenOut, uint256 _previewMultiplier, uint256 _executeMultiplier)
-    internal
-    pure
-    returns (bytes memory _data)
-  {
+  function _mockData(
+    address _tokenIn,
+    address _tokenOut,
+    uint256 _previewMultiplier,
+    uint256 _executeMultiplier
+  ) internal pure returns (bytes memory _data) {
     _data = abi.encode(
       MockConfigurableStrategyStepForTest.Data({
         tokenIn: _tokenIn,
@@ -560,8 +562,9 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
   function test_Revert_PreviewSwapToHai_InvalidStrategyStep_MismatchedOutputs() public {
     MockPreviewLengthMismatchStepForTest _step = new MockPreviewLengthMismatchStepForTest();
-    bytes memory _data =
-      abi.encode(MockPreviewLengthMismatchStepForTest.Data({tokenIn: address(collateralToken), tokenOut: address(systemCoin)}));
+    bytes memory _data = abi.encode(
+      MockPreviewLengthMismatchStepForTest.Data({tokenIn: address(collateralToken), tokenOut: address(systemCoin)})
+    );
     _setSingleStep(address(_step), _data, 0);
 
     vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);

@@ -62,11 +62,11 @@ contract MockSingleOutputMultiplierStepForTest is IStrategyStep {
     _amountsOut[0] = (_amountIn * _decoded.outputMultiplierWad) / 1e18;
   }
 
-  function execute(bytes calldata _data, uint256 _amountIn, uint256[] calldata)
-    external
-    pure
-    returns (uint256[] memory _amountsOut)
-  {
+  function execute(
+    bytes calldata _data,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external pure returns (uint256[] memory _amountsOut) {
     Data memory _decoded = abi.decode(_data, (Data));
     _amountsOut = new uint256[](1);
     _amountsOut[0] = (_amountIn * _decoded.outputMultiplierWad) / 1e18;

@@ -120,7 +120,6 @@ contract Unit_EmissionsController_UpdateSplit is Base {
   }
 }
 
-
 abstract contract Base_EmissionsControllerCore is HaiTest {
   address deployer = label('deployer');
   address receiver = label('receiver');
@@ -215,7 +214,6 @@ contract Unit_EmissionsController_MintingMarkingAuth is Base_EmissionsController
     emissionsController.markMintingRewardsDistributed(1e18);
   }
 }
-
 
 abstract contract Base_EmissionsControllerEdgeCases is HaiTest {
   address internal deployer = label('deployer');

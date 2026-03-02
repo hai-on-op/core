@@ -262,8 +262,9 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
     vm.warp(block.timestamp + 24 hours);
     uint256 _bidWithOverride = _findAnyExecutableBid(_auctionHouseWithOverride, _auctionIdWithOverride);
-    bytes4 _selectorWithOverride =
-      _getCoverAndRepayDebtRevertSelector(_auctionHouseWithOverride, _auctionIdWithOverride, _bidWithOverride, YV_VELO_ALETH_WETH_CTYPE);
+    bytes4 _selectorWithOverride = _getCoverAndRepayDebtRevertSelector(
+      _auctionHouseWithOverride, _auctionIdWithOverride, _bidWithOverride, YV_VELO_ALETH_WETH_CTYPE
+    );
     assertEq(_selectorWithOverride, bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()')));
 
     IStabilityPool.StepConfig[] memory _stepsWithoutOverride = _yvVeloAlethWethPipeline();

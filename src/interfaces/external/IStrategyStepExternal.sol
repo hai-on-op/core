@@ -9,10 +9,7 @@ interface IVelodromeRouterV2 {
     address factory;
   }
 
-  function getAmountsOut(
-    uint256 _amountIn,
-    Route[] calldata _routes
-  ) external view returns (uint256[] memory _amounts);
+  function getAmountsOut(uint256 _amountIn, Route[] calldata _routes) external view returns (uint256[] memory _amounts);
 
   function swapExactTokensForTokens(
     uint256 _amountIn,

@@ -75,14 +75,13 @@ contract Unit_StrategyStep_Metadata is Base {
         userData: bytes('')
       })
     );
-    _assertSingleOutputMetadata(
-      balancerStep, _data, bytes32('BALANCER_V3_SWAP'), TOKEN_IN, TOKEN_OUT
-    );
+    _assertSingleOutputMetadata(balancerStep, _data, bytes32('BALANCER_V3_SWAP'), TOKEN_IN, TOKEN_OUT);
   }
 
   function test_Beefy_Metadata() public view {
-    bytes memory _data =
-      abi.encode(BeefyVaultWithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, lpToken: TOKEN_OUT, shareScale: 1e18}));
+    bytes memory _data = abi.encode(
+      BeefyVaultWithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, lpToken: TOKEN_OUT, shareScale: 1e18})
+    );
     _assertSingleOutputMetadata(beefyStep, _data, bytes32('BEEFY_WITHDRAW'), LP_TOKEN, TOKEN_OUT);
   }
 
@@ -93,7 +92,8 @@ contract Unit_StrategyStep_Metadata is Base {
   }
 
   function test_ERC4626_Metadata() public view {
-    bytes memory _data = abi.encode(ERC4626WithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, assetToken: TOKEN_OUT}));
+    bytes memory _data =
+      abi.encode(ERC4626WithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, assetToken: TOKEN_OUT}));
     _assertSingleOutputMetadata(erc4626Step, _data, bytes32('ERC4626_WITHDRAW'), LP_TOKEN, TOKEN_OUT);
   }
 
@@ -144,9 +144,7 @@ contract Unit_StrategyStep_Metadata is Base {
         deadlineBuffer: 1 hours
       })
     );
-    _assertSingleOutputMetadata(
-      veloLpRemoveAndSwapStep, _data, bytes32('VELO_LP_REMOVE_SWAP'), LP_TOKEN, TOKEN_A
-    );
+    _assertSingleOutputMetadata(veloLpRemoveAndSwapStep, _data, bytes32('VELO_LP_REMOVE_SWAP'), LP_TOKEN, TOKEN_A);
   }
 
   function test_VeloSwap_Metadata() public view {
@@ -164,8 +162,9 @@ contract Unit_StrategyStep_Metadata is Base {
   }
 
   function test_Yearn_Metadata() public view {
-    bytes memory _data =
-      abi.encode(YearnVaultWithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, lpToken: TOKEN_OUT, shareScale: 1e18}));
+    bytes memory _data = abi.encode(
+      YearnVaultWithdrawalStep.Data({vault: VAULT, vaultToken: LP_TOKEN, lpToken: TOKEN_OUT, shareScale: 1e18})
+    );
     _assertSingleOutputMetadata(yearnStep, _data, bytes32('YEARN_WITHDRAW'), LP_TOKEN, TOKEN_OUT);
   }
 }

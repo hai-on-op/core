@@ -699,9 +699,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   // --- Helpers ---
 
   function _updateRewardSplitWithMockedPrices(uint256 _redemptionPrice, uint256 _marketPrice) internal {
-    vm.mockCall(
-      address(oracleRelayer), abi.encodeWithSignature('calcRedemptionPrice()'), abi.encode(_redemptionPrice)
-    );
+    vm.mockCall(address(oracleRelayer), abi.encodeWithSignature('calcRedemptionPrice()'), abi.encode(_redemptionPrice));
     vm.mockCall(address(oracleRelayer), abi.encodeWithSignature('marketPrice()'), abi.encode(_marketPrice));
 
     vm.warp(block.timestamp + HOUR + 1);

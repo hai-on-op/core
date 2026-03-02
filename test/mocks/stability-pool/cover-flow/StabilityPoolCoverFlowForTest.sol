@@ -92,11 +92,10 @@ contract MockCoverAuctionHouseForTest {
     actualAdjustedBid = _actualAdjustedBid;
   }
 
-  function getCollateralBought(uint256, uint256)
-    external
-    view
-    returns (uint256 _collateralBought, uint256 _adjustedBid)
-  {
+  function getCollateralBought(
+    uint256,
+    uint256
+  ) external view returns (uint256 _collateralBought, uint256 _adjustedBid) {
     return (estimatedCollateralBought, estimatedAdjustedBid);
   }
 

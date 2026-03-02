@@ -18,10 +18,10 @@ interface IBalancerV3RouterStableMath {
 }
 
 interface IBalancerV3VaultStableMath {
-  function getPoolTokenCountAndIndexOfToken(address _pool, IERC20 _token)
-    external
-    view
-    returns (uint256 _tokenCount, uint256 _index);
+  function getPoolTokenCountAndIndexOfToken(
+    address _pool,
+    IERC20 _token
+  ) external view returns (uint256 _tokenCount, uint256 _index);
 
   function getPoolTokenRates(address _pool)
     external

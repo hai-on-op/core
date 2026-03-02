@@ -4,8 +4,11 @@ pragma solidity 0.8.20;
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
-import {MockBalancerV3Router, MockBalancerV3StablePool, MockBalancerV3StableVault} from
-  '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
+import {
+  MockBalancerV3Router,
+  MockBalancerV3StablePool,
+  MockBalancerV3StableVault
+} from '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 

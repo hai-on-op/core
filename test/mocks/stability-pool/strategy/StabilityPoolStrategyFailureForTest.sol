@@ -35,10 +35,11 @@ contract MockConfigurableStrategyStepForTest is IStrategyStep {
     _amountsOut[0] = (_amountIn * _decoded.previewMultiplierWad) / 1e18;
   }
 
-  function execute(bytes calldata _data, uint256 _amountIn, uint256[] calldata)
-    external
-    returns (uint256[] memory _amountsOut)
-  {
+  function execute(
+    bytes calldata _data,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external returns (uint256[] memory _amountsOut) {
     Data memory _decoded = abi.decode(_data, (Data));
     _amountsOut = new uint256[](1);
     _amountsOut[0] = (_amountIn * _decoded.executeMultiplierWad) / 1e18;
@@ -75,10 +76,11 @@ contract MockPreviewLengthMismatchStepForTest is IStrategyStep {
     _amountsOut[1] = _amountIn;
   }
 
-  function execute(bytes calldata _data, uint256 _amountIn, uint256[] calldata)
-    external
-    returns (uint256[] memory _amountsOut)
-  {
+  function execute(
+    bytes calldata _data,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external returns (uint256[] memory _amountsOut) {
     Data memory _decoded = abi.decode(_data, (Data));
     _amountsOut = new uint256[](1);
     _amountsOut[0] = _amountIn;
@@ -112,10 +114,11 @@ contract MockExecuteLengthMismatchStepForTest is IStrategyStep {
     _amountsOut[0] = _amountIn;
   }
 
-  function execute(bytes calldata _data, uint256 _amountIn, uint256[] calldata)
-    external
-    returns (uint256[] memory _amountsOut)
-  {
+  function execute(
+    bytes calldata _data,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external returns (uint256[] memory _amountsOut) {
     Data memory _decoded = abi.decode(_data, (Data));
     _amountsOut = new uint256[](2);
     _amountsOut[0] = _amountIn;
