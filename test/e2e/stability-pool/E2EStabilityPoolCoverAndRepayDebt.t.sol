@@ -110,7 +110,8 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
       address(oracleRelayer),
       address(emissionsController),
       address(coinJoin),
-      address(collateralJoinFactory)
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
@@ -253,11 +254,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     stabilityPool.coverAndRepayDebt(address(collateralAuctionHouse[WETH_CTYPE]), 1, 1e18, bytes32('NO_STEPS'));
   }
 
-  function test_cover_and_repay_debt_reverts_on_collateral_type_mismatch() public {
+  function test_cover_and_repay_debt_reverts_on_invalid_auction_house_for_collateral_type() public {
     (address _auctionHouse, uint256 _auctionId) =
       _startAuction(WETH_CTYPE, safeOwner, WETH, SAFE_WETH_COLLATERAL_WEI, TARGET_SAFE_DEBT, LIQUIDATION_PRICE, true);
 
-    vm.expectRevert(IStabilityPool.StabilityPool_CollateralTypeMismatch.selector);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidAuctionHouse.selector);
     stabilityPool.coverAndRepayDebt(_auctionHouse, _auctionId, 1e18, OP_CTYPE);
   }
 

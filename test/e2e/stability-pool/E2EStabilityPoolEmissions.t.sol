@@ -66,7 +66,8 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
       address(oracleRelayer),
       address(emissionsController),
       address(coinJoin),
-      address(collateralJoinFactory)
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));

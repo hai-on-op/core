@@ -12,6 +12,14 @@ contract MockCollateralJoinFactoryForTest {
   }
 }
 
+contract MockCollateralAuctionHouseFactoryForTest {
+  mapping(bytes32 => address) public collateralAuctionHouses;
+
+  function setCollateralAuctionHouse(bytes32 _cType, address _auctionHouse) external {
+    collateralAuctionHouses[_cType] = _auctionHouse;
+  }
+}
+
 contract MockCollateralJoinForTest {
   ERC20ForTest public collateralToken;
   uint256 public multiplier;

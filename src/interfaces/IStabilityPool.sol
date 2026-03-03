@@ -5,6 +5,7 @@ import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
 import {ICollateralJoinFactory} from '@interfaces/factories/ICollateralJoinFactory.sol';
+import {ICollateralAuctionHouseFactory} from '@interfaces/factories/ICollateralAuctionHouseFactory.sol';
 import {ICoinJoin} from '@interfaces/utils/ICoinJoin.sol';
 import {IProtocolToken} from '@interfaces/tokens/IProtocolToken.sol';
 import {ISystemCoin} from '@interfaces/tokens/ISystemCoin.sol';
@@ -109,6 +110,8 @@ interface IStabilityPool is IERC4626 {
   error StabilityPool_CollateralTypeMismatch();
   /// @notice Throws when collateral join cannot be resolved for a collateral type
   error StabilityPool_InvalidCollateralJoin();
+  /// @notice Throws when the provided auction house is not the configured canonical auction house for the collateral
+  error StabilityPool_InvalidAuctionHouse();
   /// @notice Throws when slippage basis points exceed the maximum value
   error StabilityPool_InvalidSlippageBps();
   /// @notice Throws when trying to transfer shares while transfers are disabled
@@ -154,6 +157,9 @@ interface IStabilityPool is IERC4626 {
 
   /// @notice Address of the CollateralJoinFactory used to resolve collateral joins by collateral type
   function collateralJoinFactory() external view returns (ICollateralJoinFactory _collateralJoinFactory);
+
+  /// @notice Address of the CollateralAuctionHouseFactory used to resolve canonical auction houses by collateral type
+  function collateralAuctionHouseFactory() external view returns (ICollateralAuctionHouseFactory _factory);
 
   // --- Data ---
 

@@ -18,6 +18,7 @@ import {ISystemCoin} from '@interfaces/tokens/ISystemCoin.sol';
 import {ICoinJoin} from '@interfaces/utils/ICoinJoin.sol';
 import {ICollateralJoin} from '@interfaces/utils/ICollateralJoin.sol';
 import {ICollateralJoinFactory} from '@interfaces/factories/ICollateralJoinFactory.sol';
+import {ICollateralAuctionHouseFactory} from '@interfaces/factories/ICollateralAuctionHouseFactory.sol';
 import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
@@ -63,6 +64,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   /// @inheritdoc IStabilityPool
   ICollateralJoinFactory public immutable collateralJoinFactory;
+
+  /// @inheritdoc IStabilityPool
+  ICollateralAuctionHouseFactory public immutable collateralAuctionHouseFactory;
 
   // --- Rewards Data ---
 
@@ -113,6 +117,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
    * @param  _emissionsController Address of the EmissionsController
    * @param  _coinJoin Address of the CoinJoin contract
    * @param  _collateralJoinFactory Address of the CollateralJoinFactory
+   * @param  _collateralAuctionHouseFactory Address of the CollateralAuctionHouseFactory
    */
   constructor(
     address _systemCoin,
@@ -120,7 +125,8 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     address _oracleRelayer,
     address _emissionsController,
     address _coinJoin,
-    address _collateralJoinFactory
+    address _collateralJoinFactory,
+    address _collateralAuctionHouseFactory
   ) ERC4626(IERC20(_systemCoin)) ERC20('Staked HAI', 'sHAI') Authorizable(msg.sender) {
     systemCoin = ISystemCoin(_systemCoin);
     protocolToken = IProtocolToken(_protocolToken);
@@ -128,6 +134,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     emissionsController = IEmissionsController(_emissionsController);
     coinJoin = ICoinJoin(_coinJoin);
     collateralJoinFactory = ICollateralJoinFactory(_collateralJoinFactory);
+    collateralAuctionHouseFactory = ICollateralAuctionHouseFactory(_collateralAuctionHouseFactory);
     lastInternalCoinSweepTime = block.timestamp;
     kiteRewardsActive = true;
   }
@@ -287,6 +294,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     bytes32 _collateralType
   ) external nonReentrant returns (int256 _profit) {
     if (_strategySteps[_collateralType].length == 0) revert StabilityPool_NoStrategySteps();
+    if (collateralAuctionHouseFactory.collateralAuctionHouses(_collateralType) != _auctionHouse) {
+      revert StabilityPool_InvalidAuctionHouse();
+    }
 
     ICollateralAuctionHouse _auction = ICollateralAuctionHouse(_auctionHouse);
     if (_auction.collateralType() != _collateralType) revert StabilityPool_CollateralTypeMismatch();

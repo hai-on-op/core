@@ -16,6 +16,7 @@ import {
 } from '@test/mocks/stability-pool/core/StabilityPoolCoreForTest.sol';
 import {
   MockCollateralJoinFactoryForTest,
+  MockCollateralAuctionHouseFactoryForTest,
   MockCollateralJoinForTest,
   MockSingleOutputMultiplierStepForTest,
   MockAuctionHouseForTest
@@ -61,7 +62,8 @@ abstract contract Base is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       mockContract('CoinJoin'),
-      mockContract('CollateralJoinFactory')
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
@@ -242,7 +244,8 @@ contract Unit_StabilityPool_Reentrancy is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       mockContract('CoinJoin'),
-      mockContract('CollateralJoinFactory')
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
@@ -321,6 +324,7 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
   ERC20ForTest protocolToken;
   MockStabilityPoolEmissionsControllerForTest emissionsController;
   MockCollateralJoinFactoryForTest collateralJoinFactory;
+  MockCollateralAuctionHouseFactoryForTest collateralAuctionHouseFactory;
   StabilityPool stabilityPool;
   MockSingleOutputMultiplierStepForTest strategyStep;
   ERC20ForTest collateralToken;
@@ -331,6 +335,7 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
     protocolToken = new ERC20ForTest();
     emissionsController = new MockStabilityPoolEmissionsControllerForTest(protocolToken, address(0));
     collateralJoinFactory = new MockCollateralJoinFactoryForTest();
+    collateralAuctionHouseFactory = new MockCollateralAuctionHouseFactoryForTest();
     strategyStep = new MockSingleOutputMultiplierStepForTest();
     collateralToken = new ERC20ForTest();
     collateralJoin = new MockCollateralJoinForTest(collateralToken, 0);
@@ -341,7 +346,8 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       mockContract('CoinJoin'),
-      address(collateralJoinFactory)
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
     collateralJoinFactory.setCollateralJoin(CTYPE, address(collateralJoin));
@@ -454,6 +460,7 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
     stabilityPool.setStrategySteps(CTYPE, _steps);
 
     MockAuctionHouseForTest _auction = new MockAuctionHouseForTest(OTHER_CTYPE);
+    collateralAuctionHouseFactory.setCollateralAuctionHouse(CTYPE, address(_auction));
 
     vm.expectRevert(IStabilityPool.StabilityPool_CollateralTypeMismatch.selector);
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 1e18, CTYPE);
@@ -476,6 +483,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
   MockSAFEEngineForTest internal safeEngine;
   MockCoinJoinForTest internal coinJoin;
   MockCollateralJoinFactoryForTest internal collateralJoinFactory;
+  MockCollateralAuctionHouseFactoryForTest internal collateralAuctionHouseFactory;
   MockCollateralJoinForTest internal collateralJoin;
   StabilityPool internal stabilityPool;
 
@@ -490,6 +498,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     safeEngine = new MockSAFEEngineForTest();
     coinJoin = new MockCoinJoinForTest(safeEngine, systemCoin);
     collateralJoinFactory = new MockCollateralJoinFactoryForTest();
+    collateralAuctionHouseFactory = new MockCollateralAuctionHouseFactoryForTest();
     collateralJoin = new MockCollateralJoinForTest(collateralToken, 0);
 
     stabilityPool = new StabilityPool(
@@ -498,7 +507,8 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       address(coinJoin),
-      address(collateralJoinFactory)
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
@@ -537,12 +547,18 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     );
   }
 
+  function _newAuction(bytes32 _auctionCType) internal returns (MockCoverAuctionHouseForTest _auction) {
+    _auction = new MockCoverAuctionHouseForTest(_auctionCType, safeEngine);
+    collateralAuctionHouseFactory.setCollateralAuctionHouse(CTYPE, address(_auction));
+  }
+
   function test_Constructor_InitializesRegistryAndFlags() public view {
     assertEq(address(stabilityPool.systemCoin()), address(systemCoin));
     assertEq(address(stabilityPool.protocolToken()), address(protocolToken));
     assertEq(address(stabilityPool.emissionsController()), address(emissionsController));
     assertEq(address(stabilityPool.coinJoin()), address(coinJoin));
     assertEq(address(stabilityPool.collateralJoinFactory()), address(collateralJoinFactory));
+    assertEq(address(stabilityPool.collateralAuctionHouseFactory()), address(collateralAuctionHouseFactory));
     assertEq(stabilityPool.kiteRewardsActive(), true);
     assertEq(stabilityPool.transfersEnabled(), false);
   }
@@ -641,17 +657,28 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
   }
 
   function test_Revert_CoverAndRepayDebt_NoStrategySteps() public {
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
 
     vm.expectRevert(IStabilityPool.StabilityPool_NoStrategySteps.selector);
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 1e18, CTYPE);
+  }
+
+  function test_Revert_CoverAndRepayDebt_InvalidAuctionHouse() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
+
+    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    _auction.setQuote(10e18, 8e18, 10e18, 7e18);
+
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidAuctionHouse.selector);
+    stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
   }
 
   function test_CoverAndRepayDebt_ReturnsZero_WhenEstimatedCollateralIsZero() public {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(0, 0, 0, 0);
 
     int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 1e18, CTYPE);
@@ -663,7 +690,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 11e18, 10e18, 10e18);
 
     vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
@@ -676,7 +703,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
       abi.encode(MockRevertNoReasonStepForTest.Data({tokenIn: address(collateralToken), tokenOut: address(systemCoin)}));
     _setSingleStep(address(_step), _data, 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 5e18, 10e18, 5e18);
 
     vm.expectRevert(IStabilityPool.StabilityPool_DelegatecallFailed.selector);
@@ -689,7 +716,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
       abi.encode(MockRevertReasonStepForTest.Data({tokenIn: address(collateralToken), tokenOut: address(systemCoin)}));
     _setSingleStep(address(_step), _data, 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 5e18, 10e18, 5e18);
 
     vm.expectRevert(MockRevertReasonStepForTest.MockRevertReasonStepForTest_Reverted.selector);
@@ -703,7 +730,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     );
     _setSingleStep(address(_step), _data, 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 5e18, 10e18, 5e18);
 
     vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
@@ -714,7 +741,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 1e18), 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 8e18, 10e18, 7e18);
 
     vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
@@ -725,7 +752,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 1000);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 9e18, 10e18, 11e18);
 
     vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
@@ -736,7 +763,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 8e18, 10e18, 7e18);
 
     int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
@@ -755,7 +782,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
 
     safeEngine.setCoinBalance(address(stabilityPool), 100e18 * RAY);
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(1e18, 1e18, 1e18, 1e18);
 
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 1e18, CTYPE);
@@ -773,7 +800,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
 
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(500e18, 8e18, 500e18, 7e18);
 
     int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
@@ -786,7 +813,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
 
     safeEngine.setCoinBalance(address(stabilityPool), 20e18 * RAY);
-    MockCoverAuctionHouseForTest _auction = new MockCoverAuctionHouseForTest(CTYPE, safeEngine);
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
     _auction.setQuote(10e18, 8e18, 10e18, 7e18);
 
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
