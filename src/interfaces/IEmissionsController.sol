@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 /**
  * @title IEmissionsController
- * @notice Interface for the EmissionsController that distributes KITE over 1 year
+ * @notice Interface for the EmissionsController that distributes KITE over a configured duration
  */
 interface IEmissionsController {
   // --- Events ---
@@ -34,6 +34,22 @@ interface IEmissionsController {
    */
   event SetStabilityRewardsReceiver(address indexed _oldReceiver, address indexed _newReceiver);
 
+  /**
+   * @notice Emitted when emissions are extended
+   * @param  _oldEndTime Previous emission end timestamp
+   * @param  _newEndTime New emission end timestamp
+   * @param  _additionalKiteAmount Additional KITE added for emissions [wad]
+   * @param  _additionalDuration Additional emission duration [seconds]
+   * @param  _newBaseRate New total per-second emission rate [wad per second]
+   */
+  event ExtendEmissions(
+    uint256 _oldEndTime,
+    uint256 _newEndTime,
+    uint256 _additionalKiteAmount,
+    uint256 _additionalDuration,
+    uint256 _newBaseRate
+  );
+
   // --- Errors ---
 
   /// @notice Throws when trying to update split too frequently
@@ -48,6 +64,8 @@ interface IEmissionsController {
   error EmissionsController_InvalidRedemptionPrice();
   /// @notice Throws when caller is not the stability rewards receiver
   error EmissionsController_OnlyStabilityRewardsReceiver();
+  /// @notice Throws when emission duration is zero
+  error EmissionsController_InvalidEmissionDuration();
 
   // --- Registry ---
 
@@ -97,4 +115,11 @@ interface IEmissionsController {
    * @param  _receiver Address that receives stability-side KITE rewards
    */
   function setStabilityRewardsReceiver(address _receiver) external;
+
+  /**
+   * @notice Extends the emissions schedule and optionally adds more KITE rewards
+   * @param  _additionalKiteAmount Additional KITE to transfer in for emissions [wad]
+   * @param  _additionalDuration Additional duration to append to emissions [seconds]
+   */
+  function extendEmissions(uint256 _additionalKiteAmount, uint256 _additionalDuration) external;
 }

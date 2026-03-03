@@ -35,7 +35,7 @@ abstract contract Base is HaiTest {
     kite = new ERC20ForTest();
     mockOracleRelayer = new MockOracleRelayerForTest();
     emissionsController =
-      new EmissionsController(kite, IOracleRelayer(address(mockOracleRelayer)), receiver, TOTAL_KITE, 0.1e18);
+      new EmissionsController(kite, IOracleRelayer(address(mockOracleRelayer)), receiver, TOTAL_KITE, YEAR, 0.1e18);
 
     kite.mint(address(emissionsController), TOTAL_KITE);
 
@@ -141,7 +141,7 @@ abstract contract Base_EmissionsControllerCore is HaiTest {
     kite = new ERC20ForTest();
     mockOracleRelayer = new MockOracleRelayerForTest();
     emissionsController =
-      new EmissionsController(kite, IOracleRelayer(address(mockOracleRelayer)), receiver, TOTAL_KITE, 0.1e18);
+      new EmissionsController(kite, IOracleRelayer(address(mockOracleRelayer)), receiver, TOTAL_KITE, YEAR, 0.1e18);
     kite.mint(address(emissionsController), TOTAL_KITE);
 
     vm.stopPrank();
@@ -235,7 +235,8 @@ abstract contract Base_EmissionsControllerEdgeCases is HaiTest {
 
     kite = new ERC20ForTest();
     oracle = new MockOracleRelayerForTest();
-    emissionsController = new EmissionsController(kite, IOracleRelayer(address(oracle)), receiver, TOTAL_KITE, 0.1e18);
+    emissionsController =
+      new EmissionsController(kite, IOracleRelayer(address(oracle)), receiver, TOTAL_KITE, YEAR, 0.1e18);
     kite.mint(address(emissionsController), TOTAL_KITE);
 
     vm.stopPrank();
@@ -248,7 +249,37 @@ contract Unit_EmissionsController_ConstructorReverts is HaiTest {
     MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
 
     vm.expectRevert(IEmissionsController.EmissionsController_InvalidStabilityReceiver.selector);
-    new EmissionsController(_kite, IOracleRelayer(address(_oracle)), address(0), YEAR * 100 * WAD, 0.1e18);
+    new EmissionsController(_kite, IOracleRelayer(address(_oracle)), address(0), YEAR * 100 * WAD, YEAR, 0.1e18);
+  }
+
+  function test_Revert_Constructor_ZeroDuration() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidEmissionDuration.selector);
+    new EmissionsController(_kite, IOracleRelayer(address(_oracle)), address(this), YEAR * 100 * WAD, 0, 0.1e18);
+  }
+}
+
+contract Unit_EmissionsController_CustomDuration is HaiTest {
+  uint256 internal constant TOTAL_KITE = YEAR * 100 * WAD;
+  address internal deployer = label('deployer');
+  address internal receiver = label('receiver');
+
+  function test_Constructor_CustomDuration_SetsEndTimeAndRates() public {
+    uint256 _duration = 2 * YEAR;
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, TOTAL_KITE, _duration, 0.1e18);
+
+    uint256 _expectedRate = TOTAL_KITE / _duration;
+    assertEq(_controller.emissionEndTime(), _controller.emissionStartTime() + _duration);
+    assertEq(_controller.baseEmissionRate(), _expectedRate);
+    assertEq(_controller.currentStabilityPoolRate(), (_expectedRate * 50) / 100);
+    assertEq(_controller.currentMintingRate(), (_expectedRate * 50) / 100);
   }
 }
 
@@ -321,6 +352,66 @@ contract Unit_EmissionsController_MintingMarkingBranches is Base_EmissionsContro
   }
 }
 
+contract Unit_EmissionsController_Extension is Base_EmissionsControllerEdgeCases {
+  function test_Revert_ExtendEmissions_Unauthorized() public {
+    vm.prank(nextReceiver);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    emissionsController.extendEmissions(0, 30 days);
+  }
+
+  function test_Revert_ExtendEmissions_ZeroDuration() public {
+    vm.prank(deployer);
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidEmissionDuration.selector);
+    emissionsController.extendEmissions(1e18, 0);
+  }
+
+  function test_ExtendEmissions_BeforeEnd_StretchesRemainingRate() public {
+    vm.warp(block.timestamp + 30 days);
+
+    uint256 _now = block.timestamp;
+    uint256 _oldEndTime = emissionsController.emissionEndTime();
+    uint256 _oldBaseRate = emissionsController.baseEmissionRate();
+    uint256 _additionalDuration = 180 days;
+
+    vm.prank(deployer);
+    emissionsController.extendEmissions(0, _additionalDuration);
+
+    uint256 _remainingAmount = _oldBaseRate * (_oldEndTime - _now);
+    uint256 _expectedEndTime = _oldEndTime + _additionalDuration;
+    uint256 _expectedBaseRate = _remainingAmount / (_expectedEndTime - _now);
+
+    assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
+    assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
+    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
+    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+    assertEq(emissionsController.currentRateStartTime(), _now);
+  }
+
+  function test_ExtendEmissions_AfterEnd_WithAdditionalKite_RestartsFromNow() public {
+    vm.warp(emissionsController.emissionEndTime() + 7 days);
+    uint256 _now = block.timestamp;
+    uint256 _oldEndTime = emissionsController.emissionEndTime();
+    uint256 _additionalKite = 10_000e18;
+    uint256 _additionalDuration = 200 days;
+
+    kite.mint(deployer, _additionalKite);
+    vm.startPrank(deployer);
+    kite.approve(address(emissionsController), _additionalKite);
+    emissionsController.extendEmissions(_additionalKite, _additionalDuration);
+    vm.stopPrank();
+
+    uint256 _expectedEndTime = _now + _additionalDuration;
+    uint256 _expectedBaseRate = _additionalKite / _additionalDuration;
+
+    assertLt(_oldEndTime, _now);
+    assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
+    assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
+    assertEq(emissionsController.lastCheckpointTime(), _now);
+    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
+    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+  }
+}
+
 contract Unit_EmissionsController_Reentrancy is HaiTest {
   uint256 internal constant TOTAL_KITE = YEAR * 100 * WAD;
 
@@ -337,7 +428,7 @@ contract Unit_EmissionsController_Reentrancy is HaiTest {
     kite = new MockReentrantKiteTokenForTest();
     oracle = new MockOracleRelayerForTest();
     emissionsController =
-      new EmissionsController(kite, IOracleRelayer(address(oracle)), address(kite), TOTAL_KITE, 0.1e18);
+      new EmissionsController(kite, IOracleRelayer(address(oracle)), address(kite), TOTAL_KITE, YEAR, 0.1e18);
     kite.setController(address(emissionsController));
     kite.mint(address(emissionsController), TOTAL_KITE);
 

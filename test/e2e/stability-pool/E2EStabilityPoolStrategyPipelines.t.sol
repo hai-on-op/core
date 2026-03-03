@@ -22,6 +22,7 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
   uint256 internal constant FORK_BLOCK = 148_368_730;
   uint256 internal constant TOTAL_KITE = 1_000_000e18;
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
+  uint256 internal constant EMISSIONS_DURATION = 365 days;
 
   bytes32 internal constant WETH_CTYPE = bytes32('WETH');
   bytes32 internal constant WSTETH_CTYPE = bytes32('WSTETH');
@@ -106,8 +107,9 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
     try protocolToken.unpause() {} catch {}
 
     vm.startPrank(testDeployer);
-    emissionsController =
-      new EmissionsController(IERC20(address(protocolToken)), oracleRelayer, testDeployer, TOTAL_KITE, DEVIATION_LIMIT);
+    emissionsController = new EmissionsController(
+      IERC20(address(protocolToken)), oracleRelayer, testDeployer, TOTAL_KITE, EMISSIONS_DURATION, DEVIATION_LIMIT
+    );
 
     stabilityPool = new StabilityPool(
       address(systemCoin),

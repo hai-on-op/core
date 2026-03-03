@@ -22,6 +22,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
 
   uint256 internal constant TOTAL_KITE = 1_000_000e18;
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
+  uint256 internal constant EMISSIONS_DURATION = 365 days;
 
   uint256 internal constant USER_HAI_BALANCE = 5000e18;
   uint256 internal constant USER_DEPOSIT = 1000e18;
@@ -55,8 +56,9 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     try protocolToken.unpause() {} catch {}
 
     vm.startPrank(testDeployer);
-    emissionsController =
-      new EmissionsController(IERC20(address(protocolToken)), oracleRelayer, testDeployer, TOTAL_KITE, DEVIATION_LIMIT);
+    emissionsController = new EmissionsController(
+      IERC20(address(protocolToken)), oracleRelayer, testDeployer, TOTAL_KITE, EMISSIONS_DURATION, DEVIATION_LIMIT
+    );
 
     stabilityPool = new StabilityPool(
       address(systemCoin),

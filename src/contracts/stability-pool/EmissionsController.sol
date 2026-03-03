@@ -10,15 +10,14 @@ import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 
-import {Math, WAD, YEAR, HOUR} from '@libraries/Math.sol';
+import {WAD, HOUR} from '@libraries/Math.sol';
 
 /**
  * @title EmissionsController
- * @notice Distributes KITE over 1 year, splitting emissions between stability and minting incentives
+ * @notice Distributes KITE over a configured duration, splitting emissions between stability and minting incentives
  */
 contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsController {
   using SafeERC20 for IERC20;
-  using Math for uint256;
 
   // --- Constants ---
 
@@ -35,14 +34,17 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
 
   // --- Params ---
 
-  /// @notice Total KITE to distribute over 1 year
-  uint256 public immutable totalKiteAmount;
+  /// @notice Total KITE scheduled for emissions across the controller lifetime
+  uint256 public totalKiteAmount;
 
   /// @notice When emissions started
   uint256 public immutable emissionStartTime;
 
-  /// @notice When emissions end (startTime + 1 year)
-  uint256 public immutable emissionEndTime;
+  /// @notice When emissions end
+  uint256 public emissionEndTime;
+
+  /// @notice Total per-second emission rate before split (stability + minting) [wad per second]
+  uint256 public baseEmissionRate;
 
   // --- Data ---
 
@@ -88,7 +90,8 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
    * @param  _kiteToken Address of the KITE token
    * @param  _oracleRelayer Address of the OracleRelayer
    * @param  _stabilityRewardsReceiver Address receiving stability-side emissions
-   * @param  _totalKiteAmount Total KITE to distribute over 1 year [wad]
+   * @param  _totalKiteAmount Total KITE to distribute over the initial emission duration [wad]
+   * @param  _emissionDuration Initial emission duration [seconds]
    * @param  _deviationLimit Upper/lower limit for deviation (10% = 0.1e18) [wad]
    */
   constructor(
@@ -96,9 +99,11 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     IOracleRelayer _oracleRelayer,
     address _stabilityRewardsReceiver,
     uint256 _totalKiteAmount,
+    uint256 _emissionDuration,
     uint256 _deviationLimit
   ) Authorizable(msg.sender) {
     if (_stabilityRewardsReceiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
+    if (_emissionDuration == 0) revert EmissionsController_InvalidEmissionDuration();
 
     kiteToken = _kiteToken;
     oracleRelayer = _oracleRelayer;
@@ -107,16 +112,15 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     deviationLimit = _deviationLimit;
 
     emissionStartTime = block.timestamp;
-    emissionEndTime = block.timestamp + YEAR;
+    emissionEndTime = block.timestamp + _emissionDuration;
+    baseEmissionRate = _totalKiteAmount / _emissionDuration;
 
     // Initialize with 50/50 split
     stabilityPoolSplit = _SPLIT_BASELINE;
     mintingSplit = _SPLIT_BASELINE;
 
     // Calculate initial emission rates
-    uint256 _totalRate = _totalKiteAmount / YEAR; // Total per-second rate
-    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / _PERCENT_BASE;
-    currentMintingRate = (_totalRate * mintingSplit) / _PERCENT_BASE;
+    _setRatesFromCurrentSplit();
 
     lastCheckpointTime = block.timestamp;
     currentRateStartTime = block.timestamp;
@@ -171,9 +175,7 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     stabilityPoolSplit = _newStabilityPoolSplit;
     mintingSplit = _PERCENT_BASE - _newStabilityPoolSplit;
 
-    uint256 _totalRate = totalKiteAmount / YEAR;
-    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / _PERCENT_BASE;
-    currentMintingRate = (_totalRate * mintingSplit) / _PERCENT_BASE;
+    _setRatesFromCurrentSplit();
     currentRateStartTime = block.timestamp;
 
     lastSplitUpdateTime = block.timestamp;
@@ -221,6 +223,43 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     }
 
     emit SetStabilityRewardsReceiver(_oldReceiver, _receiver);
+  }
+
+  /// @inheritdoc IEmissionsController
+  function extendEmissions(
+    uint256 _additionalKiteAmount,
+    uint256 _additionalDuration
+  ) external nonReentrant isAuthorized {
+    if (_additionalDuration == 0) revert EmissionsController_InvalidEmissionDuration();
+
+    _checkpointRewards();
+
+    if (_additionalKiteAmount > 0) {
+      kiteToken.safeTransferFrom(msg.sender, address(this), _additionalKiteAmount);
+      totalKiteAmount += _additionalKiteAmount;
+    }
+
+    uint256 _currentTime = block.timestamp;
+    uint256 _oldEndTime = emissionEndTime;
+    uint256 _remainingDuration = _oldEndTime > _currentTime ? _oldEndTime - _currentTime : 0;
+    uint256 _remainingAmount = baseEmissionRate * _remainingDuration;
+    uint256 _newRemainingAmount = _remainingAmount + _additionalKiteAmount;
+
+    uint256 _extensionStartTime = _oldEndTime > _currentTime ? _oldEndTime : _currentTime;
+    uint256 _newEndTime = _extensionStartTime + _additionalDuration;
+    emissionEndTime = _newEndTime;
+
+    uint256 _newRemainingDuration = _newEndTime - _currentTime;
+    baseEmissionRate = _newRemainingAmount / _newRemainingDuration;
+    _setRatesFromCurrentSplit();
+    currentRateStartTime = _currentTime;
+
+    // If emissions had already ended, avoid retroactive accrual over the inactive gap.
+    if (lastCheckpointTime < _currentTime) {
+      lastCheckpointTime = _currentTime;
+    }
+
+    emit ExtendEmissions(_oldEndTime, _newEndTime, _additionalKiteAmount, _additionalDuration, baseEmissionRate);
   }
 
   /// @inheritdoc IEmissionsController
@@ -288,5 +327,13 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     mintingCumulativeRewards += _mintingRewards;
 
     lastCheckpointTime = _checkpointTime;
+  }
+
+  /**
+   * @notice Recomputes split-side rates from the current base emission rate and split percentages
+   */
+  function _setRatesFromCurrentSplit() internal {
+    currentStabilityPoolRate = (baseEmissionRate * stabilityPoolSplit) / _PERCENT_BASE;
+    currentMintingRate = (baseEmissionRate * mintingSplit) / _PERCENT_BASE;
   }
 }
