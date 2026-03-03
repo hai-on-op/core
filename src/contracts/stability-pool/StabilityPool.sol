@@ -153,6 +153,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     _accrueKite();
     _checkpoint(msg.sender);
     _amount = _claim(msg.sender, msg.sender);
+    _syncRewardDebt(msg.sender);
   }
 
   /// @inheritdoc IStabilityPool

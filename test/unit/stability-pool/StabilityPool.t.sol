@@ -142,6 +142,23 @@ contract Unit_StabilityPool_Rewards is Base {
     assertEq(protocolToken.balanceOf(user), 10e18);
   }
 
+  function test_ClaimRewards_Twice_DoesNotDoubleCountOrRevert() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+    protocolToken.mint(address(stabilityPool), 10e18);
+
+    vm.prank(user);
+    uint256 _firstClaim = stabilityPool.claimRewards();
+    assertEq(_firstClaim, 10e18);
+    assertEq(stabilityPool.pendingRewards(user), 0);
+
+    vm.prank(user);
+    uint256 _secondClaim = stabilityPool.claimRewards();
+    assertEq(_secondClaim, 0);
+    assertEq(stabilityPool.pendingRewards(user), 0);
+    assertEq(protocolToken.balanceOf(user), 10e18);
+  }
+
   function test_Deposit_Does_Not_Grant_PastRewards_To_NewShares() public {
     vm.prank(user);
     stabilityPool.deposit(100e18, user);
