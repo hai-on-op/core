@@ -202,12 +202,12 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (block.timestamp < lastInternalCoinSweepTime + HOUR) {
       revert StabilityPool_InternalCoinSweepTooFrequent();
     }
-    lastInternalCoinSweepTime = block.timestamp;
 
     ISAFEEngine _safeEngine = coinJoin.safeEngine();
     uint256 _internalRad = _safeEngine.coinBalance(address(this));
     _exitedWad = _internalRad / RAY;
     if (_exitedWad > 0) {
+      lastInternalCoinSweepTime = block.timestamp;
       _safeEngine.approveSAFEModification(address(coinJoin));
       coinJoin.exit(address(this), _exitedWad);
     }

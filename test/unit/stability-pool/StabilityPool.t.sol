@@ -852,16 +852,18 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     assertEq(coinJoin.lastExitWad(), 5e18);
   }
 
-  function test_SweepInternalCoin_ZeroBalance_UpdatesCooldown() public {
+  function test_SweepInternalCoin_ZeroBalance_DoesNotUpdateCooldown() public {
+    uint256 _lastSweepBefore = stabilityPool.lastInternalCoinSweepTime();
     vm.warp(block.timestamp + SWEEP_COOLDOWN + 1);
     uint256 _exited = stabilityPool.sweepInternalCoin();
 
     assertEq(_exited, 0);
-    assertEq(stabilityPool.lastInternalCoinSweepTime(), block.timestamp);
+    assertEq(stabilityPool.lastInternalCoinSweepTime(), _lastSweepBefore);
     assertEq(coinJoin.exitCalls(), 0);
 
-    vm.expectRevert(IStabilityPool.StabilityPool_InternalCoinSweepTooFrequent.selector);
-    stabilityPool.sweepInternalCoin();
+    uint256 _secondExited = stabilityPool.sweepInternalCoin();
+    assertEq(_secondExited, 0);
+    assertEq(stabilityPool.lastInternalCoinSweepTime(), _lastSweepBefore);
   }
 
   function test_SweepInternalCoin_CooldownResetsAfterSuccessfulCall() public {
