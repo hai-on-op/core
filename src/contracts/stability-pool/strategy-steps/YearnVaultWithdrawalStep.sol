@@ -68,6 +68,7 @@ contract YearnVaultWithdrawalStep is IStrategyStep {
     if (_amountIn == 0) return _amountsOut;
 
     uint256 _before = IERC20(_decoded.lpToken).balanceOf(address(this));
+    // slither-disable-next-line unused-return
     IYearnVaultWithdraw(_decoded.vault).withdraw(_amountIn);
     uint256 _after = IERC20(_decoded.lpToken).balanceOf(address(this));
     _amountsOut[0] = _after - _before;

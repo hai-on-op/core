@@ -4,7 +4,9 @@ pragma solidity 0.8.20;
 import {ERC4626} from '@openzeppelin/contracts/token/ERC20/extensions/ERC4626.sol';
 import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
@@ -27,9 +29,13 @@ import {Math, WAD, RAY, HOUR} from '@libraries/Math.sol';
  * @notice ERC4626 vault where users deposit HAI and receive sHAI shares
  * @notice Handles auction covering through configurable strategy step pipelines
  */
-contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
+contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool {
   using SafeERC20 for IERC20;
   using Math for uint256;
+
+  // --- Constants ---
+
+  uint256 internal constant _MAX_SLIPPAGE_BPS = 10_000;
 
   // --- Data ---
 
@@ -41,22 +47,22 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   // --- Registry ---
 
   /// @inheritdoc IStabilityPool
-  ISystemCoin public systemCoin;
+  ISystemCoin public immutable systemCoin;
 
   /// @inheritdoc IStabilityPool
-  IProtocolToken public protocolToken;
+  IProtocolToken public immutable protocolToken;
 
   /// @inheritdoc IStabilityPool
-  IOracleRelayer public oracleRelayer;
+  IOracleRelayer public immutable oracleRelayer;
 
   /// @inheritdoc IStabilityPool
-  IEmissionsController public emissionsController;
+  IEmissionsController public immutable emissionsController;
 
   /// @inheritdoc IStabilityPool
-  ICoinJoin public coinJoin;
+  ICoinJoin public immutable coinJoin;
 
   /// @inheritdoc IStabilityPool
-  ICollateralJoinFactory public collateralJoinFactory;
+  ICollateralJoinFactory public immutable collateralJoinFactory;
 
   // --- Rewards Data ---
 
@@ -131,7 +137,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   // --- Rewards ---
 
   /// @inheritdoc IStabilityPool
-  function claimRewardsFromEmissionsController() external returns (uint256 _amount) {
+  function claimRewardsFromEmissionsController() external nonReentrant returns (uint256 _amount) {
     if (!kiteRewardsActive) revert StabilityPool_RewardsInactive();
     _amount = emissionsController.claimRewardsForStabilityPool();
     if (_amount > 0) {
@@ -143,7 +149,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   }
 
   /// @inheritdoc IStabilityPool
-  function claimRewards() external returns (uint256 _amount) {
+  function claimRewards() external nonReentrant returns (uint256 _amount) {
     _accrueKite();
     _checkpoint(msg.sender);
     _amount = _claim(msg.sender, msg.sender);
@@ -184,10 +190,11 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   }
 
   /// @inheritdoc IStabilityPool
-  function sweepInternalCoin() external returns (uint256 _exitedWad) {
+  function sweepInternalCoin() external nonReentrant returns (uint256 _exitedWad) {
     if (block.timestamp < lastInternalCoinSweepTime + HOUR) {
       revert StabilityPool_InternalCoinSweepTooFrequent();
     }
+    lastInternalCoinSweepTime = block.timestamp;
 
     ISAFEEngine _safeEngine = coinJoin.safeEngine();
     uint256 _internalRad = _safeEngine.coinBalance(address(this));
@@ -197,7 +204,6 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
       coinJoin.exit(address(this), _exitedWad);
     }
 
-    lastInternalCoinSweepTime = block.timestamp;
     emit SweepInternalCoin(_exitedWad);
   }
 
@@ -225,7 +231,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
       if (_step.step == address(0) || !isWhitelistedStep[_step.step]) {
         revert StabilityPool_InvalidStrategyStep();
       }
-      if (_step.slippageBps > 10_000) revert StabilityPool_InvalidSlippageBps();
+      if (_step.slippageBps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidSlippageBps();
       _strategySteps[_collateralType].push(_step);
       _stepAddresses[_i] = _step.step;
     }
@@ -248,14 +254,14 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
 
   /// @inheritdoc IStabilityPool
   function setCollateralSlippageBps(bytes32 _collateralType, uint16 _bps) external isAuthorized {
-    if (_bps > 10_000) revert StabilityPool_InvalidSlippageBps();
+    if (_bps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidSlippageBps();
     collateralSlippageBps[_collateralType] = _bps;
     emit SetCollateralSlippageBps(_collateralType, _bps);
   }
 
   /// @inheritdoc IStabilityPool
   function setStepTypeSlippageBps(bytes32 _stepType, uint16 _bps) external isAuthorized {
-    if (_bps > 10_000) revert StabilityPool_InvalidSlippageBps();
+    if (_bps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidSlippageBps();
     stepTypeSlippageBps[_stepType] = _bps;
     emit SetStepTypeSlippageBps(_stepType, _bps);
   }
@@ -278,7 +284,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
     uint256 _auctionId,
     uint256 _bidAmount,
     bytes32 _collateralType
-  ) external returns (int256 _profit) {
+  ) external nonReentrant returns (int256 _profit) {
     if (_strategySteps[_collateralType].length == 0) revert StabilityPool_NoStrategySteps();
 
     ICollateralAuctionHouse _auction = ICollateralAuctionHouse(_auctionHouse);
@@ -402,7 +408,7 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
 
       _balancesLength = _setVirtualBalance(_balances, _balancesLength, _inputToken, 0);
       for (uint256 _j = 0; _j < _outputs.length; _j++) {
-        uint256 _minOut = (_outputs[_j] * (10_000 - _slippageBps)) / 10_000;
+        uint256 _minOut = (_outputs[_j] * (_MAX_SLIPPAGE_BPS - _slippageBps)) / _MAX_SLIPPAGE_BPS;
         _minOuts[_j] = _minOut;
         _balancesLength = _addVirtualBalance(_balances, _balancesLength, _outputTokens[_j], _outputs[_j]);
       }
@@ -480,8 +486,8 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
 
   function _approveAuctionHouse(ISAFEEngine _safeEngine, address _auctionHouse) internal {
     if (_safeApprovedAuctionHouse[_auctionHouse]) return;
-    _safeEngine.approveSAFEModification(_auctionHouse);
     _safeApprovedAuctionHouse[_auctionHouse] = true;
+    _safeEngine.approveSAFEModification(_auctionHouse);
   }
 
   function _exitExtraInternalCoin(uint256 _coinBalanceBefore) internal {
@@ -586,5 +592,35 @@ contract StabilityPool is ERC4626, Authorizable, IStabilityPool {
   ) internal virtual override {
     super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     _claim(_owner, _owner);
+  }
+
+  function deposit(
+    uint256 _assets,
+    address _receiver
+  ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _shares) {
+    return super.deposit(_assets, _receiver);
+  }
+
+  function mint(
+    uint256 _shares,
+    address _receiver
+  ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
+    return super.mint(_shares, _receiver);
+  }
+
+  function withdraw(
+    uint256 _assets,
+    address _receiver,
+    address _owner
+  ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _shares) {
+    return super.withdraw(_assets, _receiver, _owner);
+  }
+
+  function redeem(
+    uint256 _shares,
+    address _receiver,
+    address _owner
+  ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
+    return super.redeem(_shares, _receiver, _owner);
   }
 }

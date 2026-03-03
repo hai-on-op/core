@@ -66,6 +66,7 @@ contract ERC4626WithdrawalStep is IStrategyStep {
     if (_amountIn == 0) return _amountsOut;
 
     uint256 _before = IERC20(_decoded.assetToken).balanceOf(address(this));
+    // slither-disable-next-line unused-return
     IERC4626(_decoded.vault).redeem(_amountIn, address(this), address(this));
     uint256 _after = IERC20(_decoded.assetToken).balanceOf(address(this));
 

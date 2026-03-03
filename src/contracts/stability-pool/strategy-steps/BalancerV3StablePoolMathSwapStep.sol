@@ -70,7 +70,9 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
     IBalancerV3VaultStableMath _vault = IBalancerV3VaultStableMath(_router.getVault());
     _ensureSwapHooksDisabled(address(_vault), _decoded.pool);
 
+    // slither-disable-next-line unused-return
     (, uint256 _indexIn) = _vault.getPoolTokenCountAndIndexOfToken(_decoded.pool, IERC20(_decoded.tokenIn));
+    // slither-disable-next-line unused-return
     (, uint256 _indexOut) = _vault.getPoolTokenCountAndIndexOfToken(_decoded.pool, IERC20(_decoded.tokenOut));
 
     (uint256[] memory _decimalScalingFactors, uint256[] memory _tokenRates) = _vault.getPoolTokenRates(_decoded.pool);

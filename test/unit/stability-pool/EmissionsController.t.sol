@@ -7,7 +7,11 @@ import {EmissionsController} from '@contracts/stability-pool/EmissionsController
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
-import {MockOracleRelayerForTest} from '@test/mocks/stability-pool/core/EmissionsControllerForTest.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import {
+  MockOracleRelayerForTest,
+  MockReentrantKiteTokenForTest
+} from '@test/mocks/stability-pool/core/EmissionsControllerForTest.sol';
 
 uint256 constant YEAR = 365 days;
 uint256 constant WAD = 1e18;
@@ -314,5 +318,48 @@ contract Unit_EmissionsController_MintingMarkingBranches is Base_EmissionsContro
 
     assertEq(emissionsController.mintingRewardsLastDistributed(), _markAmount);
     assertEq(emissionsController.getMintingRewardsToDistribute(), _toDistribute - _markAmount);
+  }
+}
+
+contract Unit_EmissionsController_Reentrancy is HaiTest {
+  uint256 internal constant TOTAL_KITE = YEAR * 100 * WAD;
+
+  address internal deployer = label('deployer');
+  address internal nextReceiver = label('nextReceiver');
+
+  MockReentrantKiteTokenForTest internal kite;
+  MockOracleRelayerForTest internal oracle;
+  EmissionsController internal emissionsController;
+
+  function setUp() public {
+    vm.startPrank(deployer);
+
+    kite = new MockReentrantKiteTokenForTest();
+    oracle = new MockOracleRelayerForTest();
+    emissionsController =
+      new EmissionsController(kite, IOracleRelayer(address(oracle)), address(kite), TOTAL_KITE, 0.1e18);
+    kite.setController(address(emissionsController));
+    kite.mint(address(emissionsController), TOTAL_KITE);
+
+    vm.stopPrank();
+  }
+
+  function test_SetReceiver_Blocks_ReentrantClaim_DuringPayout() public {
+    vm.warp(block.timestamp + 10);
+    kite.setReenterOnTransfer(true);
+
+    vm.prank(deployer);
+    emissionsController.setStabilityRewardsReceiver(nextReceiver);
+
+    assertEq(emissionsController.stabilityRewardsReceiver(), nextReceiver);
+    assertFalse(kite.reenterCallSucceeded());
+    assertEq(_selector(kite.reenterErrorData()), ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+  }
+
+  function _selector(bytes memory _err) internal pure returns (bytes4 _sel) {
+    if (_err.length < 4) return bytes4(0);
+    assembly {
+      _sel := mload(add(_err, 32))
+    }
   }
 }

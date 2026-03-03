@@ -152,6 +152,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     uint160 _sqrtPriceLimitX96
   ) internal view returns (uint256 _amountOut) {
     QuoteState memory _state;
+    // slither-disable-next-line unused-return
     (_state.sqrtPriceX96, _state.tick,,,,) = IVeloCLPoolLike(_pool).slot0();
     _state.liquidity = IVeloCLPoolLike(_pool).liquidity();
 
@@ -171,7 +172,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     }
 
     _state.amountRemaining = int256(_amountIn);
-    for (uint256 _i; _i < _MAX_QUOTE_STEPS && _state.amountRemaining > 0 && _state.sqrtPriceX96 != _limit; ++_i) {
+    for (uint256 _i = 0; _i < _MAX_QUOTE_STEPS && _state.amountRemaining > 0 && _state.sqrtPriceX96 != _limit; ++_i) {
       QuoteStep memory _step;
       _step.sqrtPriceStartX96 = _state.sqrtPriceX96;
 
@@ -200,6 +201,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
 
       if (_state.sqrtPriceX96 == _step.sqrtPriceNextX96) {
         if (_step.initialized) {
+          // slither-disable-next-line unused-return
           (, int128 _liquidityNet,,,,,,,,) = IVeloCLPoolLike(_pool).ticks(_step.nextTick);
           if (_zeroForOne) _liquidityNet = -_liquidityNet;
           _state.liquidity = LiquidityMath.addDelta(_state.liquidity, _liquidityNet);

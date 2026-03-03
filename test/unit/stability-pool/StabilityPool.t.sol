@@ -8,9 +8,11 @@ import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 import {
   MockStabilityPoolEmissionsControllerForTest,
-  MockStabilityPoolStrategyStepForTest
+  MockStabilityPoolStrategyStepForTest,
+  MockReentrantStabilityPoolEmissionsControllerForTest
 } from '@test/mocks/stability-pool/core/StabilityPoolCoreForTest.sol';
 import {
   MockCollateralJoinFactoryForTest,
@@ -199,6 +201,55 @@ contract Unit_StabilityPool_Rewards is Base {
     vm.prank(user);
     vm.expectRevert(IStabilityPool.StabilityPool_RewardsInactive.selector);
     stabilityPool.claimRewardsFromEmissionsController();
+  }
+}
+
+contract Unit_StabilityPool_Reentrancy is HaiTest {
+  address internal deployer = label('deployer');
+  address internal user = label('user');
+
+  ERC20ForTest internal systemCoin;
+  ERC20ForTest internal protocolToken;
+  MockReentrantStabilityPoolEmissionsControllerForTest internal emissionsController;
+  StabilityPool internal stabilityPool;
+
+  function setUp() public {
+    vm.startPrank(deployer);
+
+    systemCoin = new ERC20ForTest();
+    protocolToken = new ERC20ForTest();
+    emissionsController = new MockReentrantStabilityPoolEmissionsControllerForTest(protocolToken, address(0));
+    stabilityPool = new StabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory')
+    );
+    emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
+
+    vm.stopPrank();
+
+    systemCoin.mint(user, 1000e18);
+    vm.prank(user);
+    systemCoin.approve(address(stabilityPool), type(uint256).max);
+  }
+
+  function test_Revert_Deposit_When_EmissionsController_Reenters() public {
+    emissionsController.setReenterClaimRewards(true);
+
+    vm.prank(user);
+    vm.expectRevert(ReentrancyGuard.ReentrancyGuardReentrantCall.selector);
+    stabilityPool.deposit(1e18, user);
+  }
+
+  function test_Deposit_Succeeds_When_EmissionsController_DoesNotReenter() public {
+    vm.prank(user);
+    uint256 _shares = stabilityPool.deposit(1e18, user);
+
+    assertEq(_shares, 1e18);
+    assertEq(stabilityPool.balanceOf(user), 1e18);
   }
 }
 

@@ -56,6 +56,7 @@ contract VeloLPRemovalStep is IStrategyStep {
     if (_amountIn == 0) return _amountsOut;
 
     IVeloPairLike _pair = IVeloPairLike(_decoded.lpToken);
+    // slither-disable-next-line unused-return
     (uint256 _reserve0, uint256 _reserve1,) = _pair.getReserves();
     uint256 _totalSupply = _pair.totalSupply();
     if (_totalSupply == 0) return _amountsOut;

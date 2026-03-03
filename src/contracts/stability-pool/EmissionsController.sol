@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
@@ -15,9 +16,14 @@ import {Math, WAD, YEAR, HOUR} from '@libraries/Math.sol';
  * @title EmissionsController
  * @notice Distributes KITE over 1 year, splitting emissions between stability and minting incentives
  */
-contract EmissionsController is Authorizable, IEmissionsController {
+contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsController {
   using SafeERC20 for IERC20;
   using Math for uint256;
+
+  // --- Constants ---
+
+  uint256 internal constant _PERCENT_BASE = 100;
+  uint256 internal constant _SPLIT_BASELINE = 50;
 
   // --- Registry ---
 
@@ -50,7 +56,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
   uint256 public mintingSplit;
 
   /// @notice Upper/lower limit for deviation (10% = 0.1e18)
-  uint256 public deviationLimit;
+  uint256 public immutable deviationLimit;
 
   /// @notice Last time split was updated (for rate limiting)
   uint256 public lastSplitUpdateTime;
@@ -104,13 +110,13 @@ contract EmissionsController is Authorizable, IEmissionsController {
     emissionEndTime = block.timestamp + YEAR;
 
     // Initialize with 50/50 split
-    stabilityPoolSplit = 50;
-    mintingSplit = 50;
+    stabilityPoolSplit = _SPLIT_BASELINE;
+    mintingSplit = _SPLIT_BASELINE;
 
     // Calculate initial emission rates
     uint256 _totalRate = _totalKiteAmount / YEAR; // Total per-second rate
-    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / 100;
-    currentMintingRate = (_totalRate * mintingSplit) / 100;
+    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / _PERCENT_BASE;
+    currentMintingRate = (_totalRate * mintingSplit) / _PERCENT_BASE;
 
     lastCheckpointTime = block.timestamp;
     currentRateStartTime = block.timestamp;
@@ -120,7 +126,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
   // --- Methods ---
 
   /// @inheritdoc IEmissionsController
-  function updateRewardSplit() external {
+  function updateRewardSplit() external nonReentrant {
     // Rate limit: max once per hour
     if (block.timestamp < lastSplitUpdateTime + HOUR) {
       revert EmissionsController_SplitUpdateTooFrequent();
@@ -143,7 +149,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
     uint256 _newStabilityPoolSplit;
     if (_deviationWad >= int256(deviationLimit)) {
       // deviation >= 0.10e18: 100% stability pool, 0% minting
-      _newStabilityPoolSplit = 100;
+      _newStabilityPoolSplit = _PERCENT_BASE;
     } else if (_deviationWad <= -int256(deviationLimit)) {
       // deviation <= -0.10e18: 0% stability pool, 100% minting
       _newStabilityPoolSplit = 0;
@@ -151,23 +157,23 @@ contract EmissionsController is Authorizable, IEmissionsController {
       // Linear scaling from 50% base: stabilityPoolSplit = 50 + (deviation * 50) / deviationLimit
       // For positive deviation: more to stability pool
       // For negative deviation: more to minting
-      int256 _scaledDeviation = (_deviationWad * 50) / int256(deviationLimit);
-      int256 _newSplit = 50 + _scaledDeviation;
+      int256 _scaledDeviation = (_deviationWad * int256(_SPLIT_BASELINE)) / int256(deviationLimit);
+      int256 _newSplit = int256(_SPLIT_BASELINE) + _scaledDeviation;
       if (_newSplit < 0) {
         _newStabilityPoolSplit = 0;
-      } else if (_newSplit > 100) {
-        _newStabilityPoolSplit = 100;
+      } else if (_newSplit > int256(_PERCENT_BASE)) {
+        _newStabilityPoolSplit = _PERCENT_BASE;
       } else {
         _newStabilityPoolSplit = uint256(_newSplit);
       }
     }
 
     stabilityPoolSplit = _newStabilityPoolSplit;
-    mintingSplit = 100 - _newStabilityPoolSplit;
+    mintingSplit = _PERCENT_BASE - _newStabilityPoolSplit;
 
     uint256 _totalRate = totalKiteAmount / YEAR;
-    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / 100;
-    currentMintingRate = (_totalRate * mintingSplit) / 100;
+    currentStabilityPoolRate = (_totalRate * stabilityPoolSplit) / _PERCENT_BASE;
+    currentMintingRate = (_totalRate * mintingSplit) / _PERCENT_BASE;
     currentRateStartTime = block.timestamp;
 
     lastSplitUpdateTime = block.timestamp;
@@ -178,7 +184,7 @@ contract EmissionsController is Authorizable, IEmissionsController {
   // --- Rewards ---
 
   /// @inheritdoc IEmissionsController
-  function claimRewardsForStabilityPool() external returns (uint256 _amount) {
+  function claimRewardsForStabilityPool() external nonReentrant returns (uint256 _amount) {
     if (msg.sender != stabilityRewardsReceiver) {
       revert EmissionsController_OnlyStabilityRewardsReceiver();
     }
@@ -199,12 +205,14 @@ contract EmissionsController is Authorizable, IEmissionsController {
   }
 
   /// @inheritdoc IEmissionsController
-  function setStabilityRewardsReceiver(address _receiver) external isAuthorized {
+  function setStabilityRewardsReceiver(address _receiver) external nonReentrant isAuthorized {
     if (_receiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
 
     _checkpointRewards();
 
     address _oldReceiver = stabilityRewardsReceiver;
+    stabilityRewardsReceiver = _receiver;
+
     if (_oldReceiver != address(0) && _oldReceiver != _receiver && stabilityPoolCumulativeRewards > 0) {
       uint256 _accrued = stabilityPoolCumulativeRewards;
       stabilityPoolCumulativeRewards = 0;
@@ -212,7 +220,6 @@ contract EmissionsController is Authorizable, IEmissionsController {
       emit ClaimRewardsForStabilityPool(_accrued);
     }
 
-    stabilityRewardsReceiver = _receiver;
     emit SetStabilityRewardsReceiver(_oldReceiver, _receiver);
   }
 

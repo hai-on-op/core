@@ -67,3 +67,49 @@ contract MockStabilityPoolStrategyStepForTest is IStrategyStep {
     _amountsOut[0] = _amountIn;
   }
 }
+
+interface IStabilityPoolClaimRewardsLike {
+  function claimRewards() external returns (uint256 _amount);
+}
+
+contract MockReentrantStabilityPoolEmissionsControllerForTest {
+  error MockReentrantStabilityPoolEmissionsControllerForTest_OnlyReceiver();
+
+  ERC20ForTest public kite;
+  address public stabilityRewardsReceiver;
+  uint256 public amountToClaim;
+  bool public reenterClaimRewards;
+
+  constructor(ERC20ForTest _kite, address _stabilityRewardsReceiver) {
+    kite = _kite;
+    stabilityRewardsReceiver = _stabilityRewardsReceiver;
+  }
+
+  function claimRewardsForStabilityPool() external returns (uint256 _amount) {
+    if (msg.sender != stabilityRewardsReceiver) {
+      revert MockReentrantStabilityPoolEmissionsControllerForTest_OnlyReceiver();
+    }
+
+    if (reenterClaimRewards) {
+      IStabilityPoolClaimRewardsLike(msg.sender).claimRewards();
+    }
+
+    _amount = amountToClaim;
+    amountToClaim = 0;
+    if (_amount > 0) {
+      kite.transfer(msg.sender, _amount);
+    }
+  }
+
+  function setStabilityRewardsReceiver(address _receiver) external {
+    stabilityRewardsReceiver = _receiver;
+  }
+
+  function setAmountToClaim(uint256 _amount) external {
+    amountToClaim = _amount;
+  }
+
+  function setReenterClaimRewards(bool _enabled) external {
+    reenterClaimRewards = _enabled;
+  }
+}
