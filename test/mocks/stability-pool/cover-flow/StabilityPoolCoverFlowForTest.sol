@@ -5,8 +5,11 @@ import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
 import {RAY} from '@libraries/Math.sol';
 
 contract MockSAFEEngineForTest {
+  error MockSAFEEngineForTest_NotSAFEAllowed();
+
   mapping(address => uint256) public coinBalances;
   mapping(address => uint256) public approveCalls;
+  mapping(address => mapping(address => bool)) public safeRights;
 
   function coinBalance(address _account) external view returns (uint256 _balance) {
     return coinBalances[_account];
@@ -25,7 +28,14 @@ contract MockSAFEEngineForTest {
   }
 
   function approveSAFEModification(address _account) external {
+    safeRights[msg.sender][_account] = true;
     approveCalls[_account] += 1;
+  }
+
+  function transferInternalCoins(address _source, address _destination, uint256 _rad) external {
+    if (_source != msg.sender && !safeRights[_source][msg.sender]) revert MockSAFEEngineForTest_NotSAFEAllowed();
+    coinBalances[_source] -= _rad;
+    coinBalances[_destination] += _rad;
   }
 }
 
@@ -57,7 +67,7 @@ contract MockCoinJoinForTest {
   function exit(address _account, uint256 _wad) external {
     exitCalls += 1;
     lastExitWad = _wad;
-    engine.decreaseCoinBalance(msg.sender, _wad * RAY);
+    engine.transferInternalCoins(msg.sender, address(this), _wad * RAY);
     systemCoinToken.mint(_account, _wad);
   }
 }

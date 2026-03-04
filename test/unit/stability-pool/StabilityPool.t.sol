@@ -774,6 +774,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     assertEq(coinJoin.lastJoinWad(), 10e18);
     assertEq(coinJoin.exitCalls(), 1);
     assertEq(coinJoin.lastExitWad(), 3e18);
+    assertEq(safeEngine.approveCalls(address(coinJoin)), 1);
     assertEq(safeEngine.approveCalls(address(_auction)), 1);
   }
 

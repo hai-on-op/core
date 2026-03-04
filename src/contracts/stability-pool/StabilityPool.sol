@@ -502,12 +502,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   function _exitExtraInternalCoin(uint256 _coinBalanceBefore) internal {
-    uint256 _coinBalanceAfter = coinJoin.safeEngine().coinBalance(address(this));
+    ISAFEEngine _safeEngine = coinJoin.safeEngine();
+    uint256 _coinBalanceAfter = _safeEngine.coinBalance(address(this));
     if (_coinBalanceAfter <= _coinBalanceBefore) return;
 
     uint256 _extraRad = _coinBalanceAfter - _coinBalanceBefore;
     uint256 _extraWad = _extraRad / RAY;
     if (_extraWad > 0) {
+      _safeEngine.approveSAFEModification(address(coinJoin));
       coinJoin.exit(address(this), _extraWad);
     }
   }

@@ -219,7 +219,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     assertEq(safeEngine.coinBalance(keeper), _keeperInternalCoinBefore);
   }
 
-  function test_cover_and_repay_debt_moo_velo_bold_lusd_auction_reverts_when_not_profitable() public {
+  function test_cover_and_repay_debt_moo_velo_bold_lusd_handles_non_profitable_preview() public {
     _setStrategySteps(MOO_VELO_BOLD_LUSD_CTYPE, _mooVeloBoldLusdPipeline());
 
     (address _auctionHouse, uint256 _auctionId) = _startAuction(
@@ -423,14 +423,20 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
     vm.warp(block.timestamp + 24 hours);
     uint256 _bidWithoutOverride = _findAnyExecutableBid(_auctionHouseWithoutOverride, _auctionIdWithoutOverride);
-    bytes4 _selectorWithoutOverride = _getCoverAndRepayDebtRevertSelector(
+    (bool _okWithoutOverride, bytes memory _returnDataWithoutOverride) = _callCoverAndRepayDebt(
       _auctionHouseWithoutOverride, _auctionIdWithoutOverride, _bidWithoutOverride, YV_VELO_ALETH_WETH_CTYPE
     );
-    assertTrue(
-      _selectorWithoutOverride == IStabilityPool.StabilityPool_NotProfitable.selector
-        || _selectorWithoutOverride == bytes4(keccak256('SAFEEng_NotSAFEAllowed()')),
-      'unexpected selector when step override slippage is disabled'
-    );
+    if (_okWithoutOverride) {
+      int256 _profitWithoutOverride = abi.decode(_returnDataWithoutOverride, (int256));
+      assertTrue(_profitWithoutOverride >= 0, 'expected non-negative profit when step override slippage is disabled');
+    } else {
+      bytes4 _selectorWithoutOverride = _revertSelector(_returnDataWithoutOverride);
+      assertEq(
+        _selectorWithoutOverride,
+        IStabilityPool.StabilityPool_NotProfitable.selector,
+        'unexpected selector when step override slippage is disabled'
+      );
+    }
   }
 
   function _runCoverAndRepayFlow(address _auctionHouse, uint256 _auctionId, bytes32 _cType) internal {
@@ -468,11 +474,16 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     assertEq(_estimatedAdjustedBid, 0, 'expected no profitable bid');
 
     uint256 _bidAmount = _findAnyExecutableBid(_auctionHouse, _auctionId);
-    bytes4 _selector = _getCoverAndRepayDebtRevertSelector(_auctionHouse, _auctionId, _bidAmount, _cType);
-    bool _isExpected = _selector == IStabilityPool.StabilityPool_NotProfitable.selector
-      || _selector == bytes4(keccak256('SAFEEng_NotSAFEAllowed()'))
-      || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'));
-    assertTrue(_isExpected, 'unexpected revert selector for non-profitable cover');
+    (bool _ok, bytes memory _returnData) = _callCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, _cType);
+    if (_ok) {
+      int256 _profit = abi.decode(_returnData, (int256));
+      assertGt(_profit, 0, 'expected positive profit when non-profitable preview still executes');
+    } else {
+      bytes4 _selector = _revertSelector(_returnData);
+      bool _isExpected = _selector == IStabilityPool.StabilityPool_NotProfitable.selector
+        || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'));
+      assertTrue(_isExpected, 'unexpected revert selector for non-profitable cover');
+    }
   }
 
   function _getCoverAndRepayDebtRevertSelector(
@@ -481,10 +492,23 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     uint256 _bidAmount,
     bytes32 _cType
   ) internal returns (bytes4 _selector) {
+    (bool _ok, bytes memory _returnData) = _callCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, _cType);
+    assertFalse(_ok, 'expected coverAndRepayDebt to revert');
+    _selector = _revertSelector(_returnData);
+  }
+
+  function _callCoverAndRepayDebt(
+    address _auctionHouse,
+    uint256 _auctionId,
+    uint256 _bidAmount,
+    bytes32 _cType
+  ) internal returns (bool _ok, bytes memory _returnData) {
     bytes memory _callData =
       abi.encodeCall(stabilityPool.coverAndRepayDebt, (_auctionHouse, _auctionId, _bidAmount, _cType));
-    (bool _ok, bytes memory _returnData) = address(stabilityPool).call(_callData);
-    assertFalse(_ok, 'expected coverAndRepayDebt to revert');
+    (_ok, _returnData) = address(stabilityPool).call(_callData);
+  }
+
+  function _revertSelector(bytes memory _returnData) internal pure returns (bytes4 _selector) {
     assertGe(_returnData.length, 4);
     _selector = bytes4(_returnData);
   }
