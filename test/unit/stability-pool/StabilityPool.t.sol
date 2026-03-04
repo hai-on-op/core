@@ -28,6 +28,7 @@ import {
 } from '@test/mocks/stability-pool/cover-flow/StabilityPoolCoverFlowForTest.sol';
 import {
   MockConfigurableStrategyStepForTest,
+  MockManyOutputsStrategyStepForTest,
   MockPreviewLengthMismatchStepForTest,
   MockExecuteLengthMismatchStepForTest,
   MockRevertNoReasonStepForTest,
@@ -701,6 +702,37 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
     vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
     stabilityPool.previewSwapToHai(CTYPE, 1e18);
+  }
+
+  function test_PreviewSwapToHai_Supports_MoreThanEightStepOutputs() public {
+    MockManyOutputsStrategyStepForTest _step = new MockManyOutputsStrategyStepForTest();
+
+    address[] memory _tokenOuts = new address[](9);
+    uint256[] memory _previewRatios = new uint256[](9);
+    uint256[] memory _executeRatios = new uint256[](9);
+    for (uint256 _i = 0; _i < 8; _i++) {
+      _tokenOuts[_i] = address(new ERC20ForTest());
+      _previewRatios[_i] = 1e18;
+      _executeRatios[_i] = 1e18;
+    }
+    _tokenOuts[8] = address(systemCoin);
+    _previewRatios[8] = 2e18;
+    _executeRatios[8] = 2e18;
+
+    bytes memory _data = abi.encode(
+      MockManyOutputsStrategyStepForTest.Data({
+        tokenIn: address(collateralToken),
+        tokenOuts: _tokenOuts,
+        previewRatiosWad: _previewRatios,
+        executeRatiosWad: _executeRatios
+      })
+    );
+
+    _setSingleStep(address(_step), _data, 0);
+
+    uint256 _expectedHai = 2e18;
+    uint256 _previewHai = stabilityPool.previewSwapToHai(CTYPE, 1e18);
+    assertEq(_previewHai, _expectedHai);
   }
 
   function test_Revert_CoverAndRepayDebt_NoStrategySteps() public {

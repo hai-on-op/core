@@ -428,34 +428,52 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     StepConfig[] storage _steps = _strategySteps[_collateralType];
     if (_steps.length == 0) revert StabilityPool_NoStrategySteps();
 
-    VirtualBalance[] memory _balances = new VirtualBalance[](_steps.length * 8 + 1);
+    address[][] memory _stepOutputTokens = new address[][](_steps.length);
+    uint256 _balancesCapacity = _steps.length + 1;
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      StepConfig storage _config = _steps[_i];
+      if (!isWhitelistedStep[_config.step]) revert StabilityPool_StepNotWhitelisted();
+      address[] memory _outputTokens = IStrategyStep(_config.step).outputTokens(_config.data);
+      _stepOutputTokens[_i] = _outputTokens;
+      _balancesCapacity += _outputTokens.length;
+    }
+
+    VirtualBalance[] memory _balances = new VirtualBalance[](_balancesCapacity);
     uint256 _balancesLength = _addVirtualBalance(_balances, 0, _collateralToken, _collateralAmount);
 
     _minOutsByStep = new bytes[](_steps.length);
     for (uint256 _i = 0; _i < _steps.length; _i++) {
       StepConfig storage _config = _steps[_i];
-      if (!isWhitelistedStep[_config.step]) revert StabilityPool_StepNotWhitelisted();
-
-      address _inputToken = IStrategyStep(_config.step).inputToken(_config.data);
-      uint256 _amountIn = _getVirtualBalance(_balances, _balancesLength, _inputToken);
-      uint256[] memory _outputs = IStrategyStep(_config.step).preview(_config.data, _amountIn);
-      address[] memory _outputTokens = IStrategyStep(_config.step).outputTokens(_config.data);
-      if (_outputs.length != _outputTokens.length) revert StabilityPool_InvalidStrategyStep();
-
-      uint16 _slippageBps = _resolveSlippageBps(_collateralType, _config, IStrategyStep(_config.step).stepType());
-      uint256[] memory _minOuts = new uint256[](_outputs.length);
-
-      _balancesLength = _setVirtualBalance(_balances, _balancesLength, _inputToken, 0);
-      for (uint256 _j = 0; _j < _outputs.length; _j++) {
-        uint256 _minOut = (_outputs[_j] * (_MAX_SLIPPAGE_BPS - _slippageBps)) / _MAX_SLIPPAGE_BPS;
-        _minOuts[_j] = _minOut;
-        _balancesLength = _addVirtualBalance(_balances, _balancesLength, _outputTokens[_j], _outputs[_j]);
-      }
-
-      _minOutsByStep[_i] = abi.encode(_minOuts);
+      (_balancesLength, _minOutsByStep[_i]) =
+        _previewStep(_collateralType, _config, _stepOutputTokens[_i], _balances, _balancesLength);
     }
 
     _expectedHai = _getVirtualBalance(_balances, _balancesLength, address(systemCoin));
+  }
+
+  function _previewStep(
+    bytes32 _collateralType,
+    StepConfig storage _config,
+    address[] memory _outputTokens,
+    VirtualBalance[] memory _balances,
+    uint256 _balancesLength
+  ) internal view returns (uint256 _newBalancesLength, bytes memory _encodedMinOuts) {
+    address _inputToken = IStrategyStep(_config.step).inputToken(_config.data);
+    uint256 _amountIn = _getVirtualBalance(_balances, _balancesLength, _inputToken);
+    uint256[] memory _outputs = IStrategyStep(_config.step).preview(_config.data, _amountIn);
+    if (_outputs.length != _outputTokens.length) revert StabilityPool_InvalidStrategyStep();
+
+    uint16 _slippageBps = _resolveSlippageBps(_collateralType, _config, IStrategyStep(_config.step).stepType());
+    uint256[] memory _minOuts = new uint256[](_outputs.length);
+
+    _newBalancesLength = _setVirtualBalance(_balances, _balancesLength, _inputToken, 0);
+    for (uint256 _j = 0; _j < _outputs.length; _j++) {
+      uint256 _minOut = (_outputs[_j] * (_MAX_SLIPPAGE_BPS - _slippageBps)) / _MAX_SLIPPAGE_BPS;
+      _minOuts[_j] = _minOut;
+      _newBalancesLength = _addVirtualBalance(_balances, _newBalancesLength, _outputTokens[_j], _outputs[_j]);
+    }
+
+    _encodedMinOuts = abi.encode(_minOuts);
   }
 
   function _executeStrategy(

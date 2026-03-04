@@ -49,6 +49,63 @@ contract MockConfigurableStrategyStepForTest is IStrategyStep {
   }
 }
 
+contract MockManyOutputsStrategyStepForTest is IStrategyStep {
+  error MockManyOutputsStrategyStepForTest_InvalidData();
+
+  struct Data {
+    address tokenIn;
+    address[] tokenOuts;
+    uint256[] previewRatiosWad;
+    uint256[] executeRatiosWad;
+  }
+
+  function stepType() external pure returns (bytes32 _stepType) {
+    return bytes32('MANY_OUTPUTS');
+  }
+
+  function inputToken(bytes calldata _data) external pure returns (address _inputToken) {
+    Data memory _decoded = abi.decode(_data, (Data));
+    return _decoded.tokenIn;
+  }
+
+  function outputTokens(bytes calldata _data) external pure returns (address[] memory _outputTokens) {
+    Data memory _decoded = abi.decode(_data, (Data));
+    return _decoded.tokenOuts;
+  }
+
+  function preview(bytes calldata _data, uint256 _amountIn) external pure returns (uint256[] memory _amountsOut) {
+    Data memory _decoded = abi.decode(_data, (Data));
+    if (_decoded.tokenOuts.length != _decoded.previewRatiosWad.length) {
+      revert MockManyOutputsStrategyStepForTest_InvalidData();
+    }
+
+    _amountsOut = new uint256[](_decoded.previewRatiosWad.length);
+    for (uint256 _i = 0; _i < _decoded.previewRatiosWad.length; _i++) {
+      _amountsOut[_i] = (_amountIn * _decoded.previewRatiosWad[_i]) / 1e18;
+    }
+  }
+
+  function execute(
+    bytes calldata _data,
+    uint256 _amountIn,
+    uint256[] calldata
+  ) external returns (uint256[] memory _amountsOut) {
+    Data memory _decoded = abi.decode(_data, (Data));
+    if (_decoded.tokenOuts.length != _decoded.executeRatiosWad.length) {
+      revert MockManyOutputsStrategyStepForTest_InvalidData();
+    }
+
+    _amountsOut = new uint256[](_decoded.executeRatiosWad.length);
+    for (uint256 _i = 0; _i < _decoded.executeRatiosWad.length; _i++) {
+      uint256 _amountOut = (_amountIn * _decoded.executeRatiosWad[_i]) / 1e18;
+      _amountsOut[_i] = _amountOut;
+      if (_amountOut > 0) {
+        ERC20ForTest(_decoded.tokenOuts[_i]).mint(address(this), _amountOut);
+      }
+    }
+  }
+}
+
 contract MockPreviewLengthMismatchStepForTest is IStrategyStep {
   struct Data {
     address tokenIn;
