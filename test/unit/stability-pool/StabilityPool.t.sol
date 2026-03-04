@@ -131,6 +131,26 @@ contract Unit_StabilityPool_TransferToggle is Base {
     stabilityPool.transfer(user2, 10e18);
     assertEq(stabilityPool.balanceOf(user2), 10e18);
   }
+
+  function test_Deposit_DuringReceiverCutover_DoesNotRevert() public {
+    vm.prank(deployer);
+    emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
+
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+
+    assertEq(stabilityPool.balanceOf(user), 100e18);
+  }
+
+  function test_Mint_DuringReceiverCutover_DoesNotRevert() public {
+    vm.prank(deployer);
+    emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
+
+    vm.prank(user);
+    stabilityPool.mint(100e18, user);
+
+    assertEq(stabilityPool.balanceOf(user), 100e18);
+  }
 }
 
 contract Unit_StabilityPool_Rewards is Base {

@@ -405,6 +405,15 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     emit ClaimRewards(_user, _amount);
   }
 
+  function _claimRewardsFromControllerIfReceiver() internal returns (uint256 _claimed) {
+    if (emissionsController.stabilityRewardsReceiver() != address(this)) return 0;
+
+    _claimed = emissionsController.claimRewardsForStabilityPool();
+    if (_claimed > 0) {
+      emit ClaimRewardsFromEmissionsController(_claimed);
+    }
+  }
+
   // --- Strategy Helpers ---
 
   function _resolveSlippageBps(
@@ -632,10 +641,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   function _deposit(address _caller, address _receiver, uint256 _assets, uint256 _shares) internal virtual override {
     if (kiteRewardsActive) {
-      uint256 _claimed = emissionsController.claimRewardsForStabilityPool();
-      if (_claimed > 0) {
-        emit ClaimRewardsFromEmissionsController(_claimed);
-      }
+      _claimRewardsFromControllerIfReceiver();
       _accrueKite();
     }
 
@@ -650,10 +656,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _shares
   ) internal virtual override {
     if (kiteRewardsActive) {
-      uint256 _claimed = emissionsController.claimRewardsForStabilityPool();
-      if (_claimed > 0) {
-        emit ClaimRewardsFromEmissionsController(_claimed);
-      }
+      _claimRewardsFromControllerIfReceiver();
       _accrueKite();
     }
 
