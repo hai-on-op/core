@@ -387,6 +387,61 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     stabilityPool.claimRewardsFromEmissionsController();
   }
 
+  function test_enable_transfers_cutover_with_emergency_kite_withdraw_keeps_user_exit_functional() public {
+    vm.warp(block.timestamp + 1 days);
+
+    vm.prank(user);
+    stabilityPool.deposit(USER_DEPOSIT, user);
+
+    vm.warp(block.timestamp + 1 days);
+    vm.prank(user);
+    uint256 _claimedFromController = stabilityPool.claimRewardsFromEmissionsController();
+    assertGt(_claimedFromController, 0);
+
+    uint256 _pendingBeforeEmergencyWithdraw = stabilityPool.pendingRewards(user);
+    assertGt(_pendingBeforeEmergencyWithdraw, 0);
+
+    uint256 _poolKiteBeforeEmergencyWithdraw = protocolToken.balanceOf(address(stabilityPool));
+    assertGe(_poolKiteBeforeEmergencyWithdraw, _pendingBeforeEmergencyWithdraw);
+    uint256 _pendingReduction = _pendingBeforeEmergencyWithdraw / 2;
+    assertGt(_pendingReduction, 0);
+    uint256 _emergencyWithdrawAmount =
+      (_poolKiteBeforeEmergencyWithdraw - _pendingBeforeEmergencyWithdraw) + _pendingReduction;
+
+    uint256 _receiverKiteBefore = protocolToken.balanceOf(postCutoverRewardsReceiver);
+    vm.prank(testDeployer);
+    stabilityPool.emergencyWithdrawKite(postCutoverRewardsReceiver, _emergencyWithdrawAmount);
+    assertEq(
+      protocolToken.balanceOf(postCutoverRewardsReceiver), _receiverKiteBefore + _emergencyWithdrawAmount
+    );
+
+    vm.prank(testDeployer);
+    emissionsController.setStabilityRewardsReceiver(postCutoverRewardsReceiver);
+    vm.prank(testDeployer);
+    stabilityPool.enableTransfers();
+
+    vm.prank(user);
+    stabilityPool.transfer(user2, USER_DEPOSIT / 2);
+
+    vm.prank(user);
+    uint256 _claimedByUser = stabilityPool.claimRewards();
+    assertEq(_claimedByUser, _pendingBeforeEmergencyWithdraw - _pendingReduction);
+    assertEq(stabilityPool.claimable(user), _pendingReduction);
+
+    vm.prank(user2);
+    uint256 _claimedByUser2 = stabilityPool.claimRewards();
+    assertEq(_claimedByUser2, 0);
+
+    vm.prank(user);
+    stabilityPool.withdraw(USER_DEPOSIT / 2, user, user);
+    vm.prank(user2);
+    stabilityPool.withdraw(USER_DEPOSIT / 2, user2, user2);
+
+    assertEq(systemCoin.balanceOf(user), USER_HAI_BALANCE - (USER_DEPOSIT / 2));
+    assertEq(systemCoin.balanceOf(user2), USER_HAI_BALANCE + (USER_DEPOSIT / 2));
+    assertEq(stabilityPool.totalAssets(), 0);
+  }
+
   function test_enable_transfers_reverts_when_unauthorized() public {
     vm.prank(user);
     vm.expectRevert(IAuthorizable.Unauthorized.selector);

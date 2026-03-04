@@ -22,6 +22,13 @@ interface IEmissionsController {
   event ClaimRewardsForStabilityPool(uint256 _amount);
 
   /**
+   * @notice Emitted when KITE is emergency withdrawn
+   * @param  _rescueReceiver Address that received the withdrawn KITE
+   * @param  _wad Amount of KITE withdrawn [wad]
+   */
+  event EmergencyWithdrawKite(address indexed _rescueReceiver, uint256 _wad);
+
+  /**
    * @notice Emitted when minting rewards are marked as distributed
    * @param  _amount Amount of minting rewards marked as distributed [wad]
    */
@@ -109,6 +116,14 @@ interface IEmissionsController {
    * @param  _amount Amount of minting rewards that were distributed [wad]
    */
   function markMintingRewardsDistributed(uint256 _amount) external;
+
+  /**
+   * @notice Emergency withdraws KITE held by the controller
+   * @dev    Callable only by authorized accounts
+   * @param  _rescueReceiver Address that receives withdrawn KITE
+   * @param  _wad Amount of KITE to withdraw [wad]
+   */
+  function emergencyWithdrawKite(address _rescueReceiver, uint256 _wad) external;
 
   /**
    * @notice Sets the receiver for stability-side emissions claims

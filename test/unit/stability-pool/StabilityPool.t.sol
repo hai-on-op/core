@@ -240,6 +240,34 @@ contract Unit_StabilityPool_Rewards is Base {
     vm.expectRevert(IStabilityPool.StabilityPool_RewardsInactive.selector);
     stabilityPool.claimRewardsFromEmissionsController();
   }
+
+  function test_Revert_EmergencyWithdrawKite_Unauthorized() public {
+    vm.prank(user);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    stabilityPool.emergencyWithdrawKite(user, 1e18);
+  }
+
+  function test_EmergencyWithdrawKite_Authorized_DoesNotBlock_Withdrawals() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+    protocolToken.mint(address(stabilityPool), 10e18);
+
+    vm.prank(deployer);
+    stabilityPool.emergencyWithdrawKite(postCutoverRewards, 6e18);
+
+    assertEq(protocolToken.balanceOf(postCutoverRewards), 6e18);
+    assertEq(stabilityPool.kiteRewardRemaining(), 4e18);
+
+    vm.prank(user);
+    uint256 _claimed = stabilityPool.claimRewards();
+    assertEq(_claimed, 4e18);
+    assertEq(protocolToken.balanceOf(user), 4e18);
+    assertEq(stabilityPool.claimable(user), 6e18);
+
+    vm.prank(user);
+    stabilityPool.withdraw(100e18, user, user);
+    assertEq(systemCoin.balanceOf(user), 1000e18);
+  }
 }
 
 contract Unit_StabilityPool_Reentrancy is HaiTest {

@@ -164,6 +164,22 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   /// @inheritdoc IStabilityPool
+  function emergencyWithdrawKite(address _rescueReceiver, uint256 _wad) external nonReentrant isAuthorized {
+    _accrueKite();
+
+    uint256 _kiteBalance = protocolToken.balanceOf(address(this));
+    uint256 _surplus = _kiteBalance > kiteRewardRemaining ? _kiteBalance - kiteRewardRemaining : 0;
+    uint256 _reservedReduction = _wad > _surplus ? _wad - _surplus : 0;
+    if (_reservedReduction > kiteRewardRemaining) {
+      _reservedReduction = kiteRewardRemaining;
+    }
+    kiteRewardRemaining -= _reservedReduction;
+
+    IERC20(address(protocolToken)).safeTransfer(_rescueReceiver, _wad);
+    emit EmergencyWithdrawKite(_rescueReceiver, _wad);
+  }
+
+  /// @inheritdoc IStabilityPool
   function pendingRewards(address _user) external view returns (uint256 _amount) {
     uint256 _currentIntegral = kiteRewardIntegral;
     if (kiteRewardsActive) {
@@ -372,10 +388,18 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   function _claim(address _user, address _receiver) internal returns (uint256 _amount) {
-    _amount = claimable[_user];
-    if (_amount == 0) return 0;
+    uint256 _claimableAmount = claimable[_user];
+    if (_claimableAmount == 0) return 0;
 
-    claimable[_user] = 0;
+    uint256 _available = kiteRewardRemaining;
+    uint256 _currentKiteBalance = protocolToken.balanceOf(address(this));
+    if (_currentKiteBalance < _available) {
+      _available = _currentKiteBalance;
+    }
+    if (_available == 0) return 0;
+
+    _amount = _claimableAmount > _available ? _available : _claimableAmount;
+    claimable[_user] = _claimableAmount - _amount;
     kiteRewardRemaining -= _amount;
     IERC20(address(protocolToken)).safeTransfer(_receiver, _amount);
     emit ClaimRewards(_user, _amount);

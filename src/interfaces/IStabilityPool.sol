@@ -31,6 +31,13 @@ interface IStabilityPool is IERC4626 {
   event ClaimRewardsFromEmissionsController(uint256 _amount);
 
   /**
+   * @notice Emitted when KITE is emergency withdrawn from the pool
+   * @param  _rescueReceiver Address that received the withdrawn KITE
+   * @param  _wad Amount of KITE withdrawn [wad]
+   */
+  event EmergencyWithdrawKite(address indexed _rescueReceiver, uint256 _wad);
+
+  /**
    * @notice Emitted when the pool covers debt in a collateral auction and repays it with swapped HAI
    * @param  _auctionId Id of the covered collateral auction
    * @param  _collateralType Bytes32 representation of the collateral type
@@ -241,6 +248,14 @@ interface IStabilityPool is IERC4626 {
    * @return _amount Amount of claimed KITE [wad]
    */
   function claimRewards() external returns (uint256 _amount);
+
+  /**
+   * @notice Emergency withdraws KITE held by the pool
+   * @dev    Callable only by authorized accounts
+   * @param  _rescueReceiver Address that receives withdrawn KITE
+   * @param  _wad Amount of KITE to withdraw [wad]
+   */
+  function emergencyWithdrawKite(address _rescueReceiver, uint256 _wad) external;
 
   /**
    * @notice Returns pending rewards for a user, including not-yet-checkpointed accrual

@@ -226,6 +226,12 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
   }
 
   /// @inheritdoc IEmissionsController
+  function emergencyWithdrawKite(address _rescueReceiver, uint256 _wad) external nonReentrant isAuthorized {
+    kiteToken.safeTransfer(_rescueReceiver, _wad);
+    emit EmergencyWithdrawKite(_rescueReceiver, _wad);
+  }
+
+  /// @inheritdoc IEmissionsController
   function extendEmissions(
     uint256 _additionalKiteAmount,
     uint256 _additionalDuration

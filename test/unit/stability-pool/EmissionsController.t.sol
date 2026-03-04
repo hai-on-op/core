@@ -114,6 +114,22 @@ contract Unit_EmissionsController_MintingMarking is Base {
   }
 }
 
+contract Unit_EmissionsController_EmergencyWithdrawKite is Base {
+  function test_Revert_EmergencyWithdrawKite_Unauthorized() public {
+    vm.prank(randomUser);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    emissionsController.emergencyWithdrawKite(nextReceiver, 1e18);
+  }
+
+  function test_EmergencyWithdrawKite_Authorized() public {
+    vm.prank(deployer);
+    emissionsController.emergencyWithdrawKite(nextReceiver, 10e18);
+
+    assertEq(kite.balanceOf(nextReceiver), 10e18);
+    assertEq(kite.balanceOf(address(emissionsController)), TOTAL_KITE - 10e18);
+  }
+}
+
 contract Unit_EmissionsController_UpdateSplit is Base {
   function test_Revert_InvalidRedemptionPrice() public {
     vm.warp(block.timestamp + HOUR + 1);
