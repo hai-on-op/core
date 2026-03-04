@@ -194,6 +194,21 @@ contract Unit_StabilityPool_Rewards is Base {
     assertEq(_claimed, 10e18);
   }
 
+  function test_Withdraw_ClaimsControllerRewards_BeforeBurningLastShares() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+
+    protocolToken.mint(address(emissionsController), 10e18);
+    emissionsController.setAmountToClaim(10e18);
+
+    vm.prank(user);
+    stabilityPool.redeem(100e18, user, user);
+
+    assertEq(protocolToken.balanceOf(user), 10e18);
+    assertEq(stabilityPool.totalSupply(), 0);
+    assertEq(protocolToken.balanceOf(address(stabilityPool)), 0);
+  }
+
   function test_PartialWithdraw_DoesNotLose_RemainingRewards() public {
     vm.prank(user);
     stabilityPool.deposit(100e18, user);

@@ -649,6 +649,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _assets,
     uint256 _shares
   ) internal virtual override {
+    if (kiteRewardsActive) {
+      uint256 _claimed = emissionsController.claimRewardsForStabilityPool();
+      if (_claimed > 0) {
+        emit ClaimRewardsFromEmissionsController(_claimed);
+      }
+      _accrueKite();
+    }
+
     super._withdraw(_caller, _receiver, _owner, _assets, _shares);
     _claim(_owner, _owner);
   }
