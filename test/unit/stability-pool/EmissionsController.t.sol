@@ -275,6 +275,14 @@ contract Unit_EmissionsController_ConstructorReverts is HaiTest {
     vm.expectRevert(IEmissionsController.EmissionsController_InvalidEmissionDuration.selector);
     new EmissionsController(_kite, IOracleRelayer(address(_oracle)), address(this), YEAR * 100 * WAD, 0, 0.1e18);
   }
+
+  function test_Revert_Constructor_ZeroDeviationLimit() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidDeviationLimit.selector);
+    new EmissionsController(_kite, IOracleRelayer(address(_oracle)), address(this), YEAR * 100 * WAD, YEAR, 0);
+  }
 }
 
 contract Unit_EmissionsController_CustomDuration is HaiTest {

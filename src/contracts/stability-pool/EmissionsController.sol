@@ -104,6 +104,7 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
   ) Authorizable(msg.sender) {
     if (_stabilityRewardsReceiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
     if (_emissionDuration == 0) revert EmissionsController_InvalidEmissionDuration();
+    if (_deviationLimit == 0) revert EmissionsController_InvalidDeviationLimit();
 
     kiteToken = _kiteToken;
     oracleRelayer = _oracleRelayer;

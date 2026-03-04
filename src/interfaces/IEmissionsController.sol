@@ -73,6 +73,8 @@ interface IEmissionsController {
   error EmissionsController_OnlyStabilityRewardsReceiver();
   /// @notice Throws when emission duration is zero
   error EmissionsController_InvalidEmissionDuration();
+  /// @notice Throws when deviation limit is zero
+  error EmissionsController_InvalidDeviationLimit();
 
   // --- Registry ---
 
