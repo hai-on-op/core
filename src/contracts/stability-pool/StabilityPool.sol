@@ -347,7 +347,11 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
     uint256 _newKite = _currentKiteBalance - kiteRewardRemaining;
     uint256 _totalSupply = totalSupply();
-    if (_totalSupply == 0) return;
+    if (_totalSupply == 0) {
+      // Track idle inflows so they are not retroactively distributed to future stakers.
+      kiteRewardRemaining = _currentKiteBalance;
+      return;
+    }
 
     kiteRewardIntegral += (_newKite * WAD) / _totalSupply;
     kiteRewardRemaining = _currentKiteBalance;

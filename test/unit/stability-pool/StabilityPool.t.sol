@@ -161,6 +161,25 @@ contract Unit_StabilityPool_Rewards is Base {
     assertEq(protocolToken.balanceOf(user), 10e18);
   }
 
+  function test_FirstDepositor_DoesNotCapture_KiteAccrued_WithoutSupply() public {
+    protocolToken.mint(address(stabilityPool), 10e18);
+
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+
+    vm.prank(user);
+    uint256 _firstClaim = stabilityPool.claimRewards();
+    assertEq(_firstClaim, 0);
+    assertEq(stabilityPool.kiteRewardRemaining(), 10e18);
+
+    protocolToken.mint(address(stabilityPool), 5e18);
+
+    vm.prank(user);
+    uint256 _secondClaim = stabilityPool.claimRewards();
+    assertEq(_secondClaim, 5e18);
+    assertEq(protocolToken.balanceOf(user), 5e18);
+  }
+
   function test_Deposit_Does_Not_Grant_PastRewards_To_NewShares() public {
     vm.prank(user);
     stabilityPool.deposit(100e18, user);

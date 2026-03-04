@@ -114,7 +114,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(_transferredFromController, _accruedBeforeDeposit);
   }
 
-  function test_user_earns_kite_from_depositing_hai() public {
+  function test_user_does_not_earn_kite_accrued_before_depositing_hai() public {
     vm.warp(block.timestamp + 1 days);
 
     vm.prank(user);
@@ -122,17 +122,17 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(_shares, USER_DEPOSIT);
 
     uint256 _pendingBeforeClaim = stabilityPool.pendingRewards(user);
-    assertGt(_pendingBeforeClaim, 0);
+    assertEq(_pendingBeforeClaim, 0);
 
     uint256 _kiteBalanceBefore = protocolToken.balanceOf(user);
     uint256 _poolKiteBefore = protocolToken.balanceOf(address(stabilityPool));
     vm.prank(user);
     uint256 _claimed = stabilityPool.claimRewards();
 
-    assertGt(_claimed, 0);
+    assertEq(_claimed, 0);
     assertEq(_claimed, _pendingBeforeClaim);
     assertEq(protocolToken.balanceOf(user), _kiteBalanceBefore + _claimed);
-    assertEq(protocolToken.balanceOf(address(stabilityPool)), _poolKiteBefore - _claimed);
+    assertEq(protocolToken.balanceOf(address(stabilityPool)), _poolKiteBefore);
   }
 
   function test_user_earns_kite_after_depositing_and_time_elapsed() public {
