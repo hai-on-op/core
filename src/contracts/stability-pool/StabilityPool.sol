@@ -342,10 +342,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     _joinSystemCoinIfNeeded(_bidAmount, _coinBalanceBefore);
     _approveAuctionHouse(_safeEngine, _auctionHouse);
 
+    (VirtualBalance[] memory _executionInputBalances, uint256 _executionInputBalancesLength) =
+      _snapshotStrategyInputBalances(_collateralType);
+
     (uint256 _actualCollateralBought, uint256 _actualAdjustedBid) = _auction.buyCollateral(_auctionId, _bidAmount);
     ICollateralJoin(_collateralJoinAddr).exit(address(this), _toCollateralWei(_actualCollateralBought, _multiplier));
 
-    uint256 _haiReceived = _executeStrategy(_collateralType, _minOutsByStep);
+    uint256 _haiReceived =
+      _executeStrategy(_collateralType, _minOutsByStep, _executionInputBalances, _executionInputBalancesLength);
     if (_haiReceived < _actualAdjustedBid) revert StabilityPool_NotProfitable();
 
     _exitExtraInternalCoin(_coinBalanceBefore);
@@ -487,7 +491,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   function _executeStrategy(
     bytes32 _collateralType,
-    bytes[] memory _minOutsByStep
+    bytes[] memory _minOutsByStep,
+    VirtualBalance[] memory _executionInputBalances,
+    uint256 _executionInputBalancesLength
   ) internal returns (uint256 _haiReceived) {
     StepConfig[] storage _steps = _strategySteps[_collateralType];
     uint256 _haiBefore = systemCoin.balanceOf(address(this));
@@ -497,7 +503,10 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
       if (!isWhitelistedStep[_config.step]) revert StabilityPool_StepNotWhitelisted();
 
       address _inputToken = IStrategyStep(_config.step).inputToken(_config.data);
-      uint256 _amountIn = IERC20(_inputToken).balanceOf(address(this));
+      uint256 _baselineBalance =
+        _getVirtualBalanceOrRevert(_executionInputBalances, _executionInputBalancesLength, _inputToken);
+      uint256 _currentBalance = IERC20(_inputToken).balanceOf(address(this));
+      uint256 _amountIn = _currentBalance > _baselineBalance ? _currentBalance - _baselineBalance : 0;
       uint256[] memory _minOuts = abi.decode(_minOutsByStep[_i], (uint256[]));
 
       (bool _success, bytes memory _result) = _config.step.delegatecall(
@@ -520,6 +529,20 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     }
 
     _haiReceived = systemCoin.balanceOf(address(this)) - _haiBefore;
+  }
+
+  function _snapshotStrategyInputBalances(
+    bytes32 _collateralType
+  ) internal view returns (VirtualBalance[] memory _inputBalances, uint256 _inputBalancesLength) {
+    StepConfig[] storage _steps = _strategySteps[_collateralType];
+    _inputBalances = new VirtualBalance[](_steps.length);
+
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      StepConfig storage _config = _steps[_i];
+      address _inputToken = IStrategyStep(_config.step).inputToken(_config.data);
+      uint256 _balance = IERC20(_inputToken).balanceOf(address(this));
+      _inputBalancesLength = _setVirtualBalance(_inputBalances, _inputBalancesLength, _inputToken, _balance);
+    }
   }
 
   function _resolveCollateral(bytes32 _collateralType)
@@ -578,6 +601,17 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
       if (_balances[_i].token == _token) return _balances[_i].amount;
     }
     return 0;
+  }
+
+  function _getVirtualBalanceOrRevert(
+    VirtualBalance[] memory _balances,
+    uint256 _length,
+    address _token
+  ) internal pure returns (uint256 _amount) {
+    for (uint256 _i = 0; _i < _length; _i++) {
+      if (_balances[_i].token == _token) return _balances[_i].amount;
+    }
+    revert StabilityPool_InvalidStrategyStep();
   }
 
   function _setVirtualBalance(

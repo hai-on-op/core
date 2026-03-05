@@ -892,6 +892,20 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     assertEq(safeEngine.approveCalls(address(_auction)), 1);
   }
 
+  function test_CoverAndRepayDebt_TradesOnlyNewlyBoughtCollateral() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
+
+    // Seed unrelated collateral inventory that should not be included in this cover execution.
+    collateralToken.mint(address(stabilityPool), 100e18);
+
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
+    _auction.setQuote(10e18, 8e18, 10e18, 7e18);
+
+    int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
+    assertEq(uint256(_profit), 3e18);
+  }
+
   function test_CoverAndRepayDebt_ApproveAuctionHouse_OnlyOnce() public {
     MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
     _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
