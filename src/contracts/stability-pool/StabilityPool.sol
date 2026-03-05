@@ -395,8 +395,8 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _claimableAmount = claimable[_user];
     if (_claimableAmount == 0) return 0;
 
-    uint256 _available = kiteRewardRemaining;
     uint256 _currentKiteBalance = protocolToken.balanceOf(address(this));
+    uint256 _available = kiteRewardsActive ? kiteRewardRemaining : _currentKiteBalance;
     if (_currentKiteBalance < _available) {
       _available = _currentKiteBalance;
     }
@@ -404,7 +404,11 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
     _amount = _claimableAmount > _available ? _available : _claimableAmount;
     claimable[_user] = _claimableAmount - _amount;
-    kiteRewardRemaining -= _amount;
+    if (_amount >= kiteRewardRemaining) {
+      kiteRewardRemaining = 0;
+    } else {
+      kiteRewardRemaining -= _amount;
+    }
     IERC20(address(protocolToken)).safeTransfer(_receiver, _amount);
     emit ClaimRewards(_user, _amount);
   }

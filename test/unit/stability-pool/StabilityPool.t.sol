@@ -266,6 +266,33 @@ contract Unit_StabilityPool_Rewards is Base {
     assertEq(_claimedUser2, 0);
   }
 
+  function test_PostCutoverTopUp_RestoresUnderfundedHistoricalClaims() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+    protocolToken.mint(address(stabilityPool), 10e18);
+
+    vm.prank(deployer);
+    stabilityPool.emergencyWithdrawKite(postCutoverRewards, 6e18);
+
+    vm.prank(deployer);
+    emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
+    vm.prank(deployer);
+    stabilityPool.enableTransfers();
+
+    vm.prank(user);
+    uint256 _firstClaim = stabilityPool.claimRewards();
+    assertEq(_firstClaim, 4e18);
+    assertEq(stabilityPool.claimable(user), 6e18);
+
+    protocolToken.mint(address(stabilityPool), 6e18);
+
+    vm.prank(user);
+    uint256 _secondClaim = stabilityPool.claimRewards();
+    assertEq(_secondClaim, 6e18);
+    assertEq(stabilityPool.claimable(user), 0);
+    assertEq(protocolToken.balanceOf(user), 10e18);
+  }
+
   function test_Revert_ClaimFromEmissions_AfterCutover() public {
     vm.prank(deployer);
     emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
