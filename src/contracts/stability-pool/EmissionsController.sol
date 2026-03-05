@@ -197,14 +197,16 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     }
 
     _checkpointRewards();
-    _amount = stabilityPoolCumulativeRewards;
+    uint256 _accrued = stabilityPoolCumulativeRewards;
+    if (_accrued == 0) return 0;
 
-    if (_amount > 0) {
-      // Reset cumulative rewards (they've been claimed)
-      stabilityPoolCumulativeRewards = 0;
-      kiteToken.safeTransfer(stabilityRewardsReceiver, _amount);
-      emit ClaimRewardsForStabilityPool(_amount);
-    }
+    uint256 _available = kiteToken.balanceOf(address(this));
+    _amount = _accrued > _available ? _available : _accrued;
+    if (_amount == 0) return 0;
+
+    stabilityPoolCumulativeRewards = _accrued - _amount;
+    kiteToken.safeTransfer(stabilityRewardsReceiver, _amount);
+    emit ClaimRewardsForStabilityPool(_amount);
   }
 
   /// @inheritdoc IEmissionsController

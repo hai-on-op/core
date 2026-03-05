@@ -60,6 +60,21 @@ contract Unit_EmissionsController_ClaimRewards is Base {
     assertGt(_claimed, 0);
     assertEq(kite.balanceOf(receiver), _before + _claimed);
   }
+
+  function test_Claim_By_CurrentReceiver_WhenUnderfunded_PaysPartially() public {
+    vm.warp(block.timestamp + 10);
+
+    vm.prank(deployer);
+    emissionsController.emergencyWithdrawKite(nextReceiver, TOTAL_KITE - 100e18);
+
+    vm.prank(receiver);
+    uint256 _claimed = emissionsController.claimRewardsForStabilityPool();
+
+    assertEq(_claimed, 100e18);
+    assertEq(kite.balanceOf(receiver), 100e18);
+    assertEq(kite.balanceOf(address(emissionsController)), 0);
+    assertEq(emissionsController.stabilityPoolCumulativeRewards(), 400e18);
+  }
 }
 
 contract Unit_EmissionsController_SetReceiver is Base {
