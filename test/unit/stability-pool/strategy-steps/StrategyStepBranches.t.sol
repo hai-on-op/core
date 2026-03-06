@@ -33,7 +33,8 @@ contract Unit_StrategyStep_Branches is Base {
     uint256 _expectedRemoveB = (_reserveB * _amountIn) / _totalSupply;
     uint256 _lpShareWad = (_amountIn * 1e18) / _totalSupply;
     uint256 _swapHaircutWad = 1e18 - (_lpShareWad * _lpShareWad) / 1e18;
-    _expectedPreviewOut = _expectedRemoveA + (((_expectedRemoveB * _swapOutMultiplierWad) / 1e18) * _swapHaircutWad) / 1e18;
+    _expectedPreviewOut =
+      _expectedRemoveA + (((_expectedRemoveB * _swapOutMultiplierWad) / 1e18) * _swapHaircutWad) / 1e18;
   }
 
   function test_BeefyPreview_DefaultShareScaleWhenZero() public {
@@ -125,7 +126,8 @@ contract Unit_StrategyStep_Branches is Base {
       deadlineBuffer: 1 hours
     });
 
-    uint256 _expectedPreviewOut = _expectedVeloLpRemoveAndSwapPreview(1000e18, 500e18, 10e18, _lpToken.totalSupply(), 2e18);
+    uint256 _expectedPreviewOut =
+      _expectedVeloLpRemoveAndSwapPreview(1000e18, 500e18, 10e18, _lpToken.totalSupply(), 2e18);
     uint256 _expectedExecuteOut = 200e18;
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 10e18);

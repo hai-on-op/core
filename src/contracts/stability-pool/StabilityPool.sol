@@ -587,9 +587,11 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     _haiReceived = systemCoin.balanceOf(address(this)) - _haiBefore;
   }
 
-  function _snapshotStrategyInputBalances(
-    bytes32 _collateralType
-  ) internal view returns (VirtualBalance[] memory _inputBalances, uint256 _inputBalancesLength) {
+  function _snapshotStrategyInputBalances(bytes32 _collateralType)
+    internal
+    view
+    returns (VirtualBalance[] memory _inputBalances, uint256 _inputBalancesLength)
+  {
     StepConfig[] storage _steps = _strategySteps[_collateralType];
     _inputBalances = new VirtualBalance[](_steps.length);
 

@@ -411,9 +411,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     uint256 _receiverKiteBefore = protocolToken.balanceOf(postCutoverRewardsReceiver);
     vm.prank(testDeployer);
     stabilityPool.emergencyWithdrawKite(postCutoverRewardsReceiver, _emergencyWithdrawAmount);
-    assertEq(
-      protocolToken.balanceOf(postCutoverRewardsReceiver), _receiverKiteBefore + _emergencyWithdrawAmount
-    );
+    assertEq(protocolToken.balanceOf(postCutoverRewardsReceiver), _receiverKiteBefore + _emergencyWithdrawAmount);
 
     vm.prank(testDeployer);
     emissionsController.setStabilityRewardsReceiver(postCutoverRewardsReceiver);
