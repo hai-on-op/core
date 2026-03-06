@@ -16,6 +16,8 @@ import {VeloSwapStep} from '@contracts/stability-pool/strategy-steps/VeloSwapSte
 import {YearnVaultWithdrawalStep} from '@contracts/stability-pool/strategy-steps/YearnVaultWithdrawalStep.sol';
 
 abstract contract Base is HaiTest {
+  uint256 internal constant DEFAULT_MAX_QUOTE_STEPS = 4096;
+
   address internal constant ROUTER = address(0x1001);
   address internal constant POOL = address(0x1002);
   address internal constant FACTORY = address(0x1003);
@@ -41,7 +43,7 @@ abstract contract Base is HaiTest {
     beefyStep = new BeefyVaultWithdrawalStep();
     curveStep = new CurveSwapStep();
     erc4626Step = new ERC4626WithdrawalStep();
-    veloClStep = new VeloCLSwapStepViewQuoter();
+    veloClStep = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
     veloLpRemovalStep = new VeloLPRemovalStep();
     veloLpRemoveAndSwapStep = new VeloLPRemoveAndSwapStep();
     veloSwapStep = new VeloSwapStep();

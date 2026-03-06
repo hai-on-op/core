@@ -29,6 +29,7 @@ import {CurveSwapStep} from '@contracts/stability-pool/strategy-steps/CurveSwapS
 
 contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment {
   uint256 internal constant FORK_BLOCK = 148_368_730;
+  uint256 internal constant DEFAULT_MAX_QUOTE_STEPS = 4096;
 
   uint256 internal constant TOTAL_KITE = 1_000_000e18;
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
@@ -117,7 +118,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
     balancerV3Step = new BalancerV3StablePoolMathSwapStep();
     erc4626Step = new ERC4626WithdrawalStep();
-    veloCLStep = new VeloCLSwapStepViewQuoter();
+    veloCLStep = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
     veloSwapStep = new VeloSwapStep();
     veloLPRemoveAndSwapStep = new VeloLPRemoveAndSwapStep();
     beefyStep = new BeefyVaultWithdrawalStep();

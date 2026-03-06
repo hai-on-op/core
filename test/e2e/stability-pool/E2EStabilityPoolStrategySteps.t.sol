@@ -155,6 +155,8 @@ contract E2ECurveSwapStepForkTest is ForkedMainnetAt148368730 {
 }
 
 contract E2EVeloCLSwapStepViewQuoterForkTest is ForkedMainnetAt148368730 {
+  uint256 internal constant DEFAULT_MAX_QUOTE_STEPS = 4096;
+
   address internal constant VELO_CL_ROUTER = 0x0792a633F0c19c351081CF4B211F68F79bCc9676;
 
   address internal constant WETH = 0x4200000000000000000000000000000000000006;
@@ -170,7 +172,7 @@ contract E2EVeloCLSwapStepViewQuoterForkTest is ForkedMainnetAt148368730 {
 
   function setUp() public {
     _forkMainnetAtPinnedBlock();
-    step = new VeloCLSwapStepViewQuoter();
+    step = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
   }
 
   function test_velo_cl_swap_step_view_quoter_preview_and_execute() public {

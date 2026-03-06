@@ -407,7 +407,7 @@ contract MainnetScript is MainnetDeployment, Common, Script {
     // erc4626Step = address(new ERC4626WithdrawalStep());
     // curveStep = address(new CurveSwapStep());
     // veloSwapStep = address(new VeloSwapStep());
-    // veloCLSwapStep = address(new VeloCLSwapStepViewQuoter());
+    // veloCLSwapStep = address(new VeloCLSwapStepViewQuoter(4096));
     // veloLPRemovalStep = address(new VeloLPRemovalStep());
     // veloLPRemoveAndSwapStep = address(new VeloLPRemoveAndSwapStep());
     // beefyStep = address(new BeefyVaultWithdrawalStep());

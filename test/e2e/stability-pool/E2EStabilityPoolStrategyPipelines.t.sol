@@ -20,6 +20,7 @@ import {YearnVaultWithdrawalStep} from '@contracts/stability-pool/strategy-steps
 
 contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment {
   uint256 internal constant FORK_BLOCK = 148_368_730;
+  uint256 internal constant DEFAULT_MAX_QUOTE_STEPS = 4096;
   uint256 internal constant TOTAL_KITE = 1_000_000e18;
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
   uint256 internal constant EMISSIONS_DURATION = 365 days;
@@ -126,7 +127,7 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
     erc4626Step = new ERC4626WithdrawalStep();
     curveStep = new CurveSwapStep();
     veloStep = new VeloSwapStep();
-    veloCLStep = new VeloCLSwapStepViewQuoter();
+    veloCLStep = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
     veloLPRemoveAndSwapStep = new VeloLPRemoveAndSwapStep();
     beefyStep = new BeefyVaultWithdrawalStep();
     yearnStep = new YearnVaultWithdrawalStep();

@@ -29,6 +29,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
   error VeloCLSwapStepViewQuoter_InvalidFeePips();
   error VeloCLSwapStepViewQuoter_InvalidSqrtPriceLimitX96();
   error VeloCLSwapStepViewQuoter_QuoteLoopExceeded();
+  error VeloCLSwapStepViewQuoter_InvalidMaxQuoteSteps();
 
   // --- Data ---
 
@@ -65,7 +66,12 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('VELO_CL_SWAP');
-  uint256 internal constant _MAX_QUOTE_STEPS = 1024;
+  uint256 public immutable maxQuoteSteps;
+
+  constructor(uint256 _maxQuoteSteps) {
+    if (_maxQuoteSteps == 0) revert VeloCLSwapStepViewQuoter_InvalidMaxQuoteSteps();
+    maxQuoteSteps = _maxQuoteSteps;
+  }
 
   // --- Methods ---
 
@@ -172,7 +178,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     }
 
     _state.amountRemaining = int256(_amountIn);
-    for (uint256 _i = 0; _i < _MAX_QUOTE_STEPS && _state.amountRemaining > 0 && _state.sqrtPriceX96 != _limit; ++_i) {
+    for (uint256 _i = 0; _i < maxQuoteSteps && _state.amountRemaining > 0 && _state.sqrtPriceX96 != _limit; ++_i) {
       QuoteStep memory _step;
       _step.sqrtPriceStartX96 = _state.sqrtPriceX96;
 

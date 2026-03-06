@@ -8,8 +8,11 @@ import {
   MockVeloCLRouterForTest,
   MockVeloCLPoolForTest
 } from '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
+import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
 
 abstract contract Base is HaiTest {
+  uint256 internal constant DEFAULT_MAX_QUOTE_STEPS = 4096;
+
   VeloCLSwapStepViewQuoter internal step;
   ERC20ForTest internal tokenIn;
   ERC20ForTest internal tokenOut;
@@ -17,7 +20,7 @@ abstract contract Base is HaiTest {
   MockVeloCLPoolForTest internal pool;
 
   function setUp() public virtual {
-    step = new VeloCLSwapStepViewQuoter();
+    step = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
     tokenIn = new ERC20ForTest();
     tokenOut = new ERC20ForTest();
     router = new MockVeloCLRouterForTest(tokenIn, tokenOut);
@@ -43,6 +46,11 @@ abstract contract Base is HaiTest {
 }
 
 contract Unit_VeloCLSwapStepViewQuoter is Base {
+  function test_Revert_Constructor_InvalidMaxQuoteSteps() public {
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_InvalidMaxQuoteSteps.selector);
+    new VeloCLSwapStepViewQuoter(0);
+  }
+
   function test_Preview_ZeroAmount() public view {
     uint256[] memory _preview = step.preview(abi.encode(_data(address(tokenIn), address(tokenOut), 60, 0)), 0);
     assertEq(_preview.length, 1);
@@ -124,6 +132,22 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
     uint160 _limit = 79_228_162_514_264_337_593_543_950_335; // current sqrt price - 1
     uint256[] memory _preview = step.preview(abi.encode(_data(address(tokenIn), address(tokenOut), 60, _limit)), 1e18);
     assertEq(_preview.length, 1);
+  }
+
+  function test_Preview_QuoteLoopLimit_IsConfigurable() public {
+    VeloCLSwapStepViewQuoter _lowCapStep = new VeloCLSwapStepViewQuoter(1);
+    VeloCLSwapStepViewQuoter _highCapStep = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
+
+    pool.setTickSpacing(1);
+    VeloCLSwapStepViewQuoter.Data memory _stepData =
+      _data(address(tokenIn), address(tokenOut), 1, TickMath.MIN_SQRT_RATIO + 1);
+
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_QuoteLoopExceeded.selector);
+    _lowCapStep.preview(abi.encode(_stepData), 1e36);
+
+    uint256[] memory _preview = _highCapStep.preview(abi.encode(_stepData), 1e36);
+    assertEq(_preview.length, 1);
+    assertGt(_preview[0], 0);
   }
 
   function test_Execute() public {
