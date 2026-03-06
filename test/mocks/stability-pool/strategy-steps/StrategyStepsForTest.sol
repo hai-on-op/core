@@ -454,6 +454,65 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
   }
 }
 
+contract MockVeloRouterWithQuoteExecutionMismatchForTest is IVelodromeRouterV2 {
+  uint256 public previewSwapOutMultiplier = 2e18; // 2x in WAD
+  uint256 public executeSwapOutMultiplier = 1.5e18; // 1.5x in WAD
+  uint256 public removeAperLp = 5e18;
+  uint256 public removeBperLp = 2.5e18;
+
+  function setPreviewSwapOutMultiplier(uint256 _multiplier) external {
+    previewSwapOutMultiplier = _multiplier;
+  }
+
+  function setExecuteSwapOutMultiplier(uint256 _multiplier) external {
+    executeSwapOutMultiplier = _multiplier;
+  }
+
+  function setRemovePerLp(uint256 _aPerLp, uint256 _bPerLp) external {
+    removeAperLp = _aPerLp;
+    removeBperLp = _bPerLp;
+  }
+
+  function getAmountsOut(uint256 _amountIn, Route[] calldata) external view returns (uint256[] memory _amounts) {
+    _amounts = new uint256[](2);
+    _amounts[0] = _amountIn;
+    _amounts[1] = (_amountIn * previewSwapOutMultiplier) / 1e18;
+  }
+
+  function swapExactTokensForTokens(
+    uint256 _amountIn,
+    uint256 _amountOutMin,
+    Route[] calldata _routes,
+    address _to,
+    uint256
+  ) external returns (uint256[] memory _amounts) {
+    ERC20ForTest(_routes[0].from).transferFrom(msg.sender, address(this), _amountIn);
+    uint256 _amountOut = (_amountIn * executeSwapOutMultiplier) / 1e18;
+    require(_amountOut >= _amountOutMin, 'min-out');
+    ERC20ForTest(_routes[0].to).mint(_to, _amountOut);
+
+    _amounts = new uint256[](2);
+    _amounts[0] = _amountIn;
+    _amounts[1] = _amountOut;
+  }
+
+  function removeLiquidity(
+    address _tokenA,
+    address _tokenB,
+    bool,
+    uint256 _liquidity,
+    uint256,
+    uint256,
+    address _to,
+    uint256
+  ) external returns (uint256 _amountA, uint256 _amountB) {
+    _amountA = (_liquidity * removeAperLp) / 1e18;
+    _amountB = (_liquidity * removeBperLp) / 1e18;
+    ERC20ForTest(_tokenA).mint(_to, _amountA);
+    ERC20ForTest(_tokenB).mint(_to, _amountB);
+  }
+}
+
 contract MockVeloPairForTest is ERC20ForTest {
   address public token0;
   address public token1;

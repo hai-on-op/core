@@ -13,6 +13,8 @@ import {IVelodromeRouterV2, IVeloPairLike} from '@interfaces/external/IStrategyS
 contract VeloLPRemoveAndSwapStep is IStrategyStep {
   using SafeERC20 for IERC20;
 
+  uint256 internal constant _WAD = 1e18;
+
   // --- Errors ---
 
   error VeloLPRemoveAndSwapStep_InsufficientOutput();
@@ -85,7 +87,12 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
         factory: _decoded.factory
       });
       uint256[] memory _amounts = IVelodromeRouterV2(_decoded.router).getAmountsOut(_amountB, _routes);
-      _amountA += _amounts[_amounts.length - 1];
+      // Removing LP first shrinks the pool before this swap executes. Discount the quoted swap leg by the
+      // removed LP share squared, which is exact for same-pair volatile pools without fees and conservative
+      // for the stable remove-and-swap routes configured in this repo.
+      uint256 _lpShareWad = (_amountIn * _WAD) / _totalSupply;
+      uint256 _swapHaircutWad = _WAD - (_lpShareWad * _lpShareWad) / _WAD;
+      _amountA += (_amounts[_amounts.length - 1] * _swapHaircutWad) / _WAD;
     }
     _amountsOut[0] = _amountA;
   }

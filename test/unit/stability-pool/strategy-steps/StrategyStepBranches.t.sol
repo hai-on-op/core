@@ -14,6 +14,7 @@ import {
   MockBeefyVaultForTest,
   MockYearnVaultForTest,
   MockVeloRouterForTest,
+  MockVeloRouterWithQuoteExecutionMismatchForTest,
   MockVeloPairForTest,
   MockERC4626VaultForTest
 } from '@test/mocks/stability-pool/strategy-steps/StrategyStepsForTest.sol';
@@ -21,6 +22,20 @@ import {
 abstract contract Base is HaiTest {}
 
 contract Unit_StrategyStep_Branches is Base {
+  function _expectedVeloLpRemoveAndSwapPreview(
+    uint256 _reserveA,
+    uint256 _reserveB,
+    uint256 _amountIn,
+    uint256 _totalSupply,
+    uint256 _swapOutMultiplierWad
+  ) internal pure returns (uint256 _expectedPreviewOut) {
+    uint256 _expectedRemoveA = (_reserveA * _amountIn) / _totalSupply;
+    uint256 _expectedRemoveB = (_reserveB * _amountIn) / _totalSupply;
+    uint256 _lpShareWad = (_amountIn * 1e18) / _totalSupply;
+    uint256 _swapHaircutWad = 1e18 - (_lpShareWad * _lpShareWad) / 1e18;
+    _expectedPreviewOut = _expectedRemoveA + (((_expectedRemoveB * _swapOutMultiplierWad) / 1e18) * _swapHaircutWad) / 1e18;
+  }
+
   function test_BeefyPreview_DefaultShareScaleWhenZero() public {
     BeefyVaultWithdrawalStep _step = new BeefyVaultWithdrawalStep();
     ERC20ForTest _lpToken = new ERC20ForTest();
@@ -110,7 +125,7 @@ contract Unit_StrategyStep_Branches is Base {
       deadlineBuffer: 1 hours
     });
 
-    uint256 _expectedPreviewOut = 181_818_181_818_181_818_180;
+    uint256 _expectedPreviewOut = _expectedVeloLpRemoveAndSwapPreview(1000e18, 500e18, 10e18, _lpToken.totalSupply(), 2e18);
     uint256 _expectedExecuteOut = 200e18;
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 10e18);
@@ -122,6 +137,37 @@ contract Unit_StrategyStep_Branches is Base {
     uint256[] memory _out = _step.execute(abi.encode(_data), 10e18, _minOuts);
     assertEq(_out[0], _expectedExecuteOut);
     assertEq(_tokenA.balanceOf(address(_step)), _expectedExecuteOut);
+  }
+
+  function test_VeloLPRemoveAndSwap_PreviewHaircutsOptimisticSwapQuote() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterWithQuoteExecutionMismatchForTest _router = new MockVeloRouterWithQuoteExecutionMismatchForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _lpToken.setState(500e18, 250e18, 50e18);
+    _lpToken.mint(address(_step), 50e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: true,
+      stableSwap: true,
+      deadlineBuffer: 1 hours
+    });
+
+    uint256[] memory _preview = _step.preview(abi.encode(_data), 50e18);
+    assertEq(_preview.length, 1);
+    assertEq(_preview[0], 437_500_000_000_000_000_000);
+
+    uint256[] memory _minOuts = new uint256[](1);
+    _minOuts[0] = _preview[0];
+    uint256[] memory _out = _step.execute(abi.encode(_data), 50e18, _minOuts);
+    assertEq(_out[0], 437_500_000_000_000_000_000);
   }
 
   function test_VeloLPRemoveAndSwap_ExecuteZeroAmount() public {
