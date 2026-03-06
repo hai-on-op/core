@@ -13,6 +13,8 @@ interface IStabilityPoolCoverJob is IAuthorizable, IModifiable, IJob {
 
   /// @notice Throws when coverAndRepayDebt does not yield a positive profit
   error StabilityPoolCoverJob_NonPositiveProfit();
+  /// @notice Throws when coverAndRepayDebt profit does not cover the keeper reward
+  error StabilityPoolCoverJob_InsufficientNetProfit();
 
   // --- Data ---
 

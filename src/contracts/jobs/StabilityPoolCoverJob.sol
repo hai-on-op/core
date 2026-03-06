@@ -60,6 +60,7 @@ contract StabilityPoolCoverJob is Authorizable, Modifiable, Job, IStabilityPoolC
 
     _profit = stabilityPool.coverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, _collateralType);
     if (_profit <= 0) revert StabilityPoolCoverJob_NonPositiveProfit();
+    if (uint256(_profit) < rewardAmount) revert StabilityPoolCoverJob_InsufficientNetProfit();
   }
 
   // --- Administration ---

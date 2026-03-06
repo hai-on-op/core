@@ -154,13 +154,26 @@ contract Unit_StabilityPoolCoverJob_WorkCoverAndRepayDebt is Base {
     stabilityPoolCoverJob.workCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, _collateralType);
   }
 
+  function test_Revert_InsufficientNetProfit(
+    address _auctionHouse,
+    uint256 _auctionId,
+    uint256 _bidAmount,
+    bytes32 _collateralType
+  ) public {
+    _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, int256(REWARD_AMOUNT - 1));
+
+    vm.expectRevert(IStabilityPoolCoverJob.StabilityPoolCoverJob_InsufficientNetProfit.selector);
+
+    stabilityPoolCoverJob.workCoverAndRepayDebt(_auctionHouse, _auctionId, _bidAmount, _collateralType);
+  }
+
   function test_Call_StabilityPool_CoverAndRepayDebt(
     address _auctionHouse,
     uint256 _auctionId,
     uint256 _bidAmount,
     bytes32 _collateralType
   ) public {
-    _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, 1);
+    _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, int256(REWARD_AMOUNT));
     vm.expectCall(
       address(mockStabilityPool),
       abi.encodeCall(mockStabilityPool.coverAndRepayDebt, (_auctionHouse, _auctionId, _bidAmount, _collateralType)),
@@ -177,7 +190,7 @@ contract Unit_StabilityPoolCoverJob_WorkCoverAndRepayDebt is Base {
     bytes32 _collateralType,
     int256 _profit
   ) public {
-    vm.assume(_profit > 0);
+    vm.assume(_profit >= int256(REWARD_AMOUNT));
     _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, _profit);
 
     assertEq(
@@ -191,7 +204,7 @@ contract Unit_StabilityPoolCoverJob_WorkCoverAndRepayDebt is Base {
     uint256 _bidAmount,
     bytes32 _collateralType
   ) public {
-    _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, 1);
+    _mockValues(true, _auctionHouse, _auctionId, _bidAmount, _collateralType, int256(REWARD_AMOUNT));
 
     vm.expectEmit();
     emit Rewarded(user, REWARD_AMOUNT);
