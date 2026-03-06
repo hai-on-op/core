@@ -87,6 +87,12 @@ interface IStabilityPool is IERC4626 {
    */
   event SetStepTypeSlippageBps(bytes32 indexed _stepType, uint16 _bps);
 
+  /**
+   * @notice Emitted when the minimum profit margin for auction covering is updated
+   * @param  _bps Minimum required profit margin in basis points
+   */
+  event SetMinProfitBps(uint16 _bps);
+
   /// @notice Emitted when sHAI transfers are enabled
   event TransfersEnabled();
 
@@ -121,6 +127,8 @@ interface IStabilityPool is IERC4626 {
   error StabilityPool_InvalidAuctionHouse();
   /// @notice Throws when slippage basis points exceed the maximum value
   error StabilityPool_InvalidSlippageBps();
+  /// @notice Throws when profit basis points exceed the maximum value
+  error StabilityPool_InvalidProfitBps();
   /// @notice Throws when trying to transfer shares while transfers are disabled
   error StabilityPool_TransfersDisabled();
   /// @notice Throws when trying to enable transfers after they were already enabled
@@ -198,6 +206,9 @@ interface IStabilityPool is IERC4626 {
 
   /// @notice Last timestamp when internal coin was swept to external HAI
   function lastInternalCoinSweepTime() external view returns (uint256 _lastInternalCoinSweepTime);
+
+  /// @notice Minimum required cover profit margin in basis points
+  function minProfitBps() external view returns (uint16 _minProfitBps);
 
   /**
    * @notice Whether a strategy step address is whitelisted
@@ -307,6 +318,12 @@ interface IStabilityPool is IERC4626 {
    * @param  _bps Slippage tolerance in basis points
    */
   function setStepTypeSlippageBps(bytes32 _stepType, uint16 _bps) external;
+
+  /**
+   * @notice Sets the minimum required profit margin for auction covering
+   * @param  _bps Minimum profit margin in basis points
+   */
+  function setMinProfitBps(uint16 _bps) external;
 
   /**
    * @notice Previews the expected HAI output from swapping collateral through configured strategy steps

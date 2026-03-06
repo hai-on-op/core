@@ -603,9 +603,11 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
 
     stabilityPool.setCollateralSlippageBps(CTYPE, 123);
     stabilityPool.setStepTypeSlippageBps(bytes32('MOCK'), 456);
+    stabilityPool.setMinProfitBps(789);
 
     assertEq(stabilityPool.collateralSlippageBps(CTYPE), 123);
     assertEq(stabilityPool.stepTypeSlippageBps(bytes32('MOCK')), 456);
+    assertEq(stabilityPool.minProfitBps(), 789);
   }
 
   function test_PreviewSwapToHai_UsesConfiguredPipeline() public {
@@ -742,6 +744,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     assertEq(address(stabilityPool.collateralAuctionHouseFactory()), address(collateralAuctionHouseFactory));
     assertEq(stabilityPool.kiteRewardsActive(), true);
     assertEq(stabilityPool.transfersEnabled(), false);
+    assertEq(stabilityPool.minProfitBps(), 200);
   }
 
   function test_Revert_SetStrategySteps_EmptyArray() public {
@@ -767,6 +770,18 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     vm.prank(deployer);
     vm.expectRevert(IStabilityPool.StabilityPool_InvalidSlippageBps.selector);
     stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_Revert_SetMinProfitBps_Unauthorized() public {
+    vm.prank(user);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    stabilityPool.setMinProfitBps(1);
+  }
+
+  function test_Revert_SetMinProfitBps_InvalidBps() public {
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidProfitBps.selector);
+    stabilityPool.setMinProfitBps(10_001);
   }
 
   function test_Revert_SetStepWhitelist_ZeroAddress() public {
@@ -909,6 +924,17 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 11e18, CTYPE);
   }
 
+  function test_Revert_CoverAndRepayDebt_PreviewProfitBelowMinimumMargin() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
+
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
+    _auction.setQuote(10e18, 9.9e18, 10e18, 9.9e18);
+
+    vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
+    stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
+  }
+
   function test_Revert_CoverAndRepayDebt_DelegatecallFailed_NoReason() public {
     MockRevertNoReasonStepForTest _step = new MockRevertNoReasonStepForTest();
     bytes memory _data =
@@ -969,6 +995,17 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
     vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
     stabilityPool.coverAndRepayDebt(address(_auction), 1, 11e18, CTYPE);
+  }
+
+  function test_Revert_CoverAndRepayDebt_FinalProfitBelowMinimumMargin() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 1e18, 1e18), 0);
+
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
+    _auction.setQuote(10e18, 9.7e18, 10e18, 9.85e18);
+
+    vm.expectRevert(IStabilityPool.StabilityPool_NotProfitable.selector);
+    stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
   }
 
   function test_CoverAndRepayDebt_Success_ProfitAndCoinJoinAccounting() public {

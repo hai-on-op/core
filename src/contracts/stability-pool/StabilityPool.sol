@@ -7,6 +7,7 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
+import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
@@ -37,6 +38,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   // --- Constants ---
 
   uint256 internal constant _MAX_SLIPPAGE_BPS = 10_000;
+  uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 200;
 
   // --- Data ---
 
@@ -106,6 +108,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   mapping(bytes32 => uint16) public stepTypeSlippageBps;
 
   /// @inheritdoc IStabilityPool
+  uint16 public minProfitBps;
+
+  /// @inheritdoc IStabilityPool
   uint256 public lastInternalCoinSweepTime;
 
   // --- Init ---
@@ -135,6 +140,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     coinJoin = ICoinJoin(_coinJoin);
     collateralJoinFactory = ICollateralJoinFactory(_collateralJoinFactory);
     collateralAuctionHouseFactory = ICollateralAuctionHouseFactory(_collateralAuctionHouseFactory);
+    minProfitBps = _DEFAULT_MIN_PROFIT_BPS;
     lastInternalCoinSweepTime = block.timestamp;
     kiteRewardsActive = true;
   }
@@ -291,6 +297,13 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   /// @inheritdoc IStabilityPool
+  function setMinProfitBps(uint16 _bps) external isAuthorized {
+    if (_bps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidProfitBps();
+    minProfitBps = _bps;
+    emit SetMinProfitBps(_bps);
+  }
+
+  /// @inheritdoc IStabilityPool
   function previewSwapToHai(
     bytes32 _collateralType,
     uint256 _collateralAmount
@@ -333,7 +346,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
       (uint256 _expectedHai, bytes[] memory _previewMinOuts) =
         _previewStrategy(_collateralType, _collateralToken, _estimatedCollateralWei);
-      if (_expectedHai < _estimatedAdjustedBid) revert StabilityPool_NotProfitable();
+      if (!_meetsMinimumProfit(_expectedHai, _estimatedAdjustedBid)) revert StabilityPool_NotProfitable();
       _minOutsByStep = _previewMinOuts;
     }
 
@@ -350,7 +363,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
     uint256 _haiReceived =
       _executeStrategy(_collateralType, _minOutsByStep, _executionInputBalances, _executionInputBalancesLength);
-    if (_haiReceived < _actualAdjustedBid) revert StabilityPool_NotProfitable();
+    if (!_meetsMinimumProfit(_haiReceived, _actualAdjustedBid)) revert StabilityPool_NotProfitable();
 
     _exitExtraInternalCoin(_coinBalanceBefore);
     _profit = int256(_haiReceived) - int256(_actualAdjustedBid);
@@ -487,6 +500,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_collateralBps > 0) return _collateralBps;
 
     return stepTypeSlippageBps[_stepType];
+  }
+
+  function _meetsMinimumProfit(uint256 _haiOut, uint256 _haiSpent) internal view returns (bool _meets) {
+    if (_haiOut < _haiSpent) return false;
+    if (_haiSpent == 0) return true;
+
+    uint256 _requiredHai = OZMath.mulDiv(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
+    return _haiOut >= _requiredHai;
   }
 
   function _previewStrategy(
