@@ -220,9 +220,13 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
 
     if (_oldReceiver != address(0) && _oldReceiver != _receiver && stabilityPoolCumulativeRewards > 0) {
       uint256 _accrued = stabilityPoolCumulativeRewards;
-      stabilityPoolCumulativeRewards = 0;
-      kiteToken.safeTransfer(_oldReceiver, _accrued);
-      emit ClaimRewardsForStabilityPool(_accrued);
+      uint256 _available = kiteToken.balanceOf(address(this));
+      uint256 _amount = _accrued > _available ? _available : _accrued;
+      if (_amount > 0) {
+        stabilityPoolCumulativeRewards = _accrued - _amount;
+        kiteToken.safeTransfer(_oldReceiver, _amount);
+        emit ClaimRewardsForStabilityPool(_amount);
+      }
     }
 
     emit SetStabilityRewardsReceiver(_oldReceiver, _receiver);

@@ -100,6 +100,21 @@ contract Unit_EmissionsController_SetReceiver is Base {
     assertEq(emissionsController.stabilityRewardsReceiver(), nextReceiver);
   }
 
+  function test_SetReceiver_WhenUnderfunded_PaysPartially_AndRotates() public {
+    vm.warp(block.timestamp + 10);
+
+    vm.prank(deployer);
+    emissionsController.emergencyWithdrawKite(nextReceiver, TOTAL_KITE - 100e18);
+
+    vm.prank(deployer);
+    emissionsController.setStabilityRewardsReceiver(nextReceiver);
+
+    assertEq(emissionsController.stabilityRewardsReceiver(), nextReceiver);
+    assertEq(kite.balanceOf(receiver), 100e18);
+    assertEq(kite.balanceOf(address(emissionsController)), 0);
+    assertEq(emissionsController.stabilityPoolCumulativeRewards(), 400e18);
+  }
+
   function test_NewReceiver_Claims_AfterSwitch() public {
     vm.prank(deployer);
     emissionsController.setStabilityRewardsReceiver(nextReceiver);
