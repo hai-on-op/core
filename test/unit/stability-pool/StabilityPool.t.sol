@@ -12,7 +12,8 @@ import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {
   MockStabilityPoolEmissionsControllerForTest,
   MockStabilityPoolStrategyStepForTest,
-  MockReentrantStabilityPoolEmissionsControllerForTest
+  MockReentrantStabilityPoolEmissionsControllerForTest,
+  MockRevertingERC20ForTest
 } from '@test/mocks/stability-pool/core/StabilityPoolCoreForTest.sol';
 import {
   MockCollateralJoinFactoryForTest,
@@ -330,6 +331,76 @@ contract Unit_StabilityPool_Rewards is Base {
     vm.prank(user);
     stabilityPool.withdraw(100e18, user, user);
     assertEq(systemCoin.balanceOf(user), 1000e18);
+  }
+}
+
+contract Unit_StabilityPool_WithdrawLiveness is HaiTest {
+  address internal deployer = label('deployer');
+  address internal user = label('user');
+
+  ERC20ForTest internal systemCoin;
+  MockRevertingERC20ForTest internal protocolToken;
+  MockStabilityPoolEmissionsControllerForTest internal emissionsController;
+  StabilityPool internal stabilityPool;
+
+  function setUp() public {
+    vm.startPrank(deployer);
+
+    systemCoin = new ERC20ForTest();
+    protocolToken = new MockRevertingERC20ForTest();
+    emissionsController = new MockStabilityPoolEmissionsControllerForTest(protocolToken, address(0));
+    stabilityPool = new StabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+    emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
+
+    vm.stopPrank();
+
+    systemCoin.mint(user, 1000e18);
+    vm.prank(user);
+    systemCoin.approve(address(stabilityPool), type(uint256).max);
+  }
+
+  function test_Withdraw_Succeeds_When_RewardTransferFails() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+    protocolToken.mint(address(stabilityPool), 10e18);
+    protocolToken.setRevertTransfers(true);
+
+    vm.prank(user);
+    stabilityPool.withdraw(100e18, user, user);
+
+    assertEq(systemCoin.balanceOf(user), 1000e18);
+    assertEq(protocolToken.balanceOf(user), 0);
+    assertEq(stabilityPool.claimable(user), 10e18);
+    assertEq(stabilityPool.kiteRewardRemaining(), 10e18);
+
+    protocolToken.setRevertTransfers(false);
+    vm.prank(user);
+    uint256 _claimed = stabilityPool.claimRewards();
+    assertEq(_claimed, 10e18);
+  }
+
+  function test_Withdraw_Succeeds_When_ControllerClaimFails() public {
+    vm.prank(user);
+    stabilityPool.deposit(100e18, user);
+
+    protocolToken.mint(address(emissionsController), 10e18);
+    emissionsController.setAmountToClaim(10e18);
+    emissionsController.setRevertOnClaim(true);
+
+    vm.prank(user);
+    stabilityPool.withdraw(100e18, user, user);
+
+    assertEq(systemCoin.balanceOf(user), 1000e18);
+    assertEq(protocolToken.balanceOf(user), 0);
+    assertEq(protocolToken.balanceOf(address(emissionsController)), 10e18);
   }
 }
 

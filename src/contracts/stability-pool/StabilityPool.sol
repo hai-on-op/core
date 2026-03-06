@@ -413,6 +413,35 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     emit ClaimRewards(_user, _amount);
   }
 
+  function _claimBestEffort(address _user, address _receiver) internal returns (uint256 _amount) {
+    uint256 _claimableAmount = claimable[_user];
+    if (_claimableAmount == 0) return 0;
+
+    uint256 _currentKiteBalance = protocolToken.balanceOf(address(this));
+    uint256 _available = kiteRewardsActive ? kiteRewardRemaining : _currentKiteBalance;
+    if (_currentKiteBalance < _available) {
+      _available = _currentKiteBalance;
+    }
+    if (_available == 0) return 0;
+
+    _amount = _claimableAmount > _available ? _available : _claimableAmount;
+    uint256 _previousRemaining = kiteRewardRemaining;
+    claimable[_user] = _claimableAmount - _amount;
+    if (_amount >= kiteRewardRemaining) {
+      kiteRewardRemaining = 0;
+    } else {
+      kiteRewardRemaining -= _amount;
+    }
+
+    if (!_tryProtocolTokenTransfer(_receiver, _amount)) {
+      claimable[_user] = _claimableAmount;
+      kiteRewardRemaining = _previousRemaining;
+      return 0;
+    }
+
+    emit ClaimRewards(_user, _amount);
+  }
+
   function _claimRewardsFromControllerIfReceiver() internal returns (uint256 _claimed) {
     if (emissionsController.stabilityRewardsReceiver() != address(this)) return 0;
 
@@ -420,6 +449,29 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_claimed > 0) {
       emit ClaimRewardsFromEmissionsController(_claimed);
     }
+  }
+
+  function _claimRewardsFromControllerIfReceiverBestEffort() internal returns (uint256 _claimed) {
+    if (emissionsController.stabilityRewardsReceiver() != address(this)) return 0;
+
+    (bool _success, bytes memory _returndata) =
+      address(emissionsController).call(abi.encodeCall(IEmissionsController.claimRewardsForStabilityPool, ()));
+    if (!_success || address(emissionsController).code.length == 0) return 0;
+    if (_returndata.length == 32) {
+      _claimed = abi.decode(_returndata, (uint256));
+      if (_claimed > 0) {
+        emit ClaimRewardsFromEmissionsController(_claimed);
+      }
+    }
+  }
+
+  function _tryProtocolTokenTransfer(address _receiver, uint256 _amount) internal returns (bool _success) {
+    (bool _callSuccess, bytes memory _returndata) =
+      address(protocolToken).call(abi.encodeCall(IERC20.transfer, (_receiver, _amount)));
+    if (!_callSuccess || address(protocolToken).code.length == 0) return false;
+    if (_returndata.length == 0) return true;
+    if (_returndata.length != 32) return false;
+    return abi.decode(_returndata, (bool));
   }
 
   // --- Strategy Helpers ---
@@ -694,12 +746,12 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _shares
   ) internal virtual override {
     if (kiteRewardsActive) {
-      _claimRewardsFromControllerIfReceiver();
+      _claimRewardsFromControllerIfReceiverBestEffort();
       _accrueKite();
     }
 
     super._withdraw(_caller, _receiver, _owner, _assets, _shares);
-    _claim(_owner, _owner);
+    _claimBestEffort(_owner, _owner);
   }
 
   function deposit(

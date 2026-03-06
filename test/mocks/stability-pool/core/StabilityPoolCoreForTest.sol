@@ -3,13 +3,17 @@ pragma solidity 0.8.20;
 
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
+import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 
 contract MockStabilityPoolEmissionsControllerForTest {
   error MockStabilityPoolEmissionsControllerForTest_OnlyReceiver();
+  error MockStabilityPoolEmissionsControllerForTest_RevertOnClaim();
 
   ERC20ForTest public kite;
   address public stabilityRewardsReceiver;
   uint256 public amountToClaim;
+  bool public revertOnClaim;
 
   constructor(ERC20ForTest _kite, address _stabilityRewardsReceiver) {
     kite = _kite;
@@ -20,6 +24,7 @@ contract MockStabilityPoolEmissionsControllerForTest {
     if (msg.sender != stabilityRewardsReceiver) {
       revert MockStabilityPoolEmissionsControllerForTest_OnlyReceiver();
     }
+    if (revertOnClaim) revert MockStabilityPoolEmissionsControllerForTest_RevertOnClaim();
     _amount = amountToClaim;
     amountToClaim = 0;
     if (_amount > 0) {
@@ -33,6 +38,25 @@ contract MockStabilityPoolEmissionsControllerForTest {
 
   function setAmountToClaim(uint256 _amount) external {
     amountToClaim = _amount;
+  }
+
+  function setRevertOnClaim(bool _enabled) external {
+    revertOnClaim = _enabled;
+  }
+}
+
+contract MockRevertingERC20ForTest is ERC20ForTest {
+  error MockRevertingERC20ForTest_TransferFailed();
+
+  bool public revertTransfers;
+
+  function setRevertTransfers(bool _enabled) external {
+    revertTransfers = _enabled;
+  }
+
+  function transfer(address _to, uint256 _value) public override(ERC20, IERC20) returns (bool) {
+    if (revertTransfers) revert MockRevertingERC20ForTest_TransferFailed();
+    return super.transfer(_to, _value);
   }
 }
 
