@@ -330,42 +330,19 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     ICollateralAuctionHouse _auction = ICollateralAuctionHouse(_auctionHouse);
     if (_auction.collateralType() != _collateralType) revert StabilityPool_CollateralTypeMismatch();
 
+    bool _hasEstimatedCollateral;
     address _collateralJoinAddr;
     uint256 _multiplier;
+    uint256 _estimatedAdjustedBid;
     bytes[] memory _minOutsByStep;
-    {
-      (uint256 _estimatedCollateralBought, uint256 _estimatedAdjustedBid) =
-        _auction.getCollateralBought(_auctionId, _bidAmount);
-      if (_estimatedCollateralBought == 0) {
-        return int256(0);
-      }
+    (_hasEstimatedCollateral, _collateralJoinAddr, _multiplier, _estimatedAdjustedBid, _minOutsByStep) =
+      _previewCover(_auction, _auctionId, _bidAmount, _collateralType);
+    if (!_hasEstimatedCollateral) return int256(0);
 
-      address _collateralToken;
-      (_collateralJoinAddr, _collateralToken, _multiplier) = _resolveCollateral(_collateralType);
-      uint256 _estimatedCollateralWei = _toCollateralWei(_estimatedCollateralBought, _multiplier);
-
-      (uint256 _expectedHai, bytes[] memory _previewMinOuts) =
-        _previewStrategy(_collateralType, _collateralToken, _estimatedCollateralWei);
-      if (!_meetsMinimumProfit(_expectedHai, _estimatedAdjustedBid)) revert StabilityPool_NotProfitable();
-      _minOutsByStep = _previewMinOuts;
-    }
-
-    ISAFEEngine _safeEngine = coinJoin.safeEngine();
-    uint256 _coinBalanceBefore = _safeEngine.coinBalance(address(this));
-    _joinSystemCoinIfNeeded(_bidAmount, _coinBalanceBefore);
-    _approveAuctionHouse(_safeEngine, _auctionHouse);
-
-    (VirtualBalance[] memory _executionInputBalances, uint256 _executionInputBalancesLength) =
-      _snapshotStrategyInputBalances(_collateralType);
-
-    (uint256 _actualCollateralBought, uint256 _actualAdjustedBid) = _auction.buyCollateral(_auctionId, _bidAmount);
-    ICollateralJoin(_collateralJoinAddr).exit(address(this), _toCollateralWei(_actualCollateralBought, _multiplier));
-
-    uint256 _haiReceived =
-      _executeStrategy(_collateralType, _minOutsByStep, _executionInputBalances, _executionInputBalancesLength);
+    (uint256 _actualCollateralBought, uint256 _actualAdjustedBid, uint256 _haiReceived) =
+      _executeCover(_auction, _auctionId, _bidAmount, _collateralType, _collateralJoinAddr, _multiplier, _minOutsByStep);
     if (!_meetsMinimumProfit(_haiReceived, _actualAdjustedBid)) revert StabilityPool_NotProfitable();
 
-    _exitExtraInternalCoin(_coinBalanceBefore);
     _profit = int256(_haiReceived) - int256(_actualAdjustedBid);
     emit CoverAndRepayDebt(_auctionId, _collateralType, _actualCollateralBought, _actualAdjustedBid, _haiReceived);
   }
@@ -541,6 +518,39 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     _expectedHai = _getVirtualBalance(_balances, _balancesLength, address(systemCoin));
   }
 
+  function _previewCover(
+    ICollateralAuctionHouse _auction,
+    uint256 _auctionId,
+    uint256 _bidAmount,
+    bytes32 _collateralType
+  )
+    internal
+    view
+    returns (
+      bool _hasEstimatedCollateral,
+      address _collateralJoinAddr,
+      uint256 _multiplier,
+      uint256 _estimatedAdjustedBid,
+      bytes[] memory _minOutsByStep
+    )
+  {
+    uint256 _estimatedCollateralBought;
+    (_estimatedCollateralBought, _estimatedAdjustedBid) = _auction.getCollateralBought(_auctionId, _bidAmount);
+    if (_estimatedCollateralBought == 0) {
+      return (false, address(0), 0, 0, new bytes[](0));
+    }
+
+    address _collateralToken;
+    (_collateralJoinAddr, _collateralToken, _multiplier) = _resolveCollateral(_collateralType);
+    uint256 _estimatedCollateralWei = _toCollateralWei(_estimatedCollateralBought, _multiplier);
+
+    uint256 _expectedHai;
+    (_expectedHai, _minOutsByStep) = _previewStrategy(_collateralType, _collateralToken, _estimatedCollateralWei);
+    if (!_meetsMinimumProfit(_expectedHai, _estimatedAdjustedBid)) revert StabilityPool_NotProfitable();
+
+    return (true, _collateralJoinAddr, _multiplier, _estimatedAdjustedBid, _minOutsByStep);
+  }
+
   function _previewStep(
     bytes32 _collateralType,
     StepConfig storage _config,
@@ -564,6 +574,47 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     }
 
     _encodedMinOuts = abi.encode(_minOuts);
+  }
+
+  function _executeCover(
+    ICollateralAuctionHouse _auction,
+    uint256 _auctionId,
+    uint256 _bidAmount,
+    bytes32 _collateralType,
+    address _collateralJoinAddr,
+    uint256 _multiplier,
+    bytes[] memory _minOutsByStep
+  ) internal returns (uint256 _actualCollateralBought, uint256 _actualAdjustedBid, uint256 _haiReceived) {
+    ISAFEEngine _safeEngine = coinJoin.safeEngine();
+    uint256 _coinBalanceBefore = _safeEngine.coinBalance(address(this));
+    uint256 _maxAdjustedBid = _getAuctionMaxAdjustedBid(_auction, _auctionId, _bidAmount);
+    _joinSystemCoinIfNeeded(_maxAdjustedBid, _coinBalanceBefore);
+    _approveAuctionHouse(_safeEngine, address(_auction));
+
+    (VirtualBalance[] memory _executionInputBalances, uint256 _executionInputBalancesLength) =
+      _snapshotStrategyInputBalances(_collateralType);
+
+    (_actualCollateralBought, _actualAdjustedBid) = _auction.buyCollateral(_auctionId, _bidAmount);
+    ICollateralJoin(_collateralJoinAddr).exit(address(this), _toCollateralWei(_actualCollateralBought, _multiplier));
+
+    _haiReceived =
+      _executeStrategy(_collateralType, _minOutsByStep, _executionInputBalances, _executionInputBalancesLength);
+    _exitExtraInternalCoin(_coinBalanceBefore);
+  }
+
+  function _getAuctionMaxAdjustedBid(
+    ICollateralAuctionHouse _auction,
+    uint256 _auctionId,
+    uint256 _bidAmount
+  ) internal view returns (uint256 _maxAdjustedBid) {
+    // Join against the auction's capped max spend, not the raw bid. Preview can readjust further downward,
+    // but execution may still spend up to the capped amount if it does not end up buying all remaining collateral.
+    _maxAdjustedBid = _bidAmount;
+    uint256 _amountToRaise = _auction.auctions(_auctionId).amountToRaise;
+    if (_amountToRaise == 0) return 0;
+    if (_maxAdjustedBid * RAY > _amountToRaise) {
+      _maxAdjustedBid = (_amountToRaise / RAY) + 1;
+    }
   }
 
   function _executeStrategy(

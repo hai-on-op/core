@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {ICollateralAuctionHouse} from '@interfaces/ICollateralAuctionHouse.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
 import {RAY} from '@libraries/Math.sol';
 
@@ -107,6 +108,21 @@ contract MockCoverAuctionHouseForTest {
     uint256
   ) external view returns (uint256 _collateralBought, uint256 _adjustedBid) {
     return (estimatedCollateralBought, estimatedAdjustedBid);
+  }
+
+  function auctions(uint256) external view returns (ICollateralAuctionHouse.Auction memory _auction) {
+    uint256 _maxAdjustedBid = estimatedAdjustedBid > actualAdjustedBid ? estimatedAdjustedBid : actualAdjustedBid;
+    uint256 _amountToSell =
+      estimatedCollateralBought > actualCollateralBought ? estimatedCollateralBought : actualCollateralBought;
+    uint256 _amountToRaise = _maxAdjustedBid == 0 ? 0 : (_maxAdjustedBid * RAY) - 1;
+
+    return ICollateralAuctionHouse.Auction({
+      amountToSell: _amountToSell,
+      amountToRaise: _amountToRaise,
+      initialTimestamp: block.timestamp,
+      forgoneCollateralReceiver: address(0),
+      auctionIncomeRecipient: address(0)
+    });
   }
 
   function buyCollateral(uint256, uint256) external returns (uint256 _collateralBought, uint256 _adjustedBid) {

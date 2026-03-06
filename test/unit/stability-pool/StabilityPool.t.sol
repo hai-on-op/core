@@ -1020,9 +1020,9 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     assertTrue(_profit > 0);
     assertEq(uint256(_profit), 13e18);
     assertEq(coinJoin.joinCalls(), 1);
-    assertEq(coinJoin.lastJoinWad(), 10e18);
+    assertEq(coinJoin.lastJoinWad(), 8e18);
     assertEq(coinJoin.exitCalls(), 1);
-    assertEq(coinJoin.lastExitWad(), 3e18);
+    assertEq(coinJoin.lastExitWad(), 1e18);
     assertEq(safeEngine.approveCalls(address(coinJoin)), 1);
     assertEq(safeEngine.approveCalls(address(_auction)), 1);
   }
@@ -1070,6 +1070,24 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
     assertEq(_scaledJoin.lastExitAmount(), 5e18);
     assertEq(uint256(_profit), 3e18);
+  }
+
+  function test_CoverAndRepayDebt_UsesAuctionAdjustedBidCap_WhenJoiningSystemCoin() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    _setSingleStep(address(_step), _mockData(address(collateralToken), address(systemCoin), 2e18, 2e18), 0);
+
+    vm.prank(address(stabilityPool));
+    systemCoin.transfer(user, 992e18);
+    assertEq(systemCoin.balanceOf(address(stabilityPool)), 8e18);
+
+    MockCoverAuctionHouseForTest _auction = _newAuction(CTYPE);
+    _auction.setQuote(10e18, 8e18, 10e18, 7e18);
+
+    int256 _profit = stabilityPool.coverAndRepayDebt(address(_auction), 1, 10e18, CTYPE);
+
+    assertEq(uint256(_profit), 13e18);
+    assertEq(coinJoin.joinCalls(), 1);
+    assertEq(coinJoin.lastJoinWad(), 8e18);
   }
 
   function test_CoverAndRepayDebt_DoesNotJoin_WhenInternalCoinIsSufficient() public {
