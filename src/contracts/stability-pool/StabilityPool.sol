@@ -37,8 +37,10 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   // --- Constants ---
 
-  uint256 internal constant _MAX_SLIPPAGE_BPS = 10_000;
-  uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 200;
+  // forgefmt: disable-next-line
+  uint256 internal constant _MAX_SLIPPAGE_BPS = 100_00;
+  // forgefmt: disable-next-line
+  uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 2_00;
 
   // --- Data ---
 
