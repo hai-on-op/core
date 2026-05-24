@@ -70,6 +70,13 @@ contract Unit_StakingManager_Constructor is Base {
     assertEq(stakingManager.params().cooldownPeriod, COOLDOWN_PERIOD);
   }
 
+  function test_Set_ZeroCooldownPeriod() public {
+    StakingManagerForTest zeroCooldownStakingManager =
+      new StakingManagerForTest(address(mockProtocolToken), address(mockStakingToken), 0);
+
+    assertEq(zeroCooldownStakingManager.params().cooldownPeriod, 0);
+  }
+
   function test_Revert_NullProtocolToken() public {
     vm.expectRevert(abi.encodeWithSelector(Assertions.NoCode.selector, address(0)));
     new StakingManagerForTest(address(0), address(mockStakingToken), COOLDOWN_PERIOD);
@@ -83,17 +90,17 @@ contract Unit_StakingManager_Constructor is Base {
 
 contract Unit_StakingManager_ModifyParameters is Base {
   function test_ModifyParameters(uint256 _cooldownPeriod) public authorized {
-    vm.assume(_cooldownPeriod > 0);
-
     stakingManager.modifyParameters('cooldownPeriod', abi.encode(_cooldownPeriod));
 
     IStakingManager.StakingManagerParams memory _params = stakingManager.params();
     assertEq(_params.cooldownPeriod, _cooldownPeriod);
   }
 
-  function test_Revert_ModifyParameters_NullCooldownPeriod() public authorized {
-    vm.expectRevert(Assertions.NullAmount.selector);
+  function test_ModifyParameters_ZeroCooldownPeriod() public authorized {
     stakingManager.modifyParameters('cooldownPeriod', abi.encode(0));
+
+    IStakingManager.StakingManagerParams memory _params = stakingManager.params();
+    assertEq(_params.cooldownPeriod, 0);
   }
 }
 
@@ -841,6 +848,30 @@ contract Unit_StakingManager_Withdraw is Base {
     vm.warp(block.timestamp + stakingManager.params().cooldownPeriod + 1);
 
     // Expect token transfers
+    vm.expectCall(
+      address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT)
+    );
+    vm.expectCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT));
+
+    vm.prank(user);
+    stakingManager.withdraw();
+  }
+
+  function test_Withdraw_ZeroCooldownPeriod() public {
+    vm.prank(authorizedAccount);
+    stakingManager.modifyParameters('cooldownPeriod', abi.encode(0));
+
+    vm.mockCall(
+      address(mockStakingToken),
+      abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT),
+      abi.encode()
+    );
+    vm.mockCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT),
+      abi.encode(true)
+    );
+
     vm.expectCall(
       address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT)
     );
