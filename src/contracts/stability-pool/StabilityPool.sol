@@ -134,7 +134,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     address _coinJoin,
     address _collateralJoinFactory,
     address _collateralAuctionHouseFactory
-  ) ERC4626(IERC20(_systemCoin)) ERC20('Staked HAI', 'sHAI') Authorizable(msg.sender) {
+  ) ERC4626(IERC20(_assertNonZeroAddress(_systemCoin))) ERC20('Staked HAI', 'sHAI') Authorizable(msg.sender) {
+    _assertNonZeroAddress(_protocolToken);
+    _assertNonZeroAddress(_oracleRelayer);
+    _assertNonZeroAddress(_emissionsController);
+    _assertNonZeroAddress(_coinJoin);
+    _assertNonZeroAddress(_collateralJoinFactory);
+    _assertNonZeroAddress(_collateralAuctionHouseFactory);
+
     systemCoin = ISystemCoin(_systemCoin);
     protocolToken = IProtocolToken(_protocolToken);
     oracleRelayer = IOracleRelayer(_oracleRelayer);
@@ -858,5 +865,10 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     address _owner
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
     return super.redeem(_shares, _receiver, _owner);
+  }
+
+  function _assertNonZeroAddress(address _address) internal pure returns (address _nonZeroAddress) {
+    if (_address == address(0)) revert StabilityPool_InvalidRegistryAddress();
+    return _address;
   }
 }

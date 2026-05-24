@@ -86,6 +86,117 @@ contract Unit_StabilityPool_Constructor is Base {
   function test_Set_SystemCoin() public view {
     assertEq(address(stabilityPool.systemCoin()), address(systemCoin));
   }
+
+  function test_Revert_Constructor_InvalidSystemCoin() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(0),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidProtocolToken() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(0),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidOracleRelayer() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      address(0),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidEmissionsController() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(0),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCoinJoin() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      address(0),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCollateralJoinFactory() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      address(0),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCollateralAuctionHouseFactory() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      address(0)
+    );
+  }
+
+  function _deployStabilityPool(
+    address _systemCoin,
+    address _protocolToken,
+    address _oracleRelayer,
+    address _emissionsController,
+    address _coinJoin,
+    address _collateralJoinFactory,
+    address _collateralAuctionHouseFactory
+  ) internal returns (StabilityPool _stabilityPool) {
+    _stabilityPool = new StabilityPool(
+      _systemCoin,
+      _protocolToken,
+      _oracleRelayer,
+      _emissionsController,
+      _coinJoin,
+      _collateralJoinFactory,
+      _collateralAuctionHouseFactory
+    );
+  }
 }
 
 contract Unit_StabilityPool_TransferToggle is Base {

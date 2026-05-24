@@ -135,6 +135,8 @@ interface IStabilityPool is IERC4626 {
   error StabilityPool_TransfersAlreadyEnabled();
   /// @notice Throws when the emissions controller rewards receiver configuration is invalid
   error StabilityPool_InvalidRewardsReceiver();
+  /// @notice Throws when a constructor registry address is null
+  error StabilityPool_InvalidRegistryAddress();
   /// @notice Throws when claiming emissions-side rewards after reward accrual has been disabled
   error StabilityPool_RewardsInactive();
   /// @notice Throws when a strategy step delegatecall fails without bubbling a revert reason
