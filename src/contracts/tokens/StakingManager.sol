@@ -107,7 +107,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
   /**
    * @param  _protocolToken Address of the ProtocolToken contract
    * @param  _stakingToken Address of the StakingToken contract
-   * @param  _cooldownPeriod Amount of time before a user can withdraw their staked tokens
+   * @param  _cooldownPeriod Amount of time before a user can withdraw their staked tokens. Set to 0 for immediate
+   *                         withdrawals.
    */
   constructor(
     address _protocolToken,
@@ -489,7 +490,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc Modifiable
   function _validateParameters() internal view override {
-    _params.cooldownPeriod.assertNonNull().assertGt(0);
+    // A zero cooldown period is valid and enables immediate withdrawals.
     address(stakingToken).assertHasCode();
     address(protocolToken).assertHasCode();
   }

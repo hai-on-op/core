@@ -174,7 +174,7 @@ interface IStakingManager is IAuthorizable, IModifiable {
   }
 
   struct StakingManagerParams {
-    // Amount of time before a user can withdraw their staked tokens
+    // Amount of time before a user can withdraw their staked tokens. Zero allows immediate withdrawals.
     uint256 cooldownPeriod;
   }
 
@@ -196,7 +196,8 @@ interface IStakingManager is IAuthorizable, IModifiable {
 
   /**
    * @notice Getter for the unpacked contract parameters struct
-   * @return _cooldownPeriod How long a user has to wait before they can withdraw after initiating a withdrawal
+   * @return _cooldownPeriod How long a user has to wait before they can withdraw after initiating a withdrawal.
+   *         Zero allows immediate withdrawals.
    */
   // solhint-disable-next-line private-vars-leading-underscore
   function _params() external view returns (uint256 _cooldownPeriod);
