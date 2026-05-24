@@ -20,6 +20,8 @@ import {
 import {
   YearnVeloVaultRelayer, IYearnVeloVaultRelayer, IYearnVault
 } from '@contracts/oracles/YearnVeloVaultRelayer.sol';
+import {CurveStableSwapNGRelayer, ICurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {ICurveStableSwapNG} from '@interfaces/external/ICurveStableSwapNG.sol';
 
 import {
   OP_CHAINLINK_ETH_USD_FEED,
@@ -28,10 +30,13 @@ import {
   OP_WETH,
   OP_WBTC,
   UNISWAP_V3_FACTORY,
-  OP_VELO_POOL,
   OP_BEEFY_VAULT,
   OP_YEARN_VAULT,
-  OP_PESSIMISTIC_VELODROME_LP_ORACLE
+  OP_BEEFY_VELO_POOL,
+  OP_YEARN_VELO_POOL,
+  OP_PESSIMISTIC_BEEFY_VELO_LP_ORACLE,
+  OP_PESSIMISTIC_YEARN_VELO_LP_ORACLE,
+  OP_CURVE_BOLD_HAI_POOL
 } from '@script/Registry.s.sol';
 
 import {Math, WAD} from '@libraries/Math.sol';
@@ -39,24 +44,31 @@ import {Math, WAD} from '@libraries/Math.sol';
 contract E2EOracleSetup is HaiTest {
   using Math for uint256;
 
-  uint256 FORK_BLOCK = 132_000_000;
+  uint256 FORK_BLOCK = 145_700_000;
 
-  uint256 CHAINLINK_ETH_USD_PRICE = 272_041_245_000;
-  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 2_720_412_450_000_000_000_000;
+  uint256 CHAINLINK_ETH_USD_PRICE = 300_932_100_000;
+  uint256 CHAINLINK_ETH_USD_PRICE_18_DECIMALS = 3_009_321_000_000_000_000_000;
 
   uint256 NEW_ETH_USD_PRICE = 200_000_000_000;
   uint256 NEW_ETH_USD_PRICE_18_DECIMALS = 2_000_000_000_000_000_000_000;
 
-  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_193_800_000_000_000_000; // NOTE: 18 decimals
+  uint256 CHAINLINK_WSTETH_ETH_PRICE = 1_222_948_550_279_631_800; // NOTE: 18 decimals
+
   uint256 WSTETH_USD_PRICE = CHAINLINK_WSTETH_ETH_PRICE.wmul(CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
 
   uint24 FEE_TIER = 500;
 
-  uint256 WBTC_ETH_PRICE = 35_709_581_021_379_870_014; // 1 BTC = 35.7 ETH
-  uint256 WBTC_USD_PRICE = 97_144_788_794_845_514_565_467; // 1 BTC = 97,144 USD
+  uint256 WBTC_ETH_PRICE = 29_705_381_750_524_484_694; // 1 BTC = 29.7 ETH
 
-  uint256 BEEFY_VAULT_USD_PRICE = 6_342_856_314_535_727_422_890;
-  uint256 YEARN_VAULT_USD_PRICE = 6_226_675_854_311_674_727_197;
+  uint256 WBTC_USD_PRICE = 89_393_029_114_870_092_803_832;
+
+  uint256 BEEFY_VAULT_USD_PRICE = 2_119_673_803_767_658_995;
+  uint256 YEARN_VAULT_USD_PRICE = 6_781_104_950_435_476_108_805;
+
+  uint256 CURVE_BOLD_HAI_USD_PRICE = 1_274_761_197_339_668_297;
+
+  uint256 CURVE_BOLD_HAI_BASE_INDEX = 0;
+  uint256 CURVE_BOLD_HAI_QUOTE_INDEX = 1;
 
   IBaseOracle public wethUsdPriceSource;
   IBaseOracle public wstethEthPriceSource;
@@ -69,6 +81,7 @@ contract E2EOracleSetup is HaiTest {
 
   IBeefyVeloVaultRelayer public beefyVeloVaultRelayerOracle;
   IYearnVeloVaultRelayer public yearnVeloVaultRelayerOracle;
+  ICurveStableSwapNGRelayer public haiBoldRelayerOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -91,12 +104,18 @@ contract E2EOracleSetup is HaiTest {
     // --- Vaults ---
     beefyVeloVaultRelayerOracle = new BeefyVeloVaultRelayer(
       IBeefyVaultV7(OP_BEEFY_VAULT),
-      IVeloPool(OP_VELO_POOL),
-      IPessimisticVeloLpOracle(OP_PESSIMISTIC_VELODROME_LP_ORACLE)
+      IVeloPool(OP_BEEFY_VELO_POOL),
+      IPessimisticVeloLpOracle(OP_PESSIMISTIC_BEEFY_VELO_LP_ORACLE)
     );
+
     yearnVeloVaultRelayerOracle = new YearnVeloVaultRelayer(
-      IYearnVault(OP_YEARN_VAULT), IVeloPool(OP_VELO_POOL), IPessimisticVeloLpOracle(OP_PESSIMISTIC_VELODROME_LP_ORACLE)
+      IYearnVault(OP_YEARN_VAULT),
+      IVeloPool(OP_YEARN_VELO_POOL),
+      IPessimisticVeloLpOracle(OP_PESSIMISTIC_YEARN_VELO_LP_ORACLE)
     );
+
+    haiBoldRelayerOracle =
+      new CurveStableSwapNGRelayer(OP_CURVE_BOLD_HAI_POOL, CURVE_BOLD_HAI_BASE_INDEX, CURVE_BOLD_HAI_QUOTE_INDEX);
   }
 
   function test_OptimismFork() public {
@@ -110,7 +129,7 @@ contract E2EOracleSetup is HaiTest {
   }
 
   function test_ChainlinkRelayer() public {
-    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 2720);
+    assertEq(CHAINLINK_ETH_USD_PRICE_18_DECIMALS / 1e18, 3009);
     assertEq(wethUsdPriceSource.read(), CHAINLINK_ETH_USD_PRICE_18_DECIMALS);
   }
 
@@ -142,12 +161,12 @@ contract E2EOracleSetup is HaiTest {
    *       concatenate in the right order, e.g WSTETH/ETH - ETH/USD
    */
   function test_DenominatedOracle() public {
-    assertEq(WSTETH_USD_PRICE / 1e18, 3247); // 2720.41 * 1.1938 = 3247
+    assertEq(WSTETH_USD_PRICE / 1e18, 3680); // 3009.24 * 1.2229 = 3680
     assertEq(wstethUsdPriceSource.read(), WSTETH_USD_PRICE);
   }
 
   function test_DenominatedOracleUniV3() public {
-    assertEq(WBTC_USD_PRICE / 1e18, 97_144); // 35.709 * 2720.41 = 97144
+    assertEq(WBTC_USD_PRICE / 1e18, 89_393); // 29.7 * 3009.24 = 89393
     assertEq(wbtcUsdPriceSource.read(), WBTC_USD_PRICE);
   }
 
@@ -262,7 +281,7 @@ contract E2EOracleSetup is HaiTest {
   }
 
   function test_BeefyVeloVaultRelayerSymbol() public {
-    assertEq(beefyVeloVaultRelayerOracle.symbol(), 'mooVeloV2wstETH-WETH / USD');
+    assertEq(beefyVeloVaultRelayerOracle.symbol(), 'mooVelodromeOptimismBOLD-LUSD / USD');
   }
 
   function test_YearnVeloVaultRelayer() public {
@@ -270,6 +289,16 @@ contract E2EOracleSetup is HaiTest {
   }
 
   function test_YearnVeloVaultRelayerSymbol() public {
-    assertEq(yearnVeloVaultRelayerOracle.symbol(), 'yvVelo-wstETH-WETH-f / USD');
+    assertEq(yearnVeloVaultRelayerOracle.symbol(), 'yvVelo-alETH-WETH-f / USD');
+  }
+
+  // --- Curve StableSwap-NG ---
+
+  function test_CurveStableSwapNGRelayer() public {
+    assertEq(haiBoldRelayerOracle.read(), CURVE_BOLD_HAI_USD_PRICE);
+  }
+
+  function test_CurveStableSwapNGRelayerSymbol() public {
+    assertEq(haiBoldRelayerOracle.symbol(), 'HAI / BOLD');
   }
 }
