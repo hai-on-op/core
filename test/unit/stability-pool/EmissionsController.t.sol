@@ -290,6 +290,22 @@ abstract contract Base_EmissionsControllerEdgeCases is HaiTest {
 }
 
 contract Unit_EmissionsController_ConstructorReverts is HaiTest {
+  function test_Revert_Constructor_InvalidKiteToken() public {
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidKiteToken.selector);
+    new EmissionsController(
+      ERC20ForTest(address(0)), IOracleRelayer(address(_oracle)), address(this), YEAR * 100 * WAD, YEAR, 0.1e18
+    );
+  }
+
+  function test_Revert_Constructor_InvalidOracleRelayer() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidOracleRelayer.selector);
+    new EmissionsController(_kite, IOracleRelayer(address(0)), address(this), YEAR * 100 * WAD, YEAR, 0.1e18);
+  }
+
   function test_Revert_Constructor_InvalidStabilityReceiver() public {
     ERC20ForTest _kite = new ERC20ForTest();
     MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();

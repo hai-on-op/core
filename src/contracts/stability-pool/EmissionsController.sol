@@ -102,6 +102,8 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     uint256 _emissionDuration,
     uint256 _deviationLimit
   ) Authorizable(msg.sender) {
+    if (address(_kiteToken) == address(0)) revert EmissionsController_InvalidKiteToken();
+    if (address(_oracleRelayer) == address(0)) revert EmissionsController_InvalidOracleRelayer();
     if (_stabilityRewardsReceiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
     if (_emissionDuration == 0) revert EmissionsController_InvalidEmissionDuration();
     if (_deviationLimit == 0) revert EmissionsController_InvalidDeviationLimit();

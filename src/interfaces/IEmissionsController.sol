@@ -67,6 +67,10 @@ interface IEmissionsController {
   error EmissionsController_EmissionsEnded();
   /// @notice Throws when trying to set a null stability receiver
   error EmissionsController_InvalidStabilityReceiver();
+  /// @notice Throws when the KITE token is null
+  error EmissionsController_InvalidKiteToken();
+  /// @notice Throws when the OracleRelayer is null
+  error EmissionsController_InvalidOracleRelayer();
   /// @notice Throws when redemption price is zero
   error EmissionsController_InvalidRedemptionPrice();
   /// @notice Throws when caller is not the stability rewards receiver
