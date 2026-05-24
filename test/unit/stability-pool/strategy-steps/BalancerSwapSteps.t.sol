@@ -104,4 +104,23 @@ contract Unit_BalancerV3StablePoolMathSwapStep is Base {
     assertEq(_out[0], 30e18);
     assertEq(tokenOut.balanceOf(address(step)), 30e18);
   }
+
+  function test_Execute_StablePoolMath_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+    tokenIn.mint(address(step), 10e18);
+
+    BalancerV3StablePoolMathSwapStep.Data memory _data = BalancerV3StablePoolMathSwapStep.Data({
+      router: address(router),
+      pool: address(pool),
+      tokenIn: address(tokenIn),
+      tokenOut: address(tokenOut),
+      deadlineBuffer: 0,
+      userData: bytes('')
+    });
+
+    uint256[] memory _out = step.execute(abi.encode(_data), 10e18, new uint256[](0));
+
+    assertEq(_out[0], 30e18);
+    assertEq(router.lastDeadline(), block.timestamp + 1);
+  }
 }

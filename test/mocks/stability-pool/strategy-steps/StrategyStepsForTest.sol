@@ -170,6 +170,7 @@ contract MockBalancerV3Vault {}
 
 contract MockBalancerV3Router {
   uint256 public outMultiplier = 3e18; // 3x in WAD
+  uint256 public lastDeadline;
   address public immutable mockVault;
 
   constructor(address _vault) {
@@ -186,10 +187,11 @@ contract MockBalancerV3Router {
     IERC20 _tokenOut,
     uint256 _exactAmountIn,
     uint256 _minAmountOut,
-    uint256,
+    uint256 _deadline,
     bytes calldata
   ) external returns (uint256 _amountOut) {
     // Push model: tokens should already be at the vault
+    lastDeadline = _deadline;
     require(IERC20(_tokenIn).balanceOf(mockVault) >= _exactAmountIn, 'tokens-not-at-vault');
     _amountOut = (_exactAmountIn * outMultiplier) / 1e18;
     require(_amountOut >= _minAmountOut, 'min-out');

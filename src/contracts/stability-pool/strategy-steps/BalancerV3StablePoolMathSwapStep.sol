@@ -122,7 +122,7 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
       IERC20(_decoded.tokenOut),
       _amountIn,
       _minOut,
-      block.timestamp + _decoded.deadlineBuffer,
+      block.timestamp + 1,
       _decoded.userData
     );
   }
