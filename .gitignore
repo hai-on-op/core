@@ -25,3 +25,11 @@ docs/src/static
 
 .yarn/
 .yarnrc.yml
+
+# Editor files
+.zed/
+notes/
+
+# Tools
+.specstory/
+skills/
