@@ -277,6 +277,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
           j: int128(0),
           tokenIn: BOLD_ADDR,
           tokenOut: HAI_ADDR,
+          useOracleFloor: true,
           tokenInOracle: boldUsdOracle,
           tokenOutOracle: HAI_USD_ORACLE,
           oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
@@ -301,6 +302,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
           tokenOut: WA_OPT_WETH_ADDR,
           deadlineBuffer: 1 hours,
           userData: bytes(''),
+          useOracleFloor: true,
           tokenInOracle: RETH_USD_ORACLE,
           tokenOutOracle: waOptWethUsdOracle,
           oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS

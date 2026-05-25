@@ -190,7 +190,7 @@ function encodeVeloSwap(data) {
 function encodeCurveSwap(data) {
   return encodeTuple(
     'tuple(address pool,int128 i,int128 j,address tokenIn,address tokenOut,' +
-      'address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
     data
   );
 }
@@ -198,7 +198,7 @@ function encodeCurveSwap(data) {
 function encodeBalancerV3Swap(data) {
   return encodeTuple(
     'tuple(address router,address pool,address tokenIn,address tokenOut,uint256 deadlineBuffer,bytes userData,' +
-      'address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
     data
   );
 }
@@ -258,6 +258,7 @@ function buildShared(steps, slippageBps, oracleAddresses) {
         j: 0,
         tokenIn: TOKEN_ADDRESSES.BOLD,
         tokenOut: TOKEN_ADDRESSES.HAI,
+        useOracleFloor: true,
         tokenInOracle: oracleAddresses.BOLD_USD,
         tokenOutOracle: oracleAddresses.HAI_USD,
         oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS,
@@ -334,6 +335,7 @@ export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_S
           tokenOut: TOKEN_ADDRESSES.WA_OPT_WETH,
           deadlineBuffer: 3600,
           userData: '0x',
+          useOracleFloor: true,
           tokenInOracle: mergedOracleAddresses.RETH_USD,
           tokenOutOracle: mergedOracleAddresses.WA_OPT_WETH_USD,
           oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS,

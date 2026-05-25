@@ -58,6 +58,7 @@ contract E2EBalancerV3StablePoolMathSwapStepForkTest is ForkedMainnetAt148368730
       tokenOut: WA_OPT_WETH,
       deadlineBuffer: 1 hours,
       userData: bytes(''),
+      useOracleFloor: true,
       tokenInOracle: RETH_USD_ORACLE,
       tokenOutOracle: address(waOptWethUsdOracle),
       oracleToleranceBps: ORACLE_TOLERANCE_BPS
@@ -165,6 +166,7 @@ contract E2ECurveSwapStepForkTest is ForkedMainnetAt148368730 {
       j: int128(0),
       tokenIn: BOLD,
       tokenOut: HAI,
+      useOracleFloor: true,
       tokenInOracle: address(boldUsdOracle),
       tokenOutOracle: HAI_USD_ORACLE,
       oracleToleranceBps: ORACLE_TOLERANCE_BPS

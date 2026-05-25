@@ -31,6 +31,7 @@ contract CurveSwapStep is IStrategyStep {
     int128 j; // index of the output token
     address tokenIn;
     address tokenOut;
+    bool useOracleFloor;
     address tokenInOracle;
     address tokenOutOracle;
     uint16 oracleToleranceBps;
@@ -92,6 +93,8 @@ contract CurveSwapStep is IStrategyStep {
   // --- Internal Methods ---
 
   function _oracleMinOut(Data memory _decoded, uint256 _amountIn) internal view returns (uint256 _minOut) {
+    if (!_decoded.useOracleFloor) return 0;
+
     if (_decoded.tokenInOracle == address(0) || _decoded.tokenOutOracle == address(0)) {
       revert CurveSwapStep_InvalidOracle();
     }

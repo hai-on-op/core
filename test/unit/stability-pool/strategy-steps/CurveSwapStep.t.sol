@@ -31,6 +31,7 @@ abstract contract Base is HaiTest {
       j: int128(1),
       tokenIn: address(tokenIn),
       tokenOut: address(tokenOut),
+      useOracleFloor: true,
       tokenInOracle: address(tokenInOracle),
       tokenOutOracle: address(tokenOutOracle),
       oracleToleranceBps: 0
@@ -52,6 +53,16 @@ contract Unit_CurveSwapStep is Base {
 
     vm.expectRevert(CurveSwapStep.CurveSwapStep_OracleFloorNotMet.selector);
     step.preview(abi.encode(_data()), 10e18);
+  }
+
+  function test_Preview_OracleFloorDisabled_IgnoresMissingOracle() public {
+    CurveSwapStep.Data memory _data = _data();
+    _data.useOracleFloor = false;
+    _data.tokenInOracle = address(0);
+    _data.tokenOutOracle = address(0);
+
+    uint256[] memory _preview = step.preview(abi.encode(_data), 10e18);
+    assertEq(_preview[0], 20e18);
   }
 
   function test_Preview_ZeroAmount() public view {
@@ -111,6 +122,19 @@ contract Unit_CurveSwapStep is Base {
 
     vm.expectRevert(bytes('min-out'));
     step.execute(abi.encode(_data()), 10e18, new uint256[](0));
+  }
+
+  function test_Execute_OracleFloorDisabled_UsesPoolOutput() public {
+    pool.setOutMultiplier(1.9e18);
+    tokenIn.mint(address(step), 10e18);
+    tokenInOracle.setPriceAndValidity(2e18, true);
+    tokenOutOracle.setPriceAndValidity(1e18, true);
+
+    CurveSwapStep.Data memory _data = _data();
+    _data.useOracleFloor = false;
+
+    uint256[] memory _out = step.execute(abi.encode(_data), 10e18, new uint256[](0));
+    assertEq(_out[0], 19e18);
   }
 
   function test_Execute_ZeroAmount() public {

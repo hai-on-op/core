@@ -38,6 +38,7 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
     address tokenOut;
     uint256 deadlineBuffer;
     bytes userData;
+    bool useOracleFloor;
     address tokenInOracle;
     address tokenOutOracle;
     uint16 oracleToleranceBps;
@@ -147,6 +148,8 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
   // --- Internal Methods ---
 
   function _oracleMinOut(Data memory _decoded, uint256 _amountIn) internal view returns (uint256 _minOut) {
+    if (!_decoded.useOracleFloor) return 0;
+
     if (_decoded.tokenInOracle == address(0) || _decoded.tokenOutOracle == address(0)) {
       revert BalancerV3StablePoolMathSwapStep_InvalidOracle();
     }

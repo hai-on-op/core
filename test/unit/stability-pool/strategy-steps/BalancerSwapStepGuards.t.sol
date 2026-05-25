@@ -44,6 +44,7 @@ abstract contract Base is HaiTest {
       tokenOut: address(tokenOut),
       deadlineBuffer: 1 hours,
       userData: bytes(''),
+      useOracleFloor: true,
       tokenInOracle: _tokenInOracle,
       tokenOutOracle: _tokenOutOracle,
       oracleToleranceBps: _oracleToleranceBps

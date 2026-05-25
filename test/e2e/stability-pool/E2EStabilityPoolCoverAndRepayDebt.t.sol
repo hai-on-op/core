@@ -837,6 +837,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         j: int128(0),
         tokenIn: BOLD,
         tokenOut: HAI,
+        useOracleFloor: true,
         tokenInOracle: address(boldUsdOracle),
         tokenOutOracle: HAI_USD_ORACLE,
         oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
@@ -853,6 +854,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenOut: WA_OPT_WETH,
         deadlineBuffer: 1 hours,
         userData: bytes(''),
+        useOracleFloor: true,
         tokenInOracle: RETH_USD_ORACLE,
         tokenOutOracle: address(waOptWethUsdOracle),
         oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS

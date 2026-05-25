@@ -889,6 +889,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         j: int128(0),
         tokenIn: BOLD_ADDR,
         tokenOut: HAI_ADDR,
+        useOracleFloor: true,
         tokenInOracle: address(boldUsdOracle),
         tokenOutOracle: HAI_USD_ORACLE,
         oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS

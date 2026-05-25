@@ -75,6 +75,7 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenOut: TOKEN_OUT,
         deadlineBuffer: 1 hours,
         userData: bytes(''),
+        useOracleFloor: true,
         tokenInOracle: address(0),
         tokenOutOracle: address(0),
         oracleToleranceBps: 0
@@ -98,6 +99,7 @@ contract Unit_StrategyStep_Metadata is Base {
         j: int128(1),
         tokenIn: TOKEN_IN,
         tokenOut: TOKEN_OUT,
+        useOracleFloor: true,
         tokenInOracle: address(1),
         tokenOutOracle: address(2),
         oracleToleranceBps: 0

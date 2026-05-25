@@ -53,6 +53,7 @@ contract Unit_BalancerV3StablePoolMathSwapStep is Base {
       tokenOut: address(tokenOut),
       deadlineBuffer: 1 hours,
       userData: bytes(''),
+      useOracleFloor: true,
       tokenInOracle: address(tokenInOracle),
       tokenOutOracle: address(tokenOutOracle),
       oracleToleranceBps: _oracleToleranceBps
@@ -97,6 +98,18 @@ contract Unit_BalancerV3StablePoolMathSwapStep is Base {
     step.preview(abi.encode(_data), 10e18);
   }
 
+  function test_Preview_OracleFloorDisabled_IgnoresMissingOracle() public {
+    pool.setOutMultiplier(1.7e18);
+
+    BalancerV3StablePoolMathSwapStep.Data memory _data = _balancerData(0);
+    _data.useOracleFloor = false;
+    _data.tokenInOracle = address(0);
+    _data.tokenOutOracle = address(0);
+
+    uint256[] memory _preview = step.preview(abi.encode(_data), 10e18);
+    assertEq(_preview[0], 17e18);
+  }
+
   function test_Execute_StablePoolMath() public {
     tokenIn.mint(address(step), 10e18);
 
@@ -133,5 +146,18 @@ contract Unit_BalancerV3StablePoolMathSwapStep is Base {
 
     vm.expectRevert(bytes('min-out'));
     step.execute(abi.encode(_data), 10e18, new uint256[](0));
+  }
+
+  function test_Execute_OracleFloorDisabled_UsesRouterOutput() public {
+    router.setOutMultiplier(1.9e18);
+    tokenIn.mint(address(step), 10e18);
+    tokenInOracle.setPriceAndValidity(2e18, true);
+    tokenOutOracle.setPriceAndValidity(1e18, true);
+
+    BalancerV3StablePoolMathSwapStep.Data memory _data = _balancerData(0);
+    _data.useOracleFloor = false;
+
+    uint256[] memory _out = step.execute(abi.encode(_data), 10e18, new uint256[](0));
+    assertEq(_out[0], 19e18);
   }
 }
