@@ -8,8 +8,11 @@ import {Common} from '@script/Common.s.sol';
 import {MainnetDeployment} from '@script/MainnetDeployment.s.sol';
 import '@script/Registry.s.sol';
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
 import {CurveSwapStep} from '@contracts/stability-pool/strategy-steps/CurveSwapStep.sol';
 import {VeloSwapStep} from '@contracts/stability-pool/strategy-steps/VeloSwapStep.sol';
@@ -45,6 +48,13 @@ contract StepsScript is MainnetDeployment, Common, Script {
   address internal constant VELO_FACTORY = 0xF1046053aa5682b4F9a81b5481394DA16BE5FF5a;
 
   address internal constant BALANCER_V3_ROUTER = 0x84813aA3e079A665C0B80F944427eE83cBA63617;
+
+  // --- ORACLE ADDRESSES ---
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+
+  address internal waOptWethUsdOracle;
 
   // --- TOKEN ADDRESSES ---
   address internal constant WETH_ADDR = 0x4200000000000000000000000000000000000006;
@@ -264,20 +274,25 @@ contract StepsScript is MainnetDeployment, Common, Script {
   //                      BALANCER V3 SWAP STEPS
   // ============================================================
 
-  IStabilityPool.StepConfig internal RETH_WA_OPT_WETH_BALANCER_V3_STEP_CONFIG = IStabilityPool.StepConfig({
-    step: BALANCER_V3_STEP,
-    data: abi.encode(
-      BalancerV3StablePoolMathSwapStep.Data({
-        router: BALANCER_V3_ROUTER,
-        pool: BALANCER_V3_RETH_WA_OPT_WETH_POOL,
-        tokenIn: RETH_ADDR,
-        tokenOut: WA_OPT_WETH_ADDR,
-        deadlineBuffer: 1 hours,
-        userData: bytes('')
-      })
-    ),
-    slippageBps: 0
-  });
+  function _rethWaOptWethBalancerV3StepConfig() internal view returns (IStabilityPool.StepConfig memory _config) {
+    _config = IStabilityPool.StepConfig({
+      step: BALANCER_V3_STEP,
+      data: abi.encode(
+        BalancerV3StablePoolMathSwapStep.Data({
+          router: BALANCER_V3_ROUTER,
+          pool: BALANCER_V3_RETH_WA_OPT_WETH_POOL,
+          tokenIn: RETH_ADDR,
+          tokenOut: WA_OPT_WETH_ADDR,
+          deadlineBuffer: 1 hours,
+          userData: bytes(''),
+          tokenInOracle: RETH_USD_ORACLE,
+          tokenOutOracle: waOptWethUsdOracle,
+          oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS
+        })
+      ),
+      slippageBps: 0
+    });
+  }
 
   // ============================================================
   //                      ERC4626 WITHDRAWAL STEPS
@@ -395,6 +410,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
 
   function setUp() public virtual {}
 
+  function _deployWaOptWethUsdOracle() internal returns (address _oracle) {
+    _oracle =
+      address(new ERC4626ShareOracle(IERC4626(WA_OPT_WETH_ADDR), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD'));
+  }
+
   /**
    * @notice This script is left as an example on how to use MainnetScript contract
    * @dev    This script is executed with `yarn script:mainnet` command
@@ -404,6 +424,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     vm.startBroadcast();
 
     // balancerV3Step = address(new BalancerV3StablePoolMathSwapStep());
+    // waOptWethUsdOracle = _deployWaOptWethUsdOracle();
     // erc4626Step = address(new ERC4626WithdrawalStep());
     // curveStep = address(new CurveSwapStep());
     // veloSwapStep = address(new VeloSwapStep());
@@ -459,7 +480,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
   function _configureRETH() internal {
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](5);
     // Step 1: RETH -> WA_OPT_WETH (Balancer V3)
-    _steps[0] = RETH_WA_OPT_WETH_BALANCER_V3_STEP_CONFIG;
+    _steps[0] = _rethWaOptWethBalancerV3StepConfig();
     // Step 2: WA_OPT_WETH -> WETH (ERC4626)
     _steps[1] = WA_OPT_WETH_ERC4626_WITHDRAWAL_STEP_CONFIG;
     // Step 3: WETH -> USDC (VeloCL)

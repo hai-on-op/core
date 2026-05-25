@@ -5,6 +5,8 @@ import {fileURLToPath} from 'url';
 
 import {ethers} from 'ethers';
 
+import {ORACLE_ADDRESSES, TOKEN_ADDRESSES} from './stability-pool-config.mjs';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT_DIR = path.resolve(__dirname, '../..');
@@ -107,6 +109,15 @@ function buildVerificationJobs(manifest) {
       name: 'YearnVaultWithdrawalStep',
       address: manifest.deployedContracts.strategySteps.yearnStep,
       contract: 'src/contracts/stability-pool/strategy-steps/YearnVaultWithdrawalStep.sol:YearnVaultWithdrawalStep',
+    },
+    {
+      name: 'ERC4626ShareOracle_waOptWETH',
+      address: manifest.deployedContracts.oracles.waOptWethUsdOracle,
+      contract: 'src/contracts/oracles/ERC4626ShareOracle.sol:ERC4626ShareOracle',
+      constructorArgs: abiCoder.encode(
+        ['address', 'address', 'string'],
+        [TOKEN_ADDRESSES.WA_OPT_WETH, ORACLE_ADDRESSES.WETH_USD, 'waOptWETH / USD']
+      ),
     },
     ...manifest.collaterals.map(collateral => ({
       name: `HardcodedOracle_${collateral.cTypeName}`,

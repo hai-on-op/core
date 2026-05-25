@@ -74,6 +74,15 @@ export const STRATEGY_STEP_ARTIFACTS = [
   },
 ];
 
+export const ORACLE_ARTIFACTS = [
+  {
+    key: 'waOptWethUsdOracle',
+    contractName: 'ERC4626ShareOracle',
+    artifactPath: 'out/ERC4626ShareOracle.sol/ERC4626ShareOracle.json',
+    constructorArgs: ['__WA_OPT_WETH__', '__WETH_USD_ORACLE__', 'waOptWETH / USD'],
+  },
+];
+
 export const TOKEN_ADDRESSES = {
   WETH: '0x4200000000000000000000000000000000000006',
   WSTETH: '0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb',
@@ -117,7 +126,13 @@ export const EXTERNAL_ADDRESSES = {
   yearnMsethWethVault: '0xd0d2Ac44Cc842079e978bB11b094764f7D0dec6A',
 };
 
+export const ORACLE_ADDRESSES = {
+  RETH_USD: '0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740',
+  WETH_USD: '0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36',
+};
+
 export const DEFAULT_STEP_SLIPPAGE_BPS = 200;
+export const BALANCER_ORACLE_TOLERANCE_BPS = 200;
 
 export const DEFAULT_TARGET_DEBT_WAD = {
   WETH: 500n * WAD,
@@ -164,7 +179,8 @@ function encodeCurveSwap(data) {
 
 function encodeBalancerV3Swap(data) {
   return encodeTuple(
-    'tuple(address router,address pool,address tokenIn,address tokenOut,uint256 deadlineBuffer,bytes userData)',
+    'tuple(address router,address pool,address tokenIn,address tokenOut,uint256 deadlineBuffer,bytes userData,' +
+      'address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
     data
   );
 }
@@ -242,7 +258,8 @@ export function stringFromBytes32(value) {
   }
 }
 
-export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_SLIPPAGE_BPS) {
+export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_SLIPPAGE_BPS, oracleAddresses = {}) {
+  const mergedOracleAddresses = { ...ORACLE_ADDRESSES, ...oracleAddresses };
   const shared = buildShared(stepAddresses, slippageBps);
 
   const wethToUsdc = shared.wethToUsdc;
@@ -296,6 +313,9 @@ export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_S
           tokenOut: TOKEN_ADDRESSES.WA_OPT_WETH,
           deadlineBuffer: 3600,
           userData: '0x',
+          tokenInOracle: mergedOracleAddresses.RETH_USD,
+          tokenOutOracle: mergedOracleAddresses.WA_OPT_WETH_USD,
+          oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS,
         }),
         slippageBps
       ),
