@@ -351,6 +351,34 @@ contract Unit_EmissionsController_CustomDuration is HaiTest {
     assertEq(_controller.currentStabilityPoolRate(), (_expectedRate * 50) / 100);
     assertEq(_controller.currentMintingRate(), (_expectedRate * 50) / 100);
   }
+
+  function test_Constructor_CarriesRateDivisionRemainder() public {
+    uint256 _totalKite = 10e18 + 9;
+    uint256 _duration = 10;
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, _totalKite, _duration, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), _totalKite / _duration);
+    assertEq(_controller.undistributedKiteAmount(), _totalKite % _duration);
+  }
+
+  function test_Constructor_SplitRatesAddUpToBaseRate() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, 101, 1, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), 101);
+    assertEq(_controller.currentStabilityPoolRate(), 50);
+    assertEq(_controller.currentMintingRate(), 51);
+    assertEq(_controller.currentStabilityPoolRate() + _controller.currentMintingRate(), _controller.baseEmissionRate());
+  }
 }
 
 contract Unit_EmissionsController_UpdateSplitLinear is Base_EmissionsControllerEdgeCases {
@@ -452,8 +480,9 @@ contract Unit_EmissionsController_Extension is Base_EmissionsControllerEdgeCases
 
     assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
     assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+    uint256 _expectedStabilityRate = (_expectedBaseRate * 50) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _expectedBaseRate - _expectedStabilityRate);
     assertEq(emissionsController.currentRateStartTime(), _now);
   }
 
@@ -477,8 +506,34 @@ contract Unit_EmissionsController_Extension is Base_EmissionsControllerEdgeCases
     assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
     assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
     assertEq(emissionsController.lastCheckpointTime(), _now);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+    uint256 _expectedStabilityRate = (_expectedBaseRate * 50) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _expectedBaseRate - _expectedStabilityRate);
+  }
+
+  function test_ExtendEmissions_CarriesUndistributedRemainderIntoNewRate() public {
+    uint256 _totalKite = 10e18 + 9;
+    uint256 _duration = 10;
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, _totalKite, _duration, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), 1e18);
+    assertEq(_controller.undistributedKiteAmount(), 9);
+
+    uint256 _additionalDuration = 1;
+    uint256 _expectedRemainingAmount =
+      _controller.baseEmissionRate() * _duration + _controller.undistributedKiteAmount();
+    uint256 _expectedRemainingDuration = _duration + _additionalDuration;
+
+    vm.prank(deployer);
+    _controller.extendEmissions(0, _additionalDuration);
+
+    assertEq(_controller.baseEmissionRate(), _expectedRemainingAmount / _expectedRemainingDuration);
+    assertEq(_controller.undistributedKiteAmount(), _expectedRemainingAmount % _expectedRemainingDuration);
   }
 }
 
