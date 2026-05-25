@@ -147,13 +147,15 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     uint256 _redemptionPrice = oracleRelayer.calcRedemptionPrice();
     if (_redemptionPrice == 0) revert EmissionsController_InvalidRedemptionPrice();
     uint256 _marketPrice = oracleRelayer.marketPrice();
+    if (_marketPrice == 0) revert EmissionsController_InvalidMarketPrice();
 
-    // Calculate deviation: (redemptionPrice - marketPrice) / redemptionPrice
+    // Calculate deviation: (redemptionPrice - marketPrice) / min(redemptionPrice, marketPrice)
     // Convert to WAD for easier calculation: deviation in WAD
     // Positive deviation: redemptionPrice > marketPrice (HAI below peg, more to stability pool)
     // Negative deviation: marketPrice > redemptionPrice (HAI above peg, more to minting)
+    uint256 _truePrice = _redemptionPrice < _marketPrice ? _redemptionPrice : _marketPrice;
     int256 _numerator = int256(_redemptionPrice) - int256(_marketPrice);
-    int256 _deviationWad = (_numerator * int256(WAD)) / int256(_redemptionPrice);
+    int256 _deviationWad = (_numerator * int256(WAD)) / int256(_truePrice);
 
     // Calculate new split
     uint256 _newStabilityPoolSplit;

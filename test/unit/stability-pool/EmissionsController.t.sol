@@ -168,6 +168,14 @@ contract Unit_EmissionsController_UpdateSplit is Base {
     vm.expectRevert(IEmissionsController.EmissionsController_InvalidRedemptionPrice.selector);
     emissionsController.updateRewardSplit();
   }
+
+  function test_Revert_InvalidMarketPrice() public {
+    vm.warp(block.timestamp + HOUR + 1);
+
+    mockOracleRelayer.setPrices(1e27, 0);
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidMarketPrice.selector);
+    emissionsController.updateRewardSplit();
+  }
 }
 
 abstract contract Base_EmissionsControllerCore is HaiTest {
@@ -384,15 +392,16 @@ contract Unit_EmissionsController_CustomDuration is HaiTest {
 contract Unit_EmissionsController_UpdateSplitLinear is Base_EmissionsControllerEdgeCases {
   function test_UpdateSplit_LinearBranch_UpdatesRatesAndTimestamps() public {
     vm.warp(block.timestamp + HOUR + 1);
-    oracle.setPrices(1e27, 95e25); // +5% deviation => 75/25 split for 10% limit
+    oracle.setPrices(1e27, 95e25); // +5.26% deviation vs market price => 76/24 split for 10% limit
 
     emissionsController.updateRewardSplit();
 
     uint256 _totalRate = TOTAL_KITE / YEAR;
-    assertEq(emissionsController.stabilityPoolSplit(), 75);
-    assertEq(emissionsController.mintingSplit(), 25);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_totalRate * 75) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_totalRate * 25) / 100);
+    assertEq(emissionsController.stabilityPoolSplit(), 76);
+    assertEq(emissionsController.mintingSplit(), 24);
+    uint256 _expectedStabilityRate = (_totalRate * 76) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _totalRate - _expectedStabilityRate);
     assertEq(emissionsController.currentRateStartTime(), block.timestamp);
     assertEq(emissionsController.lastSplitUpdateTime(), block.timestamp);
   }
