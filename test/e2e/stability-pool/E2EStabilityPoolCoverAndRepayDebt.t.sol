@@ -16,7 +16,9 @@ import {ITaxCollector} from '@interfaces/ITaxCollector.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {ICollateralJoin} from '@interfaces/utils/ICollateralJoin.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IWeth} from '@interfaces/external/IWeth.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -64,6 +66,10 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   address internal constant BOLD_LUSD_VELO_BEEFY_VAULT = 0xC06C0A19d0A3eD7B3BA9D7c3101B6BC9634b84a9;
   address internal constant ALETH_WETH_YEARN_VAULT = 0xf7D66b41Cd4241eae450fd9D2d6995754634D9f3;
 
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+
   uint256 internal constant SAFE_WETH_COLLATERAL_WEI = 3e18;
   uint256 internal constant SAFE_RETH_COLLATERAL_WEI = 3e18;
   uint256 internal constant SAFE_MOO_BOLD_LUSD_COLLATERAL_WEI = 250e18;
@@ -94,6 +100,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   BeefyVaultWithdrawalStep internal beefyStep;
   YearnVaultWithdrawalStep internal yearnStep;
   CurveSwapStep internal curveStep;
+  ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -124,6 +131,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     beefyStep = new BeefyVaultWithdrawalStep();
     yearnStep = new YearnVaultWithdrawalStep();
     curveStep = new CurveSwapStep();
+    waOptWethUsdOracle = new ERC4626ShareOracle(IERC4626(WA_OPT_WETH), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
 
     stabilityPool.setStepWhitelist(address(balancerV3Step), true);
     stabilityPool.setStepWhitelist(address(erc4626Step), true);
@@ -820,7 +828,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     );
   }
 
-  function _rethToWaOptWethBalancerV3Data() internal pure returns (bytes memory _data) {
+  function _rethToWaOptWethBalancerV3Data() internal view returns (bytes memory _data) {
     _data = abi.encode(
       BalancerV3StablePoolMathSwapStep.Data({
         router: BALANCER_V3_ROUTER,
@@ -828,7 +836,10 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenIn: RETH,
         tokenOut: WA_OPT_WETH,
         deadlineBuffer: 1 hours,
-        userData: bytes('')
+        userData: bytes(''),
+        tokenInOracle: RETH_USD_ORACLE,
+        tokenOutOracle: address(waOptWethUsdOracle),
+        oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS
       })
     );
   }

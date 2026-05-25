@@ -74,7 +74,10 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenIn: TOKEN_IN,
         tokenOut: TOKEN_OUT,
         deadlineBuffer: 1 hours,
-        userData: bytes('')
+        userData: bytes(''),
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(balancerStep, _data, bytes32('BALANCER_V3_SWAP'), TOKEN_IN, TOKEN_OUT);

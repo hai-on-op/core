@@ -177,6 +177,10 @@ contract MockBalancerV3Router {
     mockVault = _vault;
   }
 
+  function setOutMultiplier(uint256 _outMultiplier) external {
+    outMultiplier = _outMultiplier;
+  }
+
   function getVault() external view returns (address) {
     return mockVault;
   }
@@ -353,6 +357,14 @@ contract MockERC4626Vault is ERC20ForTest {
 
   constructor(address _assetToken) {
     assetToken = ERC20ForTest(_assetToken);
+  }
+
+  function asset() external view returns (address _asset) {
+    return address(assetToken);
+  }
+
+  function convertToAssets(uint256 _shares) external view returns (uint256 _assets) {
+    _assets = (_shares * assetsPerShare) / 1e18;
   }
 
   function previewRedeem(uint256 _shares) external view returns (uint256 _assets) {

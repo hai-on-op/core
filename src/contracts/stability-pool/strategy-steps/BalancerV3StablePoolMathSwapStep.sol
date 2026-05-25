@@ -2,7 +2,9 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {
@@ -10,6 +12,7 @@ import {
   IBalancerV3VaultStableMath,
   IBalancerV3StablePoolLike
 } from '@interfaces/external/IBalancerV3StableMath.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 /**
  * @title BalancerV3StablePoolMathSwapStep
@@ -21,6 +24,10 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
   // --- Errors ---
 
   error BalancerV3StablePoolMathSwapStep_UnsupportedHooks();
+  error BalancerV3StablePoolMathSwapStep_InvalidOracle();
+  error BalancerV3StablePoolMathSwapStep_InvalidOraclePrice();
+  error BalancerV3StablePoolMathSwapStep_InvalidOracleTolerance();
+  error BalancerV3StablePoolMathSwapStep_OracleFloorNotMet();
 
   // --- Data ---
 
@@ -31,12 +38,16 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
     address tokenOut;
     uint256 deadlineBuffer;
     bytes userData;
+    address tokenInOracle;
+    address tokenOutOracle;
+    uint16 oracleToleranceBps;
   }
 
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('BALANCER_V3_SWAP');
   uint256 internal constant _ONE = 1e18;
+  uint256 internal constant _BPS = 10_000;
   uint8 internal constant _SWAP_KIND_EXACT_IN = 0;
   bytes4 internal constant _SELECTOR_GET_HOOKS_CONFIG = 0xce8630d4;
 
@@ -99,6 +110,9 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
     _amountsOut[0] = _toRawUndoRateRoundDown(
       _amountOutScaled18, _decimalScalingFactors[_indexOut], _computeRateRoundUp(_tokenRates[_indexOut])
     );
+    if (_amountsOut[0] < _oracleMinOut(_decoded, _amountIn)) {
+      revert BalancerV3StablePoolMathSwapStep_OracleFloorNotMet();
+    }
   }
 
   /// @inheritdoc IStrategyStep
@@ -116,6 +130,9 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
     IERC20(_decoded.tokenIn).safeTransfer(_vault, _amountIn);
 
     uint256 _minOut = _minOuts.length > 0 ? _minOuts[0] : 0;
+    uint256 _oracleFloor = _oracleMinOut(_decoded, _amountIn);
+    if (_oracleFloor > _minOut) _minOut = _oracleFloor;
+
     _amountsOut[0] = IBalancerV3RouterStableMath(_decoded.router).swapSingleTokenExactIn(
       _decoded.pool,
       IERC20(_decoded.tokenIn),
@@ -128,6 +145,25 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
   }
 
   // --- Internal Methods ---
+
+  function _oracleMinOut(Data memory _decoded, uint256 _amountIn) internal view returns (uint256 _minOut) {
+    if (_decoded.tokenInOracle == address(0) || _decoded.tokenOutOracle == address(0)) {
+      revert BalancerV3StablePoolMathSwapStep_InvalidOracle();
+    }
+    if (_decoded.oracleToleranceBps > _BPS) revert BalancerV3StablePoolMathSwapStep_InvalidOracleTolerance();
+
+    (uint256 _tokenInPrice, bool _validTokenInPrice) = IBaseOracle(_decoded.tokenInOracle).getResultWithValidity();
+    (uint256 _tokenOutPrice, bool _validTokenOutPrice) = IBaseOracle(_decoded.tokenOutOracle).getResultWithValidity();
+    if (!_validTokenInPrice || !_validTokenOutPrice || _tokenInPrice == 0 || _tokenOutPrice == 0) {
+      revert BalancerV3StablePoolMathSwapStep_InvalidOraclePrice();
+    }
+
+    uint256 _tokenInUnit = 10 ** IERC20Metadata(_decoded.tokenIn).decimals();
+    uint256 _tokenOutUnit = 10 ** IERC20Metadata(_decoded.tokenOut).decimals();
+    uint256 _valueWad = OZMath.mulDiv(_amountIn, _tokenInPrice, _tokenInUnit);
+    uint256 _fairOut = OZMath.mulDiv(_valueWad, _tokenOutUnit, _tokenOutPrice);
+    _minOut = OZMath.mulDiv(_fairOut, _BPS - _decoded.oracleToleranceBps, _BPS);
+  }
 
   /**
    * @notice Reverts when the pool uses swap hooks that can alter quote behavior

@@ -3,6 +3,9 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -28,14 +31,19 @@ contract E2EBalancerV3StablePoolMathSwapStepForkTest is ForkedMainnetAt148368730
 
   address internal constant RETH = 0x9Bcef72be871e61ED4fBbc7630889beE758eb81D;
   address internal constant WA_OPT_WETH = 0x464b808c2C7E04b07e860fDF7a91870620246148;
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant ORACLE_TOLERANCE_BPS = 200;
 
   uint256 internal constant AMOUNT_IN = 8_633_153_881_674_896; // ~0.00863 rETH
 
   BalancerV3StablePoolMathSwapStep internal step;
+  ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
     _forkMainnetAtPinnedBlock();
     step = new BalancerV3StablePoolMathSwapStep();
+    waOptWethUsdOracle = new ERC4626ShareOracle(IERC4626(WA_OPT_WETH), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
   }
 
   function test_balancer_v3_stable_pool_math_swap_step_preview_and_execute() public {
@@ -47,7 +55,10 @@ contract E2EBalancerV3StablePoolMathSwapStepForkTest is ForkedMainnetAt148368730
       tokenIn: RETH,
       tokenOut: WA_OPT_WETH,
       deadlineBuffer: 1 hours,
-      userData: bytes('')
+      userData: bytes(''),
+      tokenInOracle: RETH_USD_ORACLE,
+      tokenOutOracle: address(waOptWethUsdOracle),
+      oracleToleranceBps: ORACLE_TOLERANCE_BPS
     });
 
     uint256[] memory _preview = step.preview(abi.encode(_data), AMOUNT_IN);
