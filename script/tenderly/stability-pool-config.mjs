@@ -76,6 +76,18 @@ export const STRATEGY_STEP_ARTIFACTS = [
 
 export const ORACLE_ARTIFACTS = [
   {
+    key: 'boldHaiOracle',
+    contractName: 'CurveStableSwapNGRelayer',
+    artifactPath: 'out/CurveStableSwapNGRelayer.sol/CurveStableSwapNGRelayer.json',
+    constructorArgs: ['__CURVE_BOLD_HAI_POOL__', 0, 1],
+  },
+  {
+    key: 'boldUsdOracle',
+    contractName: 'DenominatedOracle',
+    artifactPath: 'out/DenominatedOracle.sol/DenominatedOracle.json',
+    constructorArgs: ['__BOLD_HAI_ORACLE__', '__HAI_USD_ORACLE__', true],
+  },
+  {
     key: 'waOptWethUsdOracle',
     contractName: 'ERC4626ShareOracle',
     artifactPath: 'out/ERC4626ShareOracle.sol/ERC4626ShareOracle.json',
@@ -127,12 +139,14 @@ export const EXTERNAL_ADDRESSES = {
 };
 
 export const ORACLE_ADDRESSES = {
+  HAI_USD: '0x8c212bCaE328669c8b045D467CB78b88e0BE0D39',
   RETH_USD: '0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740',
   WETH_USD: '0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36',
 };
 
 export const DEFAULT_STEP_SLIPPAGE_BPS = 200;
 export const BALANCER_ORACLE_TOLERANCE_BPS = 200;
+export const CURVE_ORACLE_TOLERANCE_BPS = 200;
 
 export const DEFAULT_TARGET_DEBT_WAD = {
   WETH: 500n * WAD,
@@ -174,7 +188,11 @@ function encodeVeloSwap(data) {
 }
 
 function encodeCurveSwap(data) {
-  return encodeTuple('tuple(address pool,int128 i,int128 j,address tokenIn,address tokenOut)', data);
+  return encodeTuple(
+    'tuple(address pool,int128 i,int128 j,address tokenIn,address tokenOut,' +
+      'address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    data
+  );
 }
 
 function encodeBalancerV3Swap(data) {
@@ -205,7 +223,7 @@ function encodeVeloLpRemoveAndSwap(data) {
   );
 }
 
-function buildShared(steps, slippageBps) {
+function buildShared(steps, slippageBps, oracleAddresses) {
   return {
     wethToUsdc: cfg(
       steps.veloCLStep,
@@ -240,6 +258,9 @@ function buildShared(steps, slippageBps) {
         j: 0,
         tokenIn: TOKEN_ADDRESSES.BOLD,
         tokenOut: TOKEN_ADDRESSES.HAI,
+        tokenInOracle: oracleAddresses.BOLD_USD,
+        tokenOutOracle: oracleAddresses.HAI_USD,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS,
       }),
       slippageBps
     ),
@@ -260,7 +281,7 @@ export function stringFromBytes32(value) {
 
 export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_SLIPPAGE_BPS, oracleAddresses = {}) {
   const mergedOracleAddresses = { ...ORACLE_ADDRESSES, ...oracleAddresses };
-  const shared = buildShared(stepAddresses, slippageBps);
+  const shared = buildShared(stepAddresses, slippageBps, mergedOracleAddresses);
 
   const wethToUsdc = shared.wethToUsdc;
   const usdcToBold = shared.usdcToBold;

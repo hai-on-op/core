@@ -12,6 +12,8 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
 import {CurveSwapStep} from '@contracts/stability-pool/strategy-steps/CurveSwapStep.sol';
@@ -50,11 +52,14 @@ contract StepsScript is MainnetDeployment, Common, Script {
   address internal constant BALANCER_V3_ROUTER = 0x84813aA3e079A665C0B80F944427eE83cBA63617;
 
   // --- ORACLE ADDRESSES ---
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
   address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
   address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
   uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
 
   address internal waOptWethUsdOracle;
+  address internal boldUsdOracle;
 
   // --- TOKEN ADDRESSES ---
   address internal constant WETH_ADDR = 0x4200000000000000000000000000000000000006;
@@ -262,13 +267,24 @@ contract StepsScript is MainnetDeployment, Common, Script {
   //                      CURVE SWAP STEPS
   // ============================================================
 
-  IStabilityPool.StepConfig internal BOLD_HAI_CURVE_STEP_CONFIG = IStabilityPool.StepConfig({
-    step: CURVE_STEP,
-    data: abi.encode(
-      CurveSwapStep.Data({pool: CURVE_BOLD_HAI_POOL, i: int128(1), j: int128(0), tokenIn: BOLD_ADDR, tokenOut: HAI_ADDR})
-    ),
-    slippageBps: 0
-  });
+  function _boldHaiCurveStepConfig() internal view returns (IStabilityPool.StepConfig memory _config) {
+    _config = IStabilityPool.StepConfig({
+      step: CURVE_STEP,
+      data: abi.encode(
+        CurveSwapStep.Data({
+          pool: CURVE_BOLD_HAI_POOL,
+          i: int128(1),
+          j: int128(0),
+          tokenIn: BOLD_ADDR,
+          tokenOut: HAI_ADDR,
+          tokenInOracle: boldUsdOracle,
+          tokenOutOracle: HAI_USD_ORACLE,
+          oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+        })
+      ),
+      slippageBps: 0
+    });
+  }
 
   // ============================================================
   //                      BALANCER V3 SWAP STEPS
@@ -415,6 +431,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
       address(new ERC4626ShareOracle(IERC4626(WA_OPT_WETH_ADDR), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD'));
   }
 
+  function _deployBoldUsdOracle() internal returns (address _oracle) {
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_BOLD_HAI_POOL, 0, 1);
+    _oracle = address(new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true));
+  }
+
   /**
    * @notice This script is left as an example on how to use MainnetScript contract
    * @dev    This script is executed with `yarn script:mainnet` command
@@ -425,6 +446,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
 
     // balancerV3Step = address(new BalancerV3StablePoolMathSwapStep());
     // waOptWethUsdOracle = _deployWaOptWethUsdOracle();
+    // boldUsdOracle = _deployBoldUsdOracle();
     // erc4626Step = address(new ERC4626WithdrawalStep());
     // curveStep = address(new CurveSwapStep());
     // veloSwapStep = address(new VeloSwapStep());
@@ -447,7 +469,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 2: USDC -> BOLD (Velo)
     _steps[1] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 3: BOLD -> HAI (Curve)
-    _steps[2] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[2] = _boldHaiCurveStepConfig();
   }
 
   // --- WSTETH pipeline ---
@@ -460,7 +482,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- ALETH pipeline ---
@@ -473,7 +495,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- RETH pipeline ---
@@ -488,7 +510,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 4: USDC -> BOLD (Velo)
     _steps[3] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 5: BOLD -> HAI (Curve)
-    _steps[4] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[4] = _boldHaiCurveStepConfig();
   }
 
   // --- HAIVELO pipeline ---
@@ -501,7 +523,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- TBTC pipeline ---
@@ -514,7 +536,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- MSETH pipeline ---
@@ -527,7 +549,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- OP pipeline ---
@@ -540,7 +562,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 3: USDC -> BOLD (Velo)
     _steps[2] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 4: BOLD -> HAI (Curve)
-    _steps[3] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[3] = _boldHaiCurveStepConfig();
   }
 
   // --- HAIAERO pipeline --- TODO: Implement
@@ -554,7 +576,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 2: BOLD LUSD VELO LP TOKENS -> BOLD (Velo)
     _steps[1] = BOLD_LUSD_VELO_LP_REMOVAL_AND_SWAP_STEP_CONFIG;
     // Step 3: BOLD -> HAI (Curve)
-    _steps[2] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[2] = _boldHaiCurveStepConfig();
   }
 
   // --- YV_VELO_ALETH_WETH pipeline ---
@@ -569,7 +591,7 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 4: USDC -> BOLD (Velo)
     _steps[3] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 5: BOLD -> HAI (Curve)
-    _steps[4] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[4] = _boldHaiCurveStepConfig();
   }
 
   // --- YV_VELO_MSETH_WETH pipeline ---
@@ -584,6 +606,6 @@ contract StepsScript is MainnetDeployment, Common, Script {
     // Step 4: USDC -> BOLD (Velo)
     _steps[3] = USDC_BOLD_VELO_STEP_CONFIG;
     // Step 5: BOLD -> HAI (Curve)
-    _steps[4] = BOLD_HAI_CURVE_STEP_CONFIG;
+    _steps[4] = _boldHaiCurveStepConfig();
   }
 }

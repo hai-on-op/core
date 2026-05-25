@@ -12,6 +12,7 @@ uint256 constant WAD = 10 ** 18;
 /// @dev Uint256 representation of 1 year in seconds
 uint256 constant YEAR = 365 days;
 /// @dev Uint256 representation of 1 hour in seconds
+// forgefmt: disable-next-item
 uint256 constant HOUR = 3_600;
 
 /**

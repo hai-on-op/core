@@ -91,8 +91,18 @@ contract Unit_StrategyStep_Metadata is Base {
   }
 
   function test_Curve_Metadata() public view {
-    bytes memory _data =
-      abi.encode(CurveSwapStep.Data({pool: POOL, i: int128(0), j: int128(1), tokenIn: TOKEN_IN, tokenOut: TOKEN_OUT}));
+    bytes memory _data = abi.encode(
+      CurveSwapStep.Data({
+        pool: POOL,
+        i: int128(0),
+        j: int128(1),
+        tokenIn: TOKEN_IN,
+        tokenOut: TOKEN_OUT,
+        tokenInOracle: address(1),
+        tokenOutOracle: address(2),
+        oracleToleranceBps: 0
+      })
+    );
     _assertSingleOutputMetadata(curveStep, _data, bytes32('CURVE_SWAP'), TOKEN_IN, TOKEN_OUT);
   }
 

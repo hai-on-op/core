@@ -9,8 +9,11 @@ import {EmissionsControllerJob} from '@contracts/jobs/EmissionsControllerJob.sol
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {WAD, HOUR} from '@libraries/Math.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -37,6 +40,8 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   address internal constant USDC_ADDR = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;
   address internal constant BOLD_ADDR = 0x03569CC076654F82679C4BA2124D64774781B01D;
   address internal constant HAI_ADDR = 0x10398AbC267496E49106B07dd6BE13364D10dC71;
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
 
   address internal testDeployer = label('testDeployer');
   address internal user = label('user');
@@ -47,6 +52,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   EmissionsController internal emissionsController;
   StabilityPool internal stabilityPool;
   EmissionsControllerJob internal emissionsControllerJob;
+  DenominatedOracle internal boldUsdOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -71,6 +77,8 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
     emissionsControllerJob =
       new EmissionsControllerJob(address(emissionsController), address(stabilityFeeTreasury), 1e18);
     vm.stopPrank();
@@ -873,9 +881,18 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     );
   }
 
-  function _boldToHaiCurveData() internal pure returns (bytes memory _data) {
+  function _boldToHaiCurveData() internal view returns (bytes memory _data) {
     _data = abi.encode(
-      CurveSwapStep.Data({pool: CURVE_POOL, i: int128(1), j: int128(0), tokenIn: BOLD_ADDR, tokenOut: HAI_ADDR})
+      CurveSwapStep.Data({
+        pool: CURVE_POOL,
+        i: int128(1),
+        j: int128(0),
+        tokenIn: BOLD_ADDR,
+        tokenOut: HAI_ADDR,
+        tokenInOracle: address(boldUsdOracle),
+        tokenOutOracle: HAI_USD_ORACLE,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+      })
     );
   }
 

@@ -5,7 +5,7 @@ import {fileURLToPath} from 'url';
 
 import {ethers} from 'ethers';
 
-import {ORACLE_ADDRESSES, TOKEN_ADDRESSES} from './stability-pool-config.mjs';
+import {ORACLE_ADDRESSES, POOL_ADDRESSES, TOKEN_ADDRESSES} from './stability-pool-config.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -109,6 +109,21 @@ function buildVerificationJobs(manifest) {
       name: 'YearnVaultWithdrawalStep',
       address: manifest.deployedContracts.strategySteps.yearnStep,
       contract: 'src/contracts/stability-pool/strategy-steps/YearnVaultWithdrawalStep.sol:YearnVaultWithdrawalStep',
+    },
+    {
+      name: 'CurveStableSwapNGRelayer_BOLD_HAI',
+      address: manifest.deployedContracts.oracles.boldHaiOracle,
+      contract: 'src/contracts/oracles/CurveStableSwapNGRelayer.sol:CurveStableSwapNGRelayer',
+      constructorArgs: abiCoder.encode(['address', 'uint256', 'uint256'], [POOL_ADDRESSES.CURVE_BOLD_HAI, 0, 1]),
+    },
+    {
+      name: 'DenominatedOracle_BOLD_USD',
+      address: manifest.deployedContracts.oracles.boldUsdOracle,
+      contract: 'src/contracts/oracles/DenominatedOracle.sol:DenominatedOracle',
+      constructorArgs: abiCoder.encode(
+        ['address', 'address', 'bool'],
+        [manifest.deployedContracts.oracles.boldHaiOracle, ORACLE_ADDRESSES.HAI_USD, true]
+      ),
     },
     {
       name: 'ERC4626ShareOracle_waOptWETH',

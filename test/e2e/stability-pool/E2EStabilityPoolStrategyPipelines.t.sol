@@ -10,6 +10,8 @@ import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
@@ -66,9 +68,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
   address internal constant LUSD_ADDR = 0xc40F949F8a4e094D1b49a23ea9241D289B7b2819;
 
   // --- oracles ---
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
   address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
   address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
   uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
 
   // --- pools ---
   address internal constant CURVE_BOLD_HAI_POOL = 0xC4ea2ED83bC9207398fa5dB31Ee4E7477dC34fd5;
@@ -108,6 +112,7 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
   VeloLPRemoveAndSwapStep internal veloLPRemoveAndSwapStep;
   BeefyVaultWithdrawalStep internal beefyStep;
   YearnVaultWithdrawalStep internal yearnStep;
+  DenominatedOracle internal boldUsdOracle;
   ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
@@ -140,6 +145,8 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
     veloLPRemoveAndSwapStep = new VeloLPRemoveAndSwapStep();
     beefyStep = new BeefyVaultWithdrawalStep();
     yearnStep = new YearnVaultWithdrawalStep();
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_BOLD_HAI_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
     waOptWethUsdOracle =
       new ERC4626ShareOracle(IERC4626(WA_OPT_WETH_ADDR), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
 
@@ -466,9 +473,18 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
     );
   }
 
-  function _boldToHaiCurveData() internal pure returns (bytes memory _data) {
+  function _boldToHaiCurveData() internal view returns (bytes memory _data) {
     _data = abi.encode(
-      CurveSwapStep.Data({pool: CURVE_BOLD_HAI_POOL, i: int128(1), j: int128(0), tokenIn: BOLD_ADDR, tokenOut: HAI_ADDR})
+      CurveSwapStep.Data({
+        pool: CURVE_BOLD_HAI_POOL,
+        i: int128(1),
+        j: int128(0),
+        tokenIn: BOLD_ADDR,
+        tokenOut: HAI_ADDR,
+        tokenInOracle: address(boldUsdOracle),
+        tokenOutOracle: HAI_USD_ORACLE,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+      })
     );
   }
 

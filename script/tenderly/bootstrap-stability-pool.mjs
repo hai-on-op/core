@@ -11,6 +11,7 @@ import {
   MAINNET_DEPLOYMENT,
   ORACLE_ADDRESSES,
   ORACLE_ARTIFACTS,
+  POOL_ADDRESSES,
   PROFITABILITY_PRICE_DIVISORS,
   RAY,
   STRATEGY_STEP_ARTIFACTS,
@@ -607,6 +608,9 @@ async function main() {
   for (const oracleArtifact of ORACLE_ARTIFACTS) {
     const artifact = await loadArtifact(oracleArtifact.artifactPath);
     const constructorArgs = oracleArtifact.constructorArgs.map(value => {
+      if (value === '__CURVE_BOLD_HAI_POOL__') return POOL_ADDRESSES.CURVE_BOLD_HAI;
+      if (value === '__BOLD_HAI_ORACLE__') return deployedOracles.boldHaiOracle;
+      if (value === '__HAI_USD_ORACLE__') return ORACLE_ADDRESSES.HAI_USD;
       if (value === '__WA_OPT_WETH__') return TOKEN_ADDRESSES.WA_OPT_WETH;
       if (value === '__WETH_USD_ORACLE__') return ORACLE_ADDRESSES.WETH_USD;
       return value;
@@ -655,6 +659,7 @@ async function main() {
   }
 
   const pipelineConfigs = buildPipelineConfigs(deployedStepContracts, stepSlippageBps, {
+    BOLD_USD: deployedOracles.boldUsdOracle,
     WA_OPT_WETH_USD: deployedOracles.waOptWethUsdOracle,
   });
   for (const cTypeName of targetCTypeNames) {

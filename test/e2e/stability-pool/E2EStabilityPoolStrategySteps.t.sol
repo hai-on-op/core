@@ -5,6 +5,8 @@ import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
@@ -139,21 +141,34 @@ contract E2ECurveSwapStepForkTest is ForkedMainnetAt148368730 {
   address internal constant CURVE_POOL = 0xC4ea2ED83bC9207398fa5dB31Ee4E7477dC34fd5;
   address internal constant HAI = 0x10398AbC267496E49106B07dd6BE13364D10dC71;
   address internal constant BOLD = 0x03569CC076654F82679C4BA2124D64774781B01D;
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  uint16 internal constant ORACLE_TOLERANCE_BPS = 200;
 
   uint256 internal constant AMOUNT_IN = 1e16; // 0.01 BOLD
 
   CurveSwapStep internal step;
+  DenominatedOracle internal boldUsdOracle;
 
   function setUp() public {
     _forkMainnetAtPinnedBlock();
     step = new CurveSwapStep();
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
   }
 
   function test_curve_swap_step() public {
     deal(BOLD, address(step), AMOUNT_IN);
 
-    CurveSwapStep.Data memory _data =
-      CurveSwapStep.Data({pool: CURVE_POOL, i: int128(1), j: int128(0), tokenIn: BOLD, tokenOut: HAI});
+    CurveSwapStep.Data memory _data = CurveSwapStep.Data({
+      pool: CURVE_POOL,
+      i: int128(1),
+      j: int128(0),
+      tokenIn: BOLD,
+      tokenOut: HAI,
+      tokenInOracle: address(boldUsdOracle),
+      tokenOutOracle: HAI_USD_ORACLE,
+      oracleToleranceBps: ORACLE_TOLERANCE_BPS
+    });
 
     uint256[] memory _minOuts = new uint256[](1);
     uint256[] memory _out = step.execute(abi.encode(_data), AMOUNT_IN, _minOuts);
