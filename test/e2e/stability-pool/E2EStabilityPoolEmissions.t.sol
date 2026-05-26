@@ -29,6 +29,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
 
   uint256 internal constant USER_HAI_BALANCE = 5000e18;
   uint256 internal constant USER_DEPOSIT = 1000e18;
+  uint256 internal constant DEAD_SHARES_SEED = 1000e18;
 
   bytes32 internal constant WETH_CTYPE = bytes32('WETH');
 
@@ -87,8 +88,14 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     stabilityFeeTreasury.setTotalAllowance(address(emissionsControllerJob), type(uint256).max);
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
+    deal(address(systemCoin), testDeployer, DEAD_SHARES_SEED);
     deal(address(systemCoin), user, USER_HAI_BALANCE);
     deal(address(systemCoin), user2, USER_HAI_BALANCE);
+
+    vm.startPrank(testDeployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
 
     vm.prank(user);
     systemCoin.approve(address(stabilityPool), type(uint256).max);
@@ -125,9 +132,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   function test_user_does_not_earn_kite_accrued_before_depositing_hai() public {
     vm.warp(block.timestamp + 1 days);
 
+    uint256 _expectedShares = stabilityPool.previewDeposit(USER_DEPOSIT);
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(USER_DEPOSIT, user);
-    assertEq(_shares, USER_DEPOSIT);
+    assertEq(_shares, _expectedShares);
 
     uint256 _pendingBeforeClaim = stabilityPool.pendingRewards(user);
     assertEq(_pendingBeforeClaim, 0);
@@ -144,9 +152,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   }
 
   function test_user_earns_kite_after_depositing_and_time_elapsed() public {
+    uint256 _expectedShares = stabilityPool.previewDeposit(USER_DEPOSIT);
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(USER_DEPOSIT, user);
-    assertEq(_shares, USER_DEPOSIT);
+    assertEq(_shares, _expectedShares);
     assertEq(stabilityPool.pendingRewards(user), 0);
 
     vm.warp(block.timestamp + 1 days);
@@ -186,10 +195,12 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     uint256 _pendingUser1 = stabilityPool.pendingRewards(user);
     uint256 _pendingUser2 = stabilityPool.pendingRewards(user2);
 
-    uint256 _totalShares = USER_DEPOSIT + _user2Deposit;
+    uint256 _user1Shares = stabilityPool.balanceOf(user);
+    uint256 _user2Shares = stabilityPool.balanceOf(user2);
+    uint256 _totalShares = _user1Shares + _user2Shares;
     uint256 _integral = (_claimedFromController * WAD) / _totalShares;
-    uint256 _expectedUser1 = (USER_DEPOSIT * _integral) / WAD;
-    uint256 _expectedUser2 = (_user2Deposit * _integral) / WAD;
+    uint256 _expectedUser1 = (_user1Shares * _integral) / WAD;
+    uint256 _expectedUser2 = (_user2Shares * _integral) / WAD;
 
     assertEq(_pendingUser1, _expectedUser1);
     assertEq(_pendingUser2, _expectedUser2);
@@ -379,9 +390,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(stabilityPool.transfersEnabled(), true);
     assertEq(stabilityPool.kiteRewardsActive(), false);
 
+    uint256 _userSharesBeforeTransfer = stabilityPool.balanceOf(user);
     vm.prank(user);
-    stabilityPool.transfer(user2, USER_DEPOSIT / 2);
-    assertEq(stabilityPool.balanceOf(user2), USER_DEPOSIT / 2);
+    stabilityPool.transfer(user2, _userSharesBeforeTransfer / 2);
+    assertEq(stabilityPool.balanceOf(user2), _userSharesBeforeTransfer / 2);
 
     vm.prank(user);
     uint256 _claimed = stabilityPool.claimRewards();
@@ -426,8 +438,9 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     vm.prank(testDeployer);
     stabilityPool.enableTransfers();
 
+    uint256 _userSharesBeforeTransfer = stabilityPool.balanceOf(user);
     vm.prank(user);
-    stabilityPool.transfer(user2, USER_DEPOSIT / 2);
+    stabilityPool.transfer(user2, _userSharesBeforeTransfer / 2);
 
     vm.prank(user);
     uint256 _claimedByUser = stabilityPool.claimRewards();
@@ -438,14 +451,17 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     uint256 _claimedByUser2 = stabilityPool.claimRewards();
     assertEq(_claimedByUser2, 0);
 
-    vm.prank(user);
-    stabilityPool.withdraw(USER_DEPOSIT / 2, user, user);
-    vm.prank(user2);
-    stabilityPool.withdraw(USER_DEPOSIT / 2, user2, user2);
+    uint256 _userExitAssets = stabilityPool.maxWithdraw(user);
+    uint256 _user2ExitAssets = stabilityPool.maxWithdraw(user2);
 
-    assertEq(systemCoin.balanceOf(user), USER_HAI_BALANCE - (USER_DEPOSIT / 2));
-    assertEq(systemCoin.balanceOf(user2), USER_HAI_BALANCE + (USER_DEPOSIT / 2));
-    assertEq(stabilityPool.totalAssets(), 0);
+    vm.prank(user);
+    stabilityPool.withdraw(_userExitAssets, user, user);
+    vm.prank(user2);
+    stabilityPool.withdraw(_user2ExitAssets, user2, user2);
+
+    assertEq(systemCoin.balanceOf(user), USER_HAI_BALANCE - USER_DEPOSIT + _userExitAssets);
+    assertEq(systemCoin.balanceOf(user2), USER_HAI_BALANCE + _user2ExitAssets);
+    assertEq(stabilityPool.totalAssets(), DEAD_SHARES_SEED);
   }
 
   function test_enable_transfers_reverts_when_unauthorized() public {

@@ -109,6 +109,13 @@ interface IStabilityPool is IERC4626 {
    */
   event SweepInternalCoin(uint256 _exitedWad);
 
+  /**
+   * @notice Emitted when the permanent dead-share deposit is seeded
+   * @param  _assets Amount of HAI seeded into the pool [wad]
+   * @param  _shares Amount of sHAI minted to the dead-share receiver [wad]
+   */
+  event SeedDeadShares(uint256 _assets, uint256 _shares);
+
   // --- Errors ---
 
   /// @notice Throws when trying to execute/preview with no configured strategy steps
@@ -143,6 +150,12 @@ interface IStabilityPool is IERC4626 {
   error StabilityPool_DelegatecallFailed();
   /// @notice Throws when trying to sweep internal coin before the cooldown elapsed
   error StabilityPool_InternalCoinSweepTooFrequent();
+  /// @notice Throws when depositing or minting before the permanent dead-share seed exists
+  error StabilityPool_DeadSharesNotSeeded();
+  /// @notice Throws when trying to seed dead shares after shares already exist
+  error StabilityPool_DeadSharesAlreadySeeded();
+  /// @notice Throws when trying to seed a zero-asset dead-share deposit
+  error StabilityPool_NullDeadShareAmount();
 
   // --- Structs ---
 
@@ -211,6 +224,9 @@ interface IStabilityPool is IERC4626 {
 
   /// @notice Minimum required cover profit margin in basis points
   function minProfitBps() external view returns (uint16 _minProfitBps);
+
+  /// @notice Whether the permanent dead-share deposit has been seeded
+  function deadSharesSeeded() external view returns (bool _deadSharesSeeded);
 
   /**
    * @notice Whether a strategy step address is whitelisted
@@ -286,6 +302,14 @@ interface IStabilityPool is IERC4626 {
    * @return _exitedWad Amount of internal coin exited [wad]
    */
   function sweepInternalCoin() external returns (uint256 _exitedWad);
+
+  /**
+   * @notice Seeds the permanent dead-share deposit before public deposits are accepted
+   * @dev    Callable only by authorized accounts and only before any shares exist
+   * @param  _assets Amount of HAI to seed into the pool [wad]
+   * @return _shares Amount of sHAI minted to the dead-share receiver [wad]
+   */
+  function seedDeadShares(uint256 _assets) external returns (uint256 _shares);
 
   /**
    * @notice Sets the ordered strategy step pipeline for a collateral type

@@ -41,6 +41,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   uint256 internal constant _MAX_SLIPPAGE_BPS = 100_00;
   // forgefmt: disable-next-line
   uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 2_00;
+  address public constant DEAD_SHARES = 0x000000000000000000000000000000000000dEaD;
 
   // --- Data ---
 
@@ -114,6 +115,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   /// @inheritdoc IStabilityPool
   uint256 public lastInternalCoinSweepTime;
+
+  /// @inheritdoc IStabilityPool
+  bool public deadSharesSeeded;
 
   // --- Init ---
 
@@ -196,14 +200,16 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   /// @inheritdoc IStabilityPool
   function pendingRewards(address _user) external view returns (uint256 _amount) {
+    if (_user == DEAD_SHARES) return 0;
+
     uint256 _currentIntegral = kiteRewardIntegral;
     if (kiteRewardsActive) {
-      uint256 _totalSupply = totalSupply();
-      if (_totalSupply > 0) {
+      uint256 _activeRewardSupply = _rewardSupply();
+      if (_activeRewardSupply > 0) {
         uint256 _currentKiteBalance = protocolToken.balanceOf(address(this));
         if (_currentKiteBalance > kiteRewardRemaining) {
           uint256 _newKite = _currentKiteBalance - kiteRewardRemaining;
-          _currentIntegral += (_newKite * WAD) / _totalSupply;
+          _currentIntegral += (_newKite * WAD) / _activeRewardSupply;
         }
       }
     }
@@ -244,6 +250,21 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     }
 
     emit SweepInternalCoin(_exitedWad);
+  }
+
+  /// @inheritdoc IStabilityPool
+  function seedDeadShares(uint256 _assets) external nonReentrant isAuthorized returns (uint256 _shares) {
+    if (deadSharesSeeded || totalSupply() != 0) revert StabilityPool_DeadSharesAlreadySeeded();
+    if (_assets == 0) revert StabilityPool_NullDeadShareAmount();
+
+    _shares = _assets;
+    deadSharesSeeded = true;
+
+    IERC20(address(systemCoin)).safeTransferFrom(msg.sender, address(this), _assets);
+    _mint(DEAD_SHARES, _shares);
+
+    emit Deposit(msg.sender, DEAD_SHARES, _assets, _shares);
+    emit SeedDeadShares(_assets, _shares);
   }
 
   // --- Strategy Configuration ---
@@ -365,19 +386,19 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_currentKiteBalance <= kiteRewardRemaining) return;
 
     uint256 _newKite = _currentKiteBalance - kiteRewardRemaining;
-    uint256 _totalSupply = totalSupply();
-    if (_totalSupply == 0) {
+    uint256 _activeRewardSupply = _rewardSupply();
+    if (_activeRewardSupply == 0) {
       // Track idle inflows so they are not retroactively distributed to future stakers.
       kiteRewardRemaining = _currentKiteBalance;
       return;
     }
 
-    kiteRewardIntegral += (_newKite * WAD) / _totalSupply;
+    kiteRewardIntegral += (_newKite * WAD) / _activeRewardSupply;
     kiteRewardRemaining = _currentKiteBalance;
   }
 
   function _checkpoint(address _user) internal {
-    if (_user == address(0)) return;
+    if (_user == address(0) || _user == DEAD_SHARES) return;
     uint256 _accrued = (balanceOf(_user) * kiteRewardIntegral) / WAD;
     uint256 _debt = rewardDebt[_user];
     if (_accrued > _debt) {
@@ -386,8 +407,12 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   function _syncRewardDebt(address _user) internal {
-    if (_user == address(0)) return;
+    if (_user == address(0) || _user == DEAD_SHARES) return;
     rewardDebt[_user] = (balanceOf(_user) * kiteRewardIntegral) / WAD;
+  }
+
+  function _rewardSupply() internal view returns (uint256 _supply) {
+    _supply = totalSupply() - balanceOf(DEAD_SHARES);
   }
 
   function _claim(address _user, address _receiver) internal returns (uint256 _amount) {
@@ -841,6 +866,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _assets,
     address _receiver
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _shares) {
+    if (!deadSharesSeeded) revert StabilityPool_DeadSharesNotSeeded();
     return super.deposit(_assets, _receiver);
   }
 
@@ -848,7 +874,18 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _shares,
     address _receiver
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
+    if (!deadSharesSeeded) revert StabilityPool_DeadSharesNotSeeded();
     return super.mint(_shares, _receiver);
+  }
+
+  function maxDeposit(address _receiver) public view virtual override(ERC4626, IERC4626) returns (uint256 _maxAssets) {
+    if (!deadSharesSeeded) return 0;
+    return super.maxDeposit(_receiver);
+  }
+
+  function maxMint(address _receiver) public view virtual override(ERC4626, IERC4626) returns (uint256 _maxShares) {
+    if (!deadSharesSeeded) return 0;
+    return super.maxMint(_receiver);
   }
 
   function withdraw(

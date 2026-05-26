@@ -37,6 +37,7 @@ import {
 } from '@test/mocks/stability-pool/strategy/StabilityPoolStrategyFailureForTest.sol';
 
 uint256 constant RAY = 1e27;
+uint256 constant DEAD_SHARES_SEED = 1000e18;
 
 abstract contract Base is HaiTest {
   address deployer = label('deployer');
@@ -68,6 +69,10 @@ abstract contract Base is HaiTest {
       mockContract('CollateralAuctionHouseFactory')
     );
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
     systemCoin.mint(user, 1000e18);
@@ -85,6 +90,93 @@ abstract contract Base is HaiTest {
 contract Unit_StabilityPool_Constructor is Base {
   function test_Set_SystemCoin() public view {
     assertEq(address(stabilityPool.systemCoin()), address(systemCoin));
+  }
+
+  function test_Set_DeadSharesSeed() public view {
+    assertEq(stabilityPool.decimals(), systemCoin.decimals());
+    assertEq(stabilityPool.deadSharesSeeded(), true);
+    assertEq(stabilityPool.balanceOf(stabilityPool.DEAD_SHARES()), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.totalSupply(), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.totalAssets(), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.previewDeposit(1e18), 1e18);
+  }
+
+  function test_Revert_Deposit_WhenDeadSharesNotSeeded() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    systemCoin.approve(address(_unseededPool), type(uint256).max);
+
+    vm.prank(user);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesNotSeeded.selector);
+    _unseededPool.deposit(1e18, user);
+  }
+
+  function test_Revert_Mint_WhenDeadSharesNotSeeded() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    systemCoin.approve(address(_unseededPool), type(uint256).max);
+
+    vm.prank(user);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesNotSeeded.selector);
+    _unseededPool.mint(1e18, user);
+  }
+
+  function test_Revert_SeedDeadShares_Unauthorized() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    _unseededPool.seedDeadShares(1e18);
+  }
+
+  function test_Revert_SeedDeadShares_NullAmount() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.expectRevert(IStabilityPool.StabilityPool_NullDeadShareAmount.selector);
+    _unseededPool.seedDeadShares(0);
+  }
+
+  function test_Revert_SeedDeadShares_AlreadySeeded() public {
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    vm.startPrank(deployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesAlreadySeeded.selector);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
   }
 
   function test_Revert_Constructor_InvalidSystemCoin() public {
@@ -248,10 +340,11 @@ contract Unit_StabilityPool_TransferToggle is Base {
     vm.prank(deployer);
     emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
 
+    uint256 _expectedShares = stabilityPool.previewDeposit(100e18);
     vm.prank(user);
     stabilityPool.deposit(100e18, user);
 
-    assertEq(stabilityPool.balanceOf(user), 100e18);
+    assertEq(stabilityPool.balanceOf(user), _expectedShares);
   }
 
   function test_Mint_DuringReceiverCutover_DoesNotRevert() public {
@@ -328,32 +421,32 @@ contract Unit_StabilityPool_Rewards is Base {
 
   function test_Withdraw_ClaimsControllerRewards_BeforeBurningLastShares() public {
     vm.prank(user);
-    stabilityPool.deposit(100e18, user);
+    uint256 _shares = stabilityPool.deposit(100e18, user);
 
     protocolToken.mint(address(emissionsController), 10e18);
     emissionsController.setAmountToClaim(10e18);
 
     vm.prank(user);
-    stabilityPool.redeem(100e18, user, user);
+    stabilityPool.redeem(_shares, user, user);
 
     assertEq(protocolToken.balanceOf(user), 10e18);
-    assertEq(stabilityPool.totalSupply(), 0);
+    assertEq(stabilityPool.totalSupply(), DEAD_SHARES_SEED);
     assertEq(protocolToken.balanceOf(address(stabilityPool)), 0);
   }
 
   function test_PartialWithdraw_DoesNotLose_RemainingRewards() public {
     vm.prank(user);
-    stabilityPool.deposit(100e18, user);
+    uint256 _shares = stabilityPool.deposit(100e18, user);
     protocolToken.mint(address(stabilityPool), 10e18);
 
     vm.prank(user);
-    stabilityPool.redeem(50e18, user, user);
+    stabilityPool.redeem(_shares / 2, user, user);
     assertEq(protocolToken.balanceOf(user), 10e18);
 
     protocolToken.mint(address(stabilityPool), 10e18);
     vm.prank(user);
     stabilityPool.claimRewards();
-    assertEq(protocolToken.balanceOf(user), 20e18);
+    assertApproxEqAbs(protocolToken.balanceOf(user), 20e18, 1e10);
   }
 
   function test_ClaimHistoricalRewards_AfterTransferCutover() public {
@@ -471,6 +564,10 @@ contract Unit_StabilityPool_WithdrawLiveness is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
     systemCoin.mint(user, 1000e18);
@@ -541,6 +638,10 @@ contract Unit_StabilityPool_Reentrancy is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
     systemCoin.mint(user, 1000e18);
@@ -557,11 +658,13 @@ contract Unit_StabilityPool_Reentrancy is HaiTest {
   }
 
   function test_Deposit_Succeeds_When_EmissionsController_DoesNotReenter() public {
+    uint256 _expectedShares = stabilityPool.previewDeposit(1e18);
+
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(1e18, user);
 
-    assertEq(_shares, 1e18);
-    assertEq(stabilityPool.balanceOf(user), 1e18);
+    assertEq(_shares, _expectedShares);
+    assertEq(stabilityPool.balanceOf(user), _expectedShares);
   }
 }
 
@@ -643,6 +746,10 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
     collateralJoinFactory.setCollateralJoin(CTYPE, address(collateralJoin));
+
+    systemCoin.mint(address(this), DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
 
     systemCoin.mint(user, 1000e18);
     vm.prank(user);
@@ -808,9 +915,12 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
     collateralJoinFactory.setCollateralJoin(CTYPE, address(collateralJoin));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
-    systemCoin.mint(address(stabilityPool), 1000e18);
     systemCoin.mint(user, 1000e18);
   }
 

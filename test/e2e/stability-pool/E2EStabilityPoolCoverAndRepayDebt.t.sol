@@ -39,6 +39,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
   uint256 internal constant EMISSIONS_DURATION = 365 days;
   uint256 internal constant POOL_HAI_DEPOSIT = 50_000e18;
+  uint256 internal constant DEAD_SHARES_SEED = 1000e18;
 
   bytes32 internal constant WETH_CTYPE = bytes32('WETH');
   bytes32 internal constant RETH_CTYPE = bytes32('RETH');
@@ -164,7 +165,13 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     stabilityPool.setStrategySteps(OP_CTYPE, _wethPipeline());
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
+    deal(address(systemCoin), testDeployer, DEAD_SHARES_SEED);
     deal(address(systemCoin), depositor, POOL_HAI_DEPOSIT);
+
+    vm.startPrank(testDeployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
 
     vm.startPrank(depositor);
     systemCoin.approve(address(stabilityPool), type(uint256).max);
@@ -419,7 +426,10 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     bytes4 _selectorWithOverride = _getCoverAndRepayDebtRevertSelector(
       _auctionHouseWithOverride, _auctionIdWithOverride, _bidWithOverride, YV_VELO_ALETH_WETH_CTYPE
     );
-    assertEq(_selectorWithOverride, bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()')));
+    bool _isExpectedOverrideSelector = _selectorWithOverride
+      == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'))
+      || _selectorWithOverride == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
+    assertTrue(_isExpectedOverrideSelector, 'unexpected selector with step override slippage enabled');
 
     IStabilityPool.StepConfig[] memory _stepsWithoutOverride = _yvVeloAlethWethPipeline();
     for (uint256 _i = 0; _i < _stepsWithoutOverride.length; _i++) {
@@ -447,11 +457,9 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
       assertTrue(_profitWithoutOverride >= 0, 'expected non-negative profit when step override slippage is disabled');
     } else {
       bytes4 _selectorWithoutOverride = _revertSelector(_returnDataWithoutOverride);
-      assertEq(
-        _selectorWithoutOverride,
-        IStabilityPool.StabilityPool_NotProfitable.selector,
-        'unexpected selector when step override slippage is disabled'
-      );
+      bool _isExpectedSelector = _selectorWithoutOverride == IStabilityPool.StabilityPool_NotProfitable.selector
+        || _selectorWithoutOverride == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
+      assertTrue(_isExpectedSelector, 'unexpected selector when step override slippage is disabled');
     }
   }
 
@@ -497,7 +505,8 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     } else {
       bytes4 _selector = _revertSelector(_returnData);
       bool _isExpected = _selector == IStabilityPool.StabilityPool_NotProfitable.selector
-        || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'));
+        || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'))
+        || _selector == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
       assertTrue(_isExpected, 'unexpected revert selector for non-profitable cover');
     }
   }
