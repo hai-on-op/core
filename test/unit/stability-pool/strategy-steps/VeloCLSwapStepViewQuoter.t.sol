@@ -152,6 +152,7 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
 
   function test_Execute() public {
     tokenIn.mint(address(step), 10e18);
+    router.setAmountToSpend(1);
     uint256[] memory _minOuts = new uint256[](1);
     _minOuts[0] = 20e18;
 
@@ -165,6 +166,7 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
     assertEq(router.lastMinOut(), 20e18);
     assertEq(router.lastTickSpacing(), 60);
     assertEq(router.lastSqrtPriceLimit(), 0);
+    assertEq(tokenIn.allowance(address(step), address(router)), 0);
   }
 
   function test_Execute_WithoutMinOuts() public {

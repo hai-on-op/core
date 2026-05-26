@@ -758,6 +758,8 @@ contract MockVeloCLRouterForTest {
   ERC20ForTest public tokenIn;
   ERC20ForTest public tokenOut;
   uint256 public outMultiplier = 2e18; // 2x in WAD
+  uint256 public amountToSpend;
+  bool public useAmountToSpend;
 
   address public lastRecipient;
   uint256 public lastAmountIn;
@@ -774,6 +776,11 @@ contract MockVeloCLRouterForTest {
     outMultiplier = _outMultiplier;
   }
 
+  function setAmountToSpend(uint256 _amountToSpend) external {
+    amountToSpend = _amountToSpend;
+    useAmountToSpend = true;
+  }
+
   function exactInputSingle(IVeloCLRouter.ExactInputSingleParams calldata _params)
     external
     returns (uint256 _amountOut)
@@ -784,7 +791,8 @@ contract MockVeloCLRouterForTest {
     lastTickSpacing = _params.tickSpacing;
     lastSqrtPriceLimit = _params.sqrtPriceLimitX96;
 
-    tokenIn.transferFrom(msg.sender, address(this), _params.amountIn);
+    uint256 _amountSpent = useAmountToSpend ? amountToSpend : _params.amountIn;
+    tokenIn.transferFrom(msg.sender, address(this), _amountSpent);
     _amountOut = (_params.amountIn * outMultiplier) / 1e18;
     require(_amountOut >= _params.amountOutMinimum, 'min-out');
     tokenOut.mint(_params.recipient, _amountOut);

@@ -122,6 +122,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
       sqrtPriceLimitX96: _decoded.sqrtPriceLimitX96
     });
     _amountsOut[0] = IVeloCLRouter(_decoded.router).exactInputSingle(_params);
+    IERC20(_decoded.tokenIn).forceApprove(_decoded.router, 0);
   }
 
   // --- Internal Methods ---
