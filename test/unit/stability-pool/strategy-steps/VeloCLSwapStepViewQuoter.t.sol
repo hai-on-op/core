@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
+import {OracleForTest} from '@test/mocks/OracleForTest.sol';
 import {VeloCLSwapStepViewQuoter} from '@contracts/stability-pool/strategy-steps/VeloCLSwapStepViewQuoter.sol';
 import {
   MockVeloCLRouterForTest,
@@ -16,6 +17,8 @@ abstract contract Base is HaiTest {
   VeloCLSwapStepViewQuoter internal step;
   ERC20ForTest internal tokenIn;
   ERC20ForTest internal tokenOut;
+  OracleForTest internal tokenInOracle;
+  OracleForTest internal tokenOutOracle;
   MockVeloCLRouterForTest internal router;
   MockVeloCLPoolForTest internal pool;
 
@@ -23,6 +26,8 @@ abstract contract Base is HaiTest {
     step = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
     tokenIn = new ERC20ForTest();
     tokenOut = new ERC20ForTest();
+    tokenInOracle = new OracleForTest(1e18);
+    tokenOutOracle = new OracleForTest(1e18);
     router = new MockVeloCLRouterForTest(tokenIn, tokenOut);
     pool = new MockVeloCLPoolForTest(address(tokenIn), address(tokenOut));
   }
@@ -40,8 +45,19 @@ abstract contract Base is HaiTest {
       tokenOut: _tokenOut,
       tickSpacing: _tickSpacing,
       sqrtPriceLimitX96: _sqrtPriceLimitX96,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
+  }
+
+  function _oracleData() internal view returns (VeloCLSwapStepViewQuoter.Data memory _out) {
+    _out = _data(address(tokenIn), address(tokenOut), 60, 0);
+    _out.useOracleFloor = true;
+    _out.tokenInOracle = address(tokenInOracle);
+    _out.tokenOutOracle = address(tokenOutOracle);
   }
 }
 
@@ -75,7 +91,11 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
       tokenOut: address(tokenOut),
       tickSpacing: 60,
       sqrtPriceLimitX96: 0,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_PoolNotFound.selector);
@@ -134,6 +154,47 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
     assertEq(_preview.length, 1);
   }
 
+  function test_Revert_Preview_WhenPoolQuoteBelowOracleFloor() public {
+    VeloCLSwapStepViewQuoter.Data memory _stepData = _oracleData();
+    tokenInOracle.setPriceAndValidity(1_000_000e18, true);
+    tokenOutOracle.setPriceAndValidity(1e18, true);
+
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_OracleFloorNotMet.selector);
+    step.preview(abi.encode(_stepData), 1e18);
+  }
+
+  function test_Preview_OracleFloorDisabled_IgnoresMissingOracle() public view {
+    VeloCLSwapStepViewQuoter.Data memory _stepData = _data(address(tokenIn), address(tokenOut), 60, 0);
+    _stepData.tokenInOracle = address(0);
+    _stepData.tokenOutOracle = address(0);
+
+    uint256[] memory _preview = step.preview(abi.encode(_stepData), 1e18);
+    assertEq(_preview.length, 1);
+  }
+
+  function test_Revert_Preview_InvalidOracle() public {
+    VeloCLSwapStepViewQuoter.Data memory _stepData = _oracleData();
+    _stepData.tokenInOracle = address(0);
+
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_InvalidOracle.selector);
+    step.preview(abi.encode(_stepData), 1e18);
+  }
+
+  function test_Revert_Preview_InvalidOraclePrice() public {
+    tokenInOracle.setPriceAndValidity(1e18, false);
+
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_InvalidOraclePrice.selector);
+    step.preview(abi.encode(_oracleData()), 1e18);
+  }
+
+  function test_Revert_Preview_InvalidOracleTolerance() public {
+    VeloCLSwapStepViewQuoter.Data memory _stepData = _oracleData();
+    _stepData.oracleToleranceBps = 10_001;
+
+    vm.expectRevert(VeloCLSwapStepViewQuoter.VeloCLSwapStepViewQuoter_InvalidOracleTolerance.selector);
+    step.preview(abi.encode(_stepData), 1e18);
+  }
+
   function test_Preview_QuoteLoopLimit_IsConfigurable() public {
     VeloCLSwapStepViewQuoter _lowCapStep = new VeloCLSwapStepViewQuoter(1);
     VeloCLSwapStepViewQuoter _highCapStep = new VeloCLSwapStepViewQuoter(DEFAULT_MAX_QUOTE_STEPS);
@@ -177,6 +238,29 @@ contract Unit_VeloCLSwapStepViewQuoter is Base {
       step.execute(abi.encode(_data(address(tokenIn), address(tokenOut), 60, 0)), 10e18, _noMinOuts);
 
     assertEq(_out.length, 1);
+    assertEq(_out[0], 20e18);
+    assertEq(router.lastMinOut(), 0);
+  }
+
+  function test_Revert_Execute_UsesOracleFloorWhenMinOutIsLower() public {
+    tokenIn.mint(address(step), 10e18);
+    tokenInOracle.setPriceAndValidity(3e18, true);
+    tokenOutOracle.setPriceAndValidity(1e18, true);
+
+    vm.expectRevert(bytes('min-out'));
+    step.execute(abi.encode(_oracleData()), 10e18, new uint256[](0));
+  }
+
+  function test_Execute_OracleFloorDisabled_UsesRouterOutput() public {
+    tokenIn.mint(address(step), 10e18);
+    tokenInOracle.setPriceAndValidity(3e18, true);
+    tokenOutOracle.setPriceAndValidity(1e18, true);
+
+    VeloCLSwapStepViewQuoter.Data memory _stepData = _oracleData();
+    _stepData.useOracleFloor = false;
+
+    uint256[] memory _out = step.execute(abi.encode(_stepData), 10e18, new uint256[](0));
+
     assertEq(_out[0], 20e18);
     assertEq(router.lastMinOut(), 0);
   }

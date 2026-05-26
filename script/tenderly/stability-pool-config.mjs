@@ -173,10 +173,19 @@ function cfg(step, data, slippageBps) {
 }
 
 function encodeVeloClSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenInOracle: ethers.ZeroAddress,
+    tokenOutOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
     'tuple(address router,address pool,address tokenIn,address tokenOut,' +
-      'int24 tickSpacing,uint160 sqrtPriceLimitX96,uint256 deadlineBuffer)',
-    data
+      'int24 tickSpacing,uint160 sqrtPriceLimitX96,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 

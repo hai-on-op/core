@@ -214,7 +214,11 @@ contract E2EVeloCLSwapStepViewQuoterForkTest is ForkedMainnetAt148368730 {
       tokenOut: USDC,
       tickSpacing: TICK_SPACING,
       sqrtPriceLimitX96: 0,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = step.preview(abi.encode(_data), AMOUNT_IN);

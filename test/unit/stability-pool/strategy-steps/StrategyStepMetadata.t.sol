@@ -123,7 +123,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenOut: TOKEN_OUT,
         tickSpacing: 60,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloClStep, _data, bytes32('VELO_CL_SWAP'), TOKEN_IN, TOKEN_OUT);
