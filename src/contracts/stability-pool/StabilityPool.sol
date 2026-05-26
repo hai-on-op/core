@@ -283,7 +283,6 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   function setStrategySteps(bytes32 _collateralType, StepConfig[] calldata _steps) external isAuthorized {
     if (_steps.length == 0) revert StabilityPool_NoStrategySteps();
 
-    delete _strategySteps[_collateralType];
     address[] memory _stepAddresses = new address[](_steps.length);
 
     for (uint256 _i = 0; _i < _steps.length; _i++) {
@@ -292,8 +291,13 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
         revert StabilityPool_InvalidStrategyStep();
       }
       if (_step.slippageBps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidSlippageBps();
-      _strategySteps[_collateralType].push(_step);
       _stepAddresses[_i] = _step.step;
+    }
+    _validateStrategyStepSequence(_collateralType, _steps);
+
+    delete _strategySteps[_collateralType];
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      _strategySteps[_collateralType].push(_steps[_i]);
     }
 
     emit SetStrategySteps(_collateralType, _stepAddresses);
@@ -519,6 +523,36 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
     uint256 _requiredHai = OZMath.mulDiv(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
     return _haiOut >= _requiredHai;
+  }
+
+  function _validateStrategyStepSequence(bytes32 _collateralType, StepConfig[] calldata _steps) internal view {
+    (, address _collateralToken,) = _resolveCollateral(_collateralType);
+
+    address[][] memory _stepOutputTokens = new address[][](_steps.length);
+    uint256 _tokenCapacity = 1;
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      address[] memory _outputTokens = IStrategyStep(_steps[_i].step).outputTokens(_steps[_i].data);
+      if (_outputTokens.length == 0) revert StabilityPool_InvalidStrategyStep();
+      _stepOutputTokens[_i] = _outputTokens;
+      _tokenCapacity += _outputTokens.length;
+    }
+
+    address[] memory _availableTokens = new address[](_tokenCapacity);
+    uint256 _availableTokensLength = _addAvailableToken(_availableTokens, 0, _collateralToken);
+
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      address _inputToken = IStrategyStep(_steps[_i].step).inputToken(_steps[_i].data);
+      _availableTokensLength = _removeAvailableToken(_availableTokens, _availableTokensLength, _inputToken);
+
+      address[] memory _outputTokens = _stepOutputTokens[_i];
+      for (uint256 _j = 0; _j < _outputTokens.length; _j++) {
+        _availableTokensLength = _addAvailableToken(_availableTokens, _availableTokensLength, _outputTokens[_j]);
+      }
+    }
+
+    if (_availableTokensLength != 1 || _availableTokens[0] != address(systemCoin)) {
+      revert StabilityPool_InvalidStrategyStep();
+    }
   }
 
   function _previewStrategy(
@@ -793,6 +827,38 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
     _balances[_length] = VirtualBalance({token: _token, amount: _amount});
     return _length + 1;
+  }
+
+  function _addAvailableToken(
+    address[] memory _tokens,
+    uint256 _length,
+    address _token
+  ) internal pure returns (uint256 _newLength) {
+    if (_token == address(0)) revert StabilityPool_InvalidStrategyStep();
+    for (uint256 _i = 0; _i < _length; _i++) {
+      if (_tokens[_i] == _token) return _length;
+    }
+
+    _tokens[_length] = _token;
+    return _length + 1;
+  }
+
+  function _removeAvailableToken(
+    address[] memory _tokens,
+    uint256 _length,
+    address _token
+  ) internal pure returns (uint256 _newLength) {
+    if (_token == address(0)) revert StabilityPool_InvalidStrategyStep();
+    for (uint256 _i = 0; _i < _length; _i++) {
+      if (_tokens[_i] == _token) {
+        _newLength = _length - 1;
+        _tokens[_i] = _tokens[_newLength];
+        _tokens[_newLength] = address(0);
+        return _newLength;
+      }
+    }
+
+    revert StabilityPool_InvalidStrategyStep();
   }
 
   function _addVirtualBalance(

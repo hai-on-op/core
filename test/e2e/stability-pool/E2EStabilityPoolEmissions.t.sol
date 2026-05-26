@@ -533,18 +533,16 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   // --- Strategy Configuration ---
 
   function test_set_strategy_steps_configures_multi_step_strategy() public {
-    address _balancerStep = address(new BalancerV3StablePoolMathSwapStep());
-    address _erc4626Step = address(new ERC4626WithdrawalStep());
+    address _veloStep = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_balancerStep, true);
-    stabilityPool.setStepWhitelist(_erc4626Step, true);
+    stabilityPool.setStepWhitelist(_veloStep, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
-    _steps[0] = IStabilityPool.StepConfig({step: _balancerStep, data: bytes('balancer-data'), slippageBps: 50});
-    _steps[1] = IStabilityPool.StepConfig({step: _erc4626Step, data: bytes('erc4626-data'), slippageBps: 100});
+    _steps[0] = IStabilityPool.StepConfig({step: _veloStep, data: _wethToUsdcVeloData(), slippageBps: 50});
+    _steps[1] = IStabilityPool.StepConfig({step: _veloStep, data: _usdcToHaiVeloData(), slippageBps: 100});
 
     stabilityPool.setStrategySteps(_cType, _steps);
     vm.stopPrank();
@@ -552,24 +550,24 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(stabilityPool.strategyStepsLength(_cType), 2);
 
     IStabilityPool.StepConfig memory _stored0 = stabilityPool.strategySteps(_cType, 0);
-    assertEq(_stored0.step, _balancerStep);
+    assertEq(_stored0.step, _veloStep);
     assertEq(_stored0.slippageBps, 50);
 
     IStabilityPool.StepConfig memory _stored1 = stabilityPool.strategySteps(_cType, 1);
-    assertEq(_stored1.step, _erc4626Step);
+    assertEq(_stored1.step, _veloStep);
     assertEq(_stored1.slippageBps, 100);
   }
 
   function test_clear_strategy_steps_removes_configuration() public {
-    address _balancerStep = address(new BalancerV3StablePoolMathSwapStep());
+    address _veloStep = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_balancerStep, true);
+    stabilityPool.setStepWhitelist(_veloStep, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
-    _steps[0] = IStabilityPool.StepConfig({step: _balancerStep, data: bytes('data'), slippageBps: 50});
+    _steps[0] = IStabilityPool.StepConfig({step: _veloStep, data: _wethToHaiVeloData(), slippageBps: 50});
 
     stabilityPool.setStrategySteps(_cType, _steps);
     assertEq(stabilityPool.strategyStepsLength(_cType), 1);
@@ -642,29 +640,27 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   }
 
   function test_set_strategy_steps_overwrites_previous_config() public {
-    address _step1 = address(new BalancerV3StablePoolMathSwapStep());
-    address _step2 = address(new ERC4626WithdrawalStep());
+    address _step = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_step1, true);
-    stabilityPool.setStepWhitelist(_step2, true);
+    stabilityPool.setStepWhitelist(_step, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps1 = new IStabilityPool.StepConfig[](2);
-    _steps1[0] = IStabilityPool.StepConfig({step: _step1, data: bytes('old-data-1'), slippageBps: 50});
-    _steps1[1] = IStabilityPool.StepConfig({step: _step2, data: bytes('old-data-2'), slippageBps: 100});
+    _steps1[0] = IStabilityPool.StepConfig({step: _step, data: _wethToUsdcVeloData(), slippageBps: 50});
+    _steps1[1] = IStabilityPool.StepConfig({step: _step, data: _usdcToHaiVeloData(), slippageBps: 100});
     stabilityPool.setStrategySteps(_cType, _steps1);
     assertEq(stabilityPool.strategyStepsLength(_cType), 2);
 
     IStabilityPool.StepConfig[] memory _steps2 = new IStabilityPool.StepConfig[](1);
-    _steps2[0] = IStabilityPool.StepConfig({step: _step2, data: bytes('new-data'), slippageBps: 200});
+    _steps2[0] = IStabilityPool.StepConfig({step: _step, data: _wethToHaiVeloData(), slippageBps: 200});
     stabilityPool.setStrategySteps(_cType, _steps2);
     vm.stopPrank();
 
     assertEq(stabilityPool.strategyStepsLength(_cType), 1);
     IStabilityPool.StepConfig memory _stored = stabilityPool.strategySteps(_cType, 0);
-    assertEq(_stored.step, _step2);
+    assertEq(_stored.step, _step);
     assertEq(_stored.slippageBps, 200);
   }
 
@@ -892,6 +888,19 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: USDC_ADDR,
         tokenOut: HAI_ADDR,
         stable: true,
+        deadlineBuffer: 1 hours
+      })
+    );
+  }
+
+  function _wethToHaiVeloData() internal pure returns (bytes memory _data) {
+    _data = abi.encode(
+      VeloSwapStep.Data({
+        router: VELO_ROUTER,
+        factory: VELO_FACTORY,
+        tokenIn: WETH_ADDR,
+        tokenOut: HAI_ADDR,
+        stable: false,
         deadlineBuffer: 1 hours
       })
     );

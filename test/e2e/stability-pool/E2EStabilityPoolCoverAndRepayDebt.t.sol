@@ -55,6 +55,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   address internal constant RETH = 0x9Bcef72be871e61ED4fBbc7630889beE758eb81D;
   address internal constant WA_OPT_WETH = 0x464b808c2C7E04b07e860fDF7a91870620246148;
   address internal constant ALETH = 0x3E29D3A9316dAB217754d13b28646B76607c5f04;
+  address internal constant OP = 0x4200000000000000000000000000000000000042;
   address internal constant LUSD = 0xc40F949F8a4e094D1b49a23ea9241D289B7b2819;
 
   address internal constant VELO_CL_ROUTER = 0x0792a633F0c19c351081CF4B211F68F79bCc9676;
@@ -162,7 +163,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
     // Ensure OP has a non-empty strategy to hit collateral-type mismatch branch.
     vm.prank(testDeployer);
-    stabilityPool.setStrategySteps(OP_CTYPE, _wethPipeline());
+    stabilityPool.setStrategySteps(OP_CTYPE, _opToHaiPipeline());
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
     deal(address(systemCoin), testDeployer, DEAD_SHARES_SEED);
@@ -771,6 +772,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     _steps[2] = IStabilityPool.StepConfig({step: address(curveStep), data: _boldToHaiCurveData(), slippageBps: 200});
   }
 
+  function _opToHaiPipeline() internal view returns (IStabilityPool.StepConfig[] memory _steps) {
+    _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({step: address(veloSwapStep), data: _opToHaiVeloData(), slippageBps: 200});
+  }
+
   function _rethPipeline() internal view returns (IStabilityPool.StepConfig[] memory _steps) {
     _steps = new IStabilityPool.StepConfig[](5);
     _steps[0] = IStabilityPool.StepConfig({
@@ -833,6 +839,19 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenIn: USDC,
         tokenOut: BOLD,
         stable: true,
+        deadlineBuffer: 1 hours
+      })
+    );
+  }
+
+  function _opToHaiVeloData() internal pure returns (bytes memory _data) {
+    _data = abi.encode(
+      VeloSwapStep.Data({
+        router: VELO_ROUTER,
+        factory: VELO_FACTORY,
+        tokenIn: OP,
+        tokenOut: HAI,
+        stable: false,
         deadlineBuffer: 1 hours
       })
     );

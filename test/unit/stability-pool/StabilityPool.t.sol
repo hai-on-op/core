@@ -50,6 +50,10 @@ abstract contract Base is HaiTest {
   MockStabilityPoolEmissionsControllerForTest emissionsController;
   StabilityPool stabilityPool;
   MockStabilityPoolStrategyStepForTest strategyStep;
+  ERC20ForTest collateralToken;
+  MockCollateralJoinFactoryForTest collateralJoinFactory;
+  MockCollateralAuctionHouseFactoryForTest collateralAuctionHouseFactory;
+  MockCollateralJoinForTest collateralJoin;
 
   function setUp() public virtual {
     vm.startPrank(deployer);
@@ -58,6 +62,10 @@ abstract contract Base is HaiTest {
     protocolToken = new ERC20ForTest();
     emissionsController = new MockStabilityPoolEmissionsControllerForTest(protocolToken, address(0));
     strategyStep = new MockStabilityPoolStrategyStepForTest();
+    collateralToken = new ERC20ForTest();
+    collateralJoinFactory = new MockCollateralJoinFactoryForTest();
+    collateralAuctionHouseFactory = new MockCollateralAuctionHouseFactoryForTest();
+    collateralJoin = new MockCollateralJoinForTest(collateralToken, 0);
 
     stabilityPool = new StabilityPool(
       address(systemCoin),
@@ -65,9 +73,10 @@ abstract contract Base is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       mockContract('CoinJoin'),
-      mockContract('CollateralJoinFactory'),
-      mockContract('CollateralAuctionHouseFactory')
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
+    collateralJoinFactory.setCollateralJoin(bytes32('WSTETH'), address(collateralJoin));
 
     systemCoin.mint(deployer, DEAD_SHARES_SEED);
     systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
@@ -673,7 +682,7 @@ contract Unit_StabilityPool_StrategyConfig is Base {
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
     _steps[0] = IStabilityPool.StepConfig({
       step: address(strategyStep),
-      data: abi.encode(address(systemCoin), address(systemCoin)),
+      data: abi.encode(address(collateralToken), address(systemCoin)),
       slippageBps: 0
     });
 
@@ -689,7 +698,7 @@ contract Unit_StabilityPool_StrategyConfig is Base {
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
     _steps[0] = IStabilityPool.StepConfig({
       step: address(strategyStep),
-      data: abi.encode(address(systemCoin), address(systemCoin)),
+      data: abi.encode(address(collateralToken), address(systemCoin)),
       slippageBps: 0
     });
 
@@ -993,6 +1002,94 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     stabilityPool.setStrategySteps(CTYPE, _steps);
   }
 
+  function test_SetStrategySteps_ValidatesChainedOutputs() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _intermediateToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_intermediateToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+    _steps[1] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_intermediateToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+
+    assertEq(stabilityPool.strategyStepsLength(CTYPE), 2);
+  }
+
+  function test_Revert_SetStrategySteps_FirstInputMustBeCollateral() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _wrongInputToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_wrongInputToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_Revert_SetStrategySteps_InputMustBeAvailablePreviousOutput() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _intermediateToken = new ERC20ForTest();
+    ERC20ForTest _wrongInputToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_intermediateToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+    _steps[1] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_wrongInputToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_Revert_SetStrategySteps_FinalTokenMustBeHai() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _nonHaiToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_nonHaiToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
   function test_Revert_SetMinProfitBps_Unauthorized() public {
     vm.prank(user);
     vm.expectRevert(IAuthorizable.Unauthorized.selector);
@@ -1073,7 +1170,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     stabilityPool.previewSwapToHai(CTYPE, 1e18);
   }
 
-  function test_PreviewSwapToHai_Supports_MoreThanEightStepOutputs() public {
+  function test_Revert_SetStrategySteps_FinalStateIncludesNonHaiOutput() public {
     MockManyOutputsStrategyStepForTest _step = new MockManyOutputsStrategyStepForTest();
 
     address[] memory _tokenOuts = new address[](9);
@@ -1097,11 +1194,15 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
       })
     );
 
-    _setSingleStep(address(_step), _data, 0);
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
 
-    uint256 _expectedHai = 2e18;
-    uint256 _previewHai = stabilityPool.previewSwapToHai(CTYPE, 1e18);
-    assertEq(_previewHai, _expectedHai);
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({step: address(_step), data: _data, slippageBps: 0});
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
   }
 
   function test_Revert_CoverAndRepayDebt_NoStrategySteps() public {
