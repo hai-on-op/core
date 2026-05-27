@@ -27,6 +27,7 @@ contract VeloSwapStep is IStrategyStep {
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('VELO_SWAP');
+  uint256 internal constant _DEADLINE_OFFSET = 1;
 
   // --- Methods ---
 
@@ -86,7 +87,7 @@ contract VeloSwapStep is IStrategyStep {
       factory: _decoded.factory
     });
     uint256[] memory _rawAmounts = IVelodromeRouterV2(_decoded.router).swapExactTokensForTokens(
-      _amountIn, _minOut, _routes, address(this), block.timestamp + _decoded.deadlineBuffer
+      _amountIn, _minOut, _routes, address(this), block.timestamp + _DEADLINE_OFFSET
     );
     _amountsOut[0] = _rawAmounts[_rawAmounts.length - 1];
   }

@@ -463,6 +463,30 @@ contract Unit_StrategyStep_Branches is Base {
     assertEq(_out[0], 0);
   }
 
+  function test_VeloSwap_Execute_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+
+    VeloSwapStep _step = new VeloSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+
+    _tokenA.mint(address(_step), 1e18);
+
+    VeloSwapStep.Data memory _data = VeloSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      tokenIn: address(_tokenA),
+      tokenOut: address(_tokenB),
+      stable: false,
+      deadlineBuffer: 0
+    });
+
+    _step.execute(abi.encode(_data), 1e18, new uint256[](0));
+
+    assertEq(_router.lastSwapDeadline(), block.timestamp + 1);
+  }
+
   function test_ERC4626Withdraw_Execute_ZeroAmount() public {
     ERC4626WithdrawalStep _step = new ERC4626WithdrawalStep();
     ERC20ForTest _assetToken = new ERC20ForTest();
