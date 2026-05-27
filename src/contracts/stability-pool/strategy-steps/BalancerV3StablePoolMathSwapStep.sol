@@ -8,6 +8,7 @@ import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {
   IBalancerV3RouterStableMath,
+  IBalancerV3VaultHooksConfig,
   IBalancerV3VaultStableMath,
   IBalancerV3StablePoolLike
 } from '@interfaces/external/IBalancerV3StableMath.sol';
@@ -50,7 +51,6 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
   uint256 internal constant _ONE = 1e18;
   uint256 internal constant _BPS = 10_000;
   uint8 internal constant _SWAP_KIND_EXACT_IN = 0;
-  bytes4 internal constant _SELECTOR_GET_HOOKS_CONFIG = 0xce8630d4;
 
   // --- Methods ---
 
@@ -173,7 +173,8 @@ contract BalancerV3StablePoolMathSwapStep is IStrategyStep {
    * @dev Dynamic swap fee and swap hooks are not modeled by this step's preview math
    */
   function _ensureSwapHooksDisabled(address _vault, address _pool) internal view {
-    (bool _ok, bytes memory _ret) = _vault.staticcall(abi.encodeWithSelector(_SELECTOR_GET_HOOKS_CONFIG, _pool));
+    (bool _ok, bytes memory _ret) =
+      _vault.staticcall(abi.encodeWithSelector(IBalancerV3VaultHooksConfig.getHooksConfig.selector, _pool));
     if (!_ok || _ret.length < 352) revert BalancerV3StablePoolMathSwapStep_UnsupportedHooks();
 
     (,,, bool _shouldCallComputeDynamicSwapFee, bool _shouldCallBeforeSwap, bool _shouldCallAfterSwap,,,,,) =
