@@ -291,7 +291,11 @@ contract E2EVeloLPRemovalStepForkTest is ForkedMainnetAt148368730 {
       tokenA: TOKEN_A,
       tokenB: TOKEN_B,
       stable: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](2);

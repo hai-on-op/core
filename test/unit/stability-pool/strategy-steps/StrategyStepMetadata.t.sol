@@ -141,7 +141,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenA: TOKEN_A,
         tokenB: TOKEN_B,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     assertEq(veloLpRemovalStep.stepType(), bytes32('VELO_LP_REMOVE'));
