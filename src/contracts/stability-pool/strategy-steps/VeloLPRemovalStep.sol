@@ -27,6 +27,7 @@ contract VeloLPRemovalStep is IStrategyStep {
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('VELO_LP_REMOVE');
+  uint256 internal constant _DEADLINE_OFFSET = 1;
 
   // --- Methods ---
 
@@ -92,7 +93,7 @@ contract VeloLPRemovalStep is IStrategyStep {
       _minA,
       _minB,
       address(this),
-      block.timestamp + _decoded.deadlineBuffer
+      block.timestamp + _DEADLINE_OFFSET
     );
   }
 }

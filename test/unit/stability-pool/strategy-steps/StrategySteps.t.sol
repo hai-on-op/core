@@ -114,4 +114,21 @@ contract Unit_VeloLPRemovalStep is Base {
     assertEq(tokenA.balanceOf(address(step)), 500e18);
     assertEq(tokenB.balanceOf(address(step)), 1000e18);
   }
+
+  function test_Execute_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+
+    VeloLPRemovalStep.Data memory _data = VeloLPRemovalStep.Data({
+      router: address(router),
+      lpToken: address(lpToken),
+      tokenA: address(tokenA),
+      tokenB: address(tokenB),
+      stable: false,
+      deadlineBuffer: 0
+    });
+
+    step.execute(abi.encode(_data), 100e18, new uint256[](0));
+
+    assertEq(router.lastRemoveLiquidityDeadline(), block.timestamp + 1);
+  }
 }

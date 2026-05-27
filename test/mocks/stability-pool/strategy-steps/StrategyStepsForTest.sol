@@ -674,6 +674,7 @@ contract MockVeloRouter {
   uint256 public swapOutMultiplier = 2e18; // 2x in WAD
   uint256 public removeAperLp = 5e18;
   uint256 public removeBperLp = 10e18;
+  uint256 public lastRemoveLiquidityDeadline;
 
   function setSwapOutMultiplier(uint256 _multiplier) external {
     swapOutMultiplier = _multiplier;
@@ -722,8 +723,9 @@ contract MockVeloRouter {
     uint256 _amountAMin,
     uint256 _amountBMin,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256 _amountA, uint256 _amountB) {
+    lastRemoveLiquidityDeadline = _deadline;
     _amountA = (_liquidity * removeAperLp) / 1e18;
     _amountB = (_liquidity * removeBperLp) / 1e18;
     require(_amountA >= _amountAMin && _amountB >= _amountBMin, 'min-out');
