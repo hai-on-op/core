@@ -35,6 +35,7 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('VELO_LP_REMOVE_SWAP');
+  uint256 internal constant _DEADLINE_OFFSET = 1;
 
   // --- Methods ---
 
@@ -116,7 +117,7 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
       0,
       0,
       address(this),
-      block.timestamp + _decoded.deadlineBuffer
+      block.timestamp + _DEADLINE_OFFSET
     );
 
     if (_amountB > 0) {
@@ -129,7 +130,7 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
         factory: _decoded.factory
       });
       uint256[] memory _swapAmounts = IVelodromeRouterV2(_decoded.router).swapExactTokensForTokens(
-        _amountB, 0, _routes, address(this), block.timestamp + _decoded.deadlineBuffer
+        _amountB, 0, _routes, address(this), block.timestamp + _DEADLINE_OFFSET
       );
       _amountA += _swapAmounts[_swapAmounts.length - 1];
     }

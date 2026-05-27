@@ -419,6 +419,8 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
   uint256 public swapOutMultiplier = 2e18; // 2x in WAD
   uint256 public removeAperLp = 10e18;
   uint256 public removeBperLp = 5e18;
+  uint256 public lastRemoveLiquidityDeadline;
+  uint256 public lastSwapDeadline;
 
   function setSwapOutMultiplier(uint256 _multiplier) external {
     swapOutMultiplier = _multiplier;
@@ -440,8 +442,9 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
     uint256,
     Route[] calldata _routes,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256[] memory _amounts) {
+    lastSwapDeadline = _deadline;
     ERC20ForTest(_routes[0].from).transferFrom(msg.sender, address(this), _amountIn);
     uint256 _amountOut = (_amountIn * swapOutMultiplier) / 1e18;
     ERC20ForTest(_routes[0].to).mint(_to, _amountOut);
@@ -459,8 +462,9 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
     uint256,
     uint256,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256 _amountA, uint256 _amountB) {
+    lastRemoveLiquidityDeadline = _deadline;
     _amountA = (_liquidity * removeAperLp) / 1e18;
     _amountB = (_liquidity * removeBperLp) / 1e18;
     ERC20ForTest(_tokenA).mint(_to, _amountA);

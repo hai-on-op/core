@@ -193,6 +193,34 @@ contract Unit_StrategyStep_Branches is Base {
     assertEq(_out[0], 0);
   }
 
+  function test_VeloLPRemoveAndSwap_Execute_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    ERC20ForTest _lpToken = new ERC20ForTest();
+
+    _lpToken.mint(address(_step), 1e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 0
+    });
+
+    _step.execute(abi.encode(_data), 1e18, new uint256[](0));
+
+    assertEq(_router.lastRemoveLiquidityDeadline(), block.timestamp + 1);
+    assertEq(_router.lastSwapDeadline(), block.timestamp + 1);
+  }
+
   function test_VeloLPRemoval_Preview_TokenOrderFlipBranch() public {
     VeloLPRemovalStep _step = new VeloLPRemovalStep();
     MockVeloRouterForTest _router = new MockVeloRouterForTest();
