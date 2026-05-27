@@ -18,6 +18,7 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
   // --- Errors ---
 
   error VeloLPRemoveAndSwapStep_InsufficientOutput();
+  error VeloLPRemoveAndSwapStep_InvalidPairTokens();
 
   // --- Data ---
 
@@ -71,12 +72,16 @@ contract VeloLPRemoveAndSwapStep is IStrategyStep {
 
     uint256 _amountA;
     uint256 _amountB;
-    if (_pair.token0() == _decoded.tokenA) {
+    address _token0 = _pair.token0();
+    address _token1 = _pair.token1();
+    if (_token0 == _decoded.tokenA && _token1 == _decoded.tokenB) {
       _amountA = (_reserve0 * _amountIn) / _totalSupply;
       _amountB = (_reserve1 * _amountIn) / _totalSupply;
-    } else {
+    } else if (_token0 == _decoded.tokenB && _token1 == _decoded.tokenA) {
       _amountA = (_reserve1 * _amountIn) / _totalSupply;
       _amountB = (_reserve0 * _amountIn) / _totalSupply;
+    } else {
+      revert VeloLPRemoveAndSwapStep_InvalidPairTokens();
     }
 
     if (_amountB > 0) {

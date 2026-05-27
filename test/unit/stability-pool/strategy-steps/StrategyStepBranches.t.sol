@@ -172,6 +172,31 @@ contract Unit_StrategyStep_Branches is Base {
     assertEq(_out[0], 437_500_000_000_000_000_000);
   }
 
+  function test_Revert_VeloLPRemoveAndSwap_Preview_InvalidPairTokens() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    ERC20ForTest _wrongTokenB = new ERC20ForTest();
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _lpToken.setState(1000e18, 500e18, 100e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_wrongTokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 1 hours
+    });
+
+    vm.expectRevert(VeloLPRemoveAndSwapStep.VeloLPRemoveAndSwapStep_InvalidPairTokens.selector);
+    _step.preview(abi.encode(_data), 10e18);
+  }
+
   function test_VeloLPRemoveAndSwap_ExecuteZeroAmount() public {
     VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
     uint256[] memory _minOuts = new uint256[](1);
