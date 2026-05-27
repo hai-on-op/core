@@ -37,6 +37,7 @@ import {
 } from '@test/mocks/stability-pool/strategy/StabilityPoolStrategyFailureForTest.sol';
 
 uint256 constant RAY = 1e27;
+uint256 constant DEAD_SHARES_SEED = 1000e18;
 
 abstract contract Base is HaiTest {
   address deployer = label('deployer');
@@ -49,6 +50,10 @@ abstract contract Base is HaiTest {
   MockStabilityPoolEmissionsControllerForTest emissionsController;
   StabilityPool stabilityPool;
   MockStabilityPoolStrategyStepForTest strategyStep;
+  ERC20ForTest collateralToken;
+  MockCollateralJoinFactoryForTest collateralJoinFactory;
+  MockCollateralAuctionHouseFactoryForTest collateralAuctionHouseFactory;
+  MockCollateralJoinForTest collateralJoin;
 
   function setUp() public virtual {
     vm.startPrank(deployer);
@@ -57,6 +62,10 @@ abstract contract Base is HaiTest {
     protocolToken = new ERC20ForTest();
     emissionsController = new MockStabilityPoolEmissionsControllerForTest(protocolToken, address(0));
     strategyStep = new MockStabilityPoolStrategyStepForTest();
+    collateralToken = new ERC20ForTest();
+    collateralJoinFactory = new MockCollateralJoinFactoryForTest();
+    collateralAuctionHouseFactory = new MockCollateralAuctionHouseFactoryForTest();
+    collateralJoin = new MockCollateralJoinForTest(collateralToken, 0);
 
     stabilityPool = new StabilityPool(
       address(systemCoin),
@@ -64,9 +73,14 @@ abstract contract Base is HaiTest {
       mockContract('OracleRelayer'),
       address(emissionsController),
       mockContract('CoinJoin'),
-      mockContract('CollateralJoinFactory'),
-      mockContract('CollateralAuctionHouseFactory')
+      address(collateralJoinFactory),
+      address(collateralAuctionHouseFactory)
     );
+    collateralJoinFactory.setCollateralJoin(bytes32('WSTETH'), address(collateralJoin));
+
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
@@ -85,6 +99,204 @@ abstract contract Base is HaiTest {
 contract Unit_StabilityPool_Constructor is Base {
   function test_Set_SystemCoin() public view {
     assertEq(address(stabilityPool.systemCoin()), address(systemCoin));
+  }
+
+  function test_Set_DeadSharesSeed() public view {
+    assertEq(stabilityPool.decimals(), systemCoin.decimals());
+    assertEq(stabilityPool.deadSharesSeeded(), true);
+    assertEq(stabilityPool.balanceOf(stabilityPool.DEAD_SHARES()), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.totalSupply(), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.totalAssets(), DEAD_SHARES_SEED);
+    assertEq(stabilityPool.previewDeposit(1e18), 1e18);
+  }
+
+  function test_Revert_Deposit_WhenDeadSharesNotSeeded() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    systemCoin.approve(address(_unseededPool), type(uint256).max);
+
+    vm.prank(user);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesNotSeeded.selector);
+    _unseededPool.deposit(1e18, user);
+  }
+
+  function test_Revert_Mint_WhenDeadSharesNotSeeded() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    systemCoin.approve(address(_unseededPool), type(uint256).max);
+
+    vm.prank(user);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesNotSeeded.selector);
+    _unseededPool.mint(1e18, user);
+  }
+
+  function test_Revert_SeedDeadShares_Unauthorized() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.prank(user);
+    vm.expectRevert(IAuthorizable.Unauthorized.selector);
+    _unseededPool.seedDeadShares(1e18);
+  }
+
+  function test_Revert_SeedDeadShares_NullAmount() public {
+    StabilityPool _unseededPool = _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+
+    vm.expectRevert(IStabilityPool.StabilityPool_NullDeadShareAmount.selector);
+    _unseededPool.seedDeadShares(0);
+  }
+
+  function test_Revert_SeedDeadShares_AlreadySeeded() public {
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    vm.startPrank(deployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    vm.expectRevert(IStabilityPool.StabilityPool_DeadSharesAlreadySeeded.selector);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
+  }
+
+  function test_Revert_Constructor_InvalidSystemCoin() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(0),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidProtocolToken() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(0),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidOracleRelayer() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      address(0),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidEmissionsController() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(0),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCoinJoin() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      address(0),
+      mockContract('CollateralJoinFactory'),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCollateralJoinFactory() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      address(0),
+      mockContract('CollateralAuctionHouseFactory')
+    );
+  }
+
+  function test_Revert_Constructor_InvalidCollateralAuctionHouseFactory() public {
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidRegistryAddress.selector);
+    _deployStabilityPool(
+      address(systemCoin),
+      address(protocolToken),
+      mockContract('OracleRelayer'),
+      address(emissionsController),
+      mockContract('CoinJoin'),
+      mockContract('CollateralJoinFactory'),
+      address(0)
+    );
+  }
+
+  function _deployStabilityPool(
+    address _systemCoin,
+    address _protocolToken,
+    address _oracleRelayer,
+    address _emissionsController,
+    address _coinJoin,
+    address _collateralJoinFactory,
+    address _collateralAuctionHouseFactory
+  ) internal returns (StabilityPool _stabilityPool) {
+    _stabilityPool = new StabilityPool(
+      _systemCoin,
+      _protocolToken,
+      _oracleRelayer,
+      _emissionsController,
+      _coinJoin,
+      _collateralJoinFactory,
+      _collateralAuctionHouseFactory
+    );
   }
 }
 
@@ -137,10 +349,11 @@ contract Unit_StabilityPool_TransferToggle is Base {
     vm.prank(deployer);
     emissionsController.setStabilityRewardsReceiver(postCutoverRewards);
 
+    uint256 _expectedShares = stabilityPool.previewDeposit(100e18);
     vm.prank(user);
     stabilityPool.deposit(100e18, user);
 
-    assertEq(stabilityPool.balanceOf(user), 100e18);
+    assertEq(stabilityPool.balanceOf(user), _expectedShares);
   }
 
   function test_Mint_DuringReceiverCutover_DoesNotRevert() public {
@@ -217,32 +430,32 @@ contract Unit_StabilityPool_Rewards is Base {
 
   function test_Withdraw_ClaimsControllerRewards_BeforeBurningLastShares() public {
     vm.prank(user);
-    stabilityPool.deposit(100e18, user);
+    uint256 _shares = stabilityPool.deposit(100e18, user);
 
     protocolToken.mint(address(emissionsController), 10e18);
     emissionsController.setAmountToClaim(10e18);
 
     vm.prank(user);
-    stabilityPool.redeem(100e18, user, user);
+    stabilityPool.redeem(_shares, user, user);
 
     assertEq(protocolToken.balanceOf(user), 10e18);
-    assertEq(stabilityPool.totalSupply(), 0);
+    assertEq(stabilityPool.totalSupply(), DEAD_SHARES_SEED);
     assertEq(protocolToken.balanceOf(address(stabilityPool)), 0);
   }
 
   function test_PartialWithdraw_DoesNotLose_RemainingRewards() public {
     vm.prank(user);
-    stabilityPool.deposit(100e18, user);
+    uint256 _shares = stabilityPool.deposit(100e18, user);
     protocolToken.mint(address(stabilityPool), 10e18);
 
     vm.prank(user);
-    stabilityPool.redeem(50e18, user, user);
+    stabilityPool.redeem(_shares / 2, user, user);
     assertEq(protocolToken.balanceOf(user), 10e18);
 
     protocolToken.mint(address(stabilityPool), 10e18);
     vm.prank(user);
     stabilityPool.claimRewards();
-    assertEq(protocolToken.balanceOf(user), 20e18);
+    assertApproxEqAbs(protocolToken.balanceOf(user), 20e18, 1e10);
   }
 
   function test_ClaimHistoricalRewards_AfterTransferCutover() public {
@@ -360,6 +573,10 @@ contract Unit_StabilityPool_WithdrawLiveness is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
     systemCoin.mint(user, 1000e18);
@@ -430,6 +647,10 @@ contract Unit_StabilityPool_Reentrancy is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
     systemCoin.mint(user, 1000e18);
@@ -446,11 +667,13 @@ contract Unit_StabilityPool_Reentrancy is HaiTest {
   }
 
   function test_Deposit_Succeeds_When_EmissionsController_DoesNotReenter() public {
+    uint256 _expectedShares = stabilityPool.previewDeposit(1e18);
+
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(1e18, user);
 
-    assertEq(_shares, 1e18);
-    assertEq(stabilityPool.balanceOf(user), 1e18);
+    assertEq(_shares, _expectedShares);
+    assertEq(stabilityPool.balanceOf(user), _expectedShares);
   }
 }
 
@@ -459,7 +682,7 @@ contract Unit_StabilityPool_StrategyConfig is Base {
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
     _steps[0] = IStabilityPool.StepConfig({
       step: address(strategyStep),
-      data: abi.encode(address(systemCoin), address(systemCoin)),
+      data: abi.encode(address(collateralToken), address(systemCoin)),
       slippageBps: 0
     });
 
@@ -475,7 +698,7 @@ contract Unit_StabilityPool_StrategyConfig is Base {
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
     _steps[0] = IStabilityPool.StepConfig({
       step: address(strategyStep),
-      data: abi.encode(address(systemCoin), address(systemCoin)),
+      data: abi.encode(address(collateralToken), address(systemCoin)),
       slippageBps: 0
     });
 
@@ -532,6 +755,10 @@ contract Unit_StabilityPool_AdminAndPipelines is HaiTest {
     );
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
     collateralJoinFactory.setCollateralJoin(CTYPE, address(collateralJoin));
+
+    systemCoin.mint(address(this), DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
 
     systemCoin.mint(user, 1000e18);
     vm.prank(user);
@@ -697,9 +924,12 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
     collateralJoinFactory.setCollateralJoin(CTYPE, address(collateralJoin));
 
+    systemCoin.mint(deployer, DEAD_SHARES_SEED);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+
     vm.stopPrank();
 
-    systemCoin.mint(address(stabilityPool), 1000e18);
     systemCoin.mint(user, 1000e18);
   }
 
@@ -769,6 +999,94 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
 
     vm.prank(deployer);
     vm.expectRevert(IStabilityPool.StabilityPool_InvalidSlippageBps.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_SetStrategySteps_ValidatesChainedOutputs() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _intermediateToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_intermediateToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+    _steps[1] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_intermediateToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+
+    assertEq(stabilityPool.strategyStepsLength(CTYPE), 2);
+  }
+
+  function test_Revert_SetStrategySteps_FirstInputMustBeCollateral() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _wrongInputToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_wrongInputToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_Revert_SetStrategySteps_InputMustBeAvailablePreviousOutput() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _intermediateToken = new ERC20ForTest();
+    ERC20ForTest _wrongInputToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_intermediateToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+    _steps[1] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(_wrongInputToken), address(systemCoin), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
+  }
+
+  function test_Revert_SetStrategySteps_FinalTokenMustBeHai() public {
+    MockConfigurableStrategyStepForTest _step = new MockConfigurableStrategyStepForTest(bytes32('STEP'));
+    ERC20ForTest _nonHaiToken = new ERC20ForTest();
+
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
+
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({
+      step: address(_step),
+      data: _mockData(address(collateralToken), address(_nonHaiToken), 1e18, 1e18),
+      slippageBps: 0
+    });
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
     stabilityPool.setStrategySteps(CTYPE, _steps);
   }
 
@@ -852,7 +1170,7 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
     stabilityPool.previewSwapToHai(CTYPE, 1e18);
   }
 
-  function test_PreviewSwapToHai_Supports_MoreThanEightStepOutputs() public {
+  function test_Revert_SetStrategySteps_FinalStateIncludesNonHaiOutput() public {
     MockManyOutputsStrategyStepForTest _step = new MockManyOutputsStrategyStepForTest();
 
     address[] memory _tokenOuts = new address[](9);
@@ -876,11 +1194,15 @@ contract Unit_StabilityPool_CoverAndRepayFlow is HaiTest {
       })
     );
 
-    _setSingleStep(address(_step), _data, 0);
+    vm.prank(deployer);
+    stabilityPool.setStepWhitelist(address(_step), true);
 
-    uint256 _expectedHai = 2e18;
-    uint256 _previewHai = stabilityPool.previewSwapToHai(CTYPE, 1e18);
-    assertEq(_previewHai, _expectedHai);
+    IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({step: address(_step), data: _data, slippageBps: 0});
+
+    vm.prank(deployer);
+    vm.expectRevert(IStabilityPool.StabilityPool_InvalidStrategyStep.selector);
+    stabilityPool.setStrategySteps(CTYPE, _steps);
   }
 
   function test_Revert_CoverAndRepayDebt_NoStrategySteps() public {

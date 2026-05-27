@@ -33,6 +33,25 @@ interface IBalancerV3VaultStableMath {
   function getStaticSwapFeePercentage(address _pool) external view returns (uint256 _swapFeePercentage);
 }
 
+interface IBalancerV3VaultHooksConfig {
+  function getHooksConfig(address _pool)
+    external
+    view
+    returns (
+      bool _enableHookAdjustedAmounts,
+      bool _shouldCallBeforeInitialize,
+      bool _shouldCallAfterInitialize,
+      bool _shouldCallComputeDynamicSwapFee,
+      bool _shouldCallBeforeSwap,
+      bool _shouldCallAfterSwap,
+      bool _shouldCallBeforeAddLiquidity,
+      bool _shouldCallAfterAddLiquidity,
+      bool _shouldCallBeforeRemoveLiquidity,
+      bool _shouldCallAfterRemoveLiquidity,
+      address _hooksContract
+    );
+}
+
 interface IBalancerV3StablePoolLike {
   struct PoolSwapParams {
     uint8 kind;

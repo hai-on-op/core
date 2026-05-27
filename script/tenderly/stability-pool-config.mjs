@@ -74,6 +74,27 @@ export const STRATEGY_STEP_ARTIFACTS = [
   },
 ];
 
+export const ORACLE_ARTIFACTS = [
+  {
+    key: 'boldHaiOracle',
+    contractName: 'CurveStableSwapNGRelayer',
+    artifactPath: 'out/CurveStableSwapNGRelayer.sol/CurveStableSwapNGRelayer.json',
+    constructorArgs: ['__CURVE_BOLD_HAI_POOL__', 0, 1],
+  },
+  {
+    key: 'boldUsdOracle',
+    contractName: 'DenominatedOracle',
+    artifactPath: 'out/DenominatedOracle.sol/DenominatedOracle.json',
+    constructorArgs: ['__BOLD_HAI_ORACLE__', '__HAI_USD_ORACLE__', true],
+  },
+  {
+    key: 'waOptWethUsdOracle',
+    contractName: 'ERC4626ShareOracle',
+    artifactPath: 'out/ERC4626ShareOracle.sol/ERC4626ShareOracle.json',
+    constructorArgs: ['__WA_OPT_WETH__', '__WETH_USD_ORACLE__', 'waOptWETH / USD'],
+  },
+];
+
 export const TOKEN_ADDRESSES = {
   WETH: '0x4200000000000000000000000000000000000006',
   WSTETH: '0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb',
@@ -117,7 +138,15 @@ export const EXTERNAL_ADDRESSES = {
   yearnMsethWethVault: '0xd0d2Ac44Cc842079e978bB11b094764f7D0dec6A',
 };
 
+export const ORACLE_ADDRESSES = {
+  HAI_USD: '0x8c212bCaE328669c8b045D467CB78b88e0BE0D39',
+  RETH_USD: '0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740',
+  WETH_USD: '0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36',
+};
+
 export const DEFAULT_STEP_SLIPPAGE_BPS = 200;
+export const BALANCER_ORACLE_TOLERANCE_BPS = 200;
+export const CURVE_ORACLE_TOLERANCE_BPS = 200;
 
 export const DEFAULT_TARGET_DEBT_WAD = {
   WETH: 500n * WAD,
@@ -144,27 +173,50 @@ function cfg(step, data, slippageBps) {
 }
 
 function encodeVeloClSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenInOracle: ethers.ZeroAddress,
+    tokenOutOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
     'tuple(address router,address pool,address tokenIn,address tokenOut,' +
-      'int24 tickSpacing,uint160 sqrtPriceLimitX96,uint256 deadlineBuffer)',
-    data
+      'int24 tickSpacing,uint160 sqrtPriceLimitX96,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 
 function encodeVeloSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenInOracle: ethers.ZeroAddress,
+    tokenOutOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
-    'tuple(address router,address factory,address tokenIn,address tokenOut,bool stable,uint256 deadlineBuffer)',
-    data
+    'tuple(address router,address factory,address tokenIn,address tokenOut,bool stable,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 
 function encodeCurveSwap(data) {
-  return encodeTuple('tuple(address pool,int128 i,int128 j,address tokenIn,address tokenOut)', data);
+  return encodeTuple(
+    'tuple(address pool,int128 i,int128 j,address tokenIn,address tokenOut,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    data
+  );
 }
 
 function encodeBalancerV3Swap(data) {
   return encodeTuple(
-    'tuple(address router,address pool,address tokenIn,address tokenOut,uint256 deadlineBuffer,bytes userData)',
+    'tuple(address router,address pool,address tokenIn,address tokenOut,uint256 deadlineBuffer,bytes userData,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
     data
   );
 }
@@ -182,14 +234,23 @@ function encodeYearnWithdrawal(data) {
 }
 
 function encodeVeloLpRemoveAndSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenAOracle: ethers.ZeroAddress,
+    tokenBOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
     'tuple(address router,address factory,address lpToken,address tokenA,address tokenB,' +
-      'bool stableLp,bool stableSwap,uint256 deadlineBuffer)',
-    data
+      'bool stableLp,bool stableSwap,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenAOracle,address tokenBOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 
-function buildShared(steps, slippageBps) {
+function buildShared(steps, slippageBps, oracleAddresses) {
   return {
     wethToUsdc: cfg(
       steps.veloCLStep,
@@ -224,6 +285,10 @@ function buildShared(steps, slippageBps) {
         j: 0,
         tokenIn: TOKEN_ADDRESSES.BOLD,
         tokenOut: TOKEN_ADDRESSES.HAI,
+        useOracleFloor: true,
+        tokenInOracle: oracleAddresses.BOLD_USD,
+        tokenOutOracle: oracleAddresses.HAI_USD,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS,
       }),
       slippageBps
     ),
@@ -242,8 +307,9 @@ export function stringFromBytes32(value) {
   }
 }
 
-export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_SLIPPAGE_BPS) {
-  const shared = buildShared(stepAddresses, slippageBps);
+export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_SLIPPAGE_BPS, oracleAddresses = {}) {
+  const mergedOracleAddresses = { ...ORACLE_ADDRESSES, ...oracleAddresses };
+  const shared = buildShared(stepAddresses, slippageBps, mergedOracleAddresses);
 
   const wethToUsdc = shared.wethToUsdc;
   const usdcToBold = shared.usdcToBold;
@@ -296,6 +362,10 @@ export function buildPipelineConfigs(stepAddresses, slippageBps = DEFAULT_STEP_S
           tokenOut: TOKEN_ADDRESSES.WA_OPT_WETH,
           deadlineBuffer: 3600,
           userData: '0x',
+          useOracleFloor: true,
+          tokenInOracle: mergedOracleAddresses.RETH_USD,
+          tokenOutOracle: mergedOracleAddresses.WA_OPT_WETH_USD,
+          oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS,
         }),
         slippageBps
       ),

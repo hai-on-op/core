@@ -8,6 +8,11 @@ import {EmissionsController} from '@contracts/stability-pool/EmissionsController
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -62,6 +67,13 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
   address internal constant OP_ADDR = 0x4200000000000000000000000000000000000042;
   address internal constant LUSD_ADDR = 0xc40F949F8a4e094D1b49a23ea9241D289B7b2819;
 
+  // --- oracles ---
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
+
   // --- pools ---
   address internal constant CURVE_BOLD_HAI_POOL = 0xC4ea2ED83bC9207398fa5dB31Ee4E7477dC34fd5;
   address internal constant BALANCER_V3_RETH_WA_OPT_WETH_POOL = 0x870c0Af8A1af0B58b4b0bD31CE4fe72864ae45BE;
@@ -100,6 +112,8 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
   VeloLPRemoveAndSwapStep internal veloLPRemoveAndSwapStep;
   BeefyVaultWithdrawalStep internal beefyStep;
   YearnVaultWithdrawalStep internal yearnStep;
+  DenominatedOracle internal boldUsdOracle;
+  ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -131,6 +145,10 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
     veloLPRemoveAndSwapStep = new VeloLPRemoveAndSwapStep();
     beefyStep = new BeefyVaultWithdrawalStep();
     yearnStep = new YearnVaultWithdrawalStep();
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_BOLD_HAI_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
+    waOptWethUsdOracle =
+      new ERC4626ShareOracle(IERC4626(WA_OPT_WETH_ADDR), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
 
     stabilityPool.setStepWhitelist(address(balancerV3Step), true);
     stabilityPool.setStepWhitelist(address(erc4626Step), true);
@@ -329,7 +347,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenOut: USDC_ADDR,
         tickSpacing: 100,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -343,7 +365,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenOut: WETH_ADDR,
         tickSpacing: 1,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -357,7 +383,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenOut: WBTC_ADDR,
         tickSpacing: 1,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -371,7 +401,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenOut: USDC_ADDR,
         tickSpacing: 100,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -385,7 +419,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenOut: WETH_ADDR,
         tickSpacing: 200,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -398,7 +436,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: USDC_ADDR,
         tokenOut: BOLD_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -411,7 +453,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: ALETH_ADDR,
         tokenOut: WETH_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -424,7 +470,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: HAIVELO_ADDR,
         tokenOut: VELO_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -437,7 +487,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: VELO_ADDR,
         tokenOut: USDC_ADDR,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -450,18 +504,32 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: MSETH_ADDR,
         tokenOut: WETH_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
 
-  function _boldToHaiCurveData() internal pure returns (bytes memory _data) {
+  function _boldToHaiCurveData() internal view returns (bytes memory _data) {
     _data = abi.encode(
-      CurveSwapStep.Data({pool: CURVE_BOLD_HAI_POOL, i: int128(1), j: int128(0), tokenIn: BOLD_ADDR, tokenOut: HAI_ADDR})
+      CurveSwapStep.Data({
+        pool: CURVE_BOLD_HAI_POOL,
+        i: int128(1),
+        j: int128(0),
+        tokenIn: BOLD_ADDR,
+        tokenOut: HAI_ADDR,
+        useOracleFloor: true,
+        tokenInOracle: address(boldUsdOracle),
+        tokenOutOracle: HAI_USD_ORACLE,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+      })
     );
   }
 
-  function _rethToWaOptWethBalancerV3Data() internal pure returns (bytes memory _data) {
+  function _rethToWaOptWethBalancerV3Data() internal view returns (bytes memory _data) {
     _data = abi.encode(
       BalancerV3StablePoolMathSwapStep.Data({
         router: BALANCER_V3_ROUTER,
@@ -469,7 +537,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenIn: RETH_ADDR,
         tokenOut: WA_OPT_WETH_ADDR,
         deadlineBuffer: 1 hours,
-        userData: bytes('')
+        userData: bytes(''),
+        useOracleFloor: true,
+        tokenInOracle: RETH_USD_ORACLE,
+        tokenOutOracle: address(waOptWethUsdOracle),
+        oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS
       })
     );
   }
@@ -523,7 +595,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: LUSD_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -538,7 +614,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: ALETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -553,7 +633,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: MSETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }

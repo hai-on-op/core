@@ -7,7 +7,6 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
@@ -24,6 +23,7 @@ import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 
+import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 import {Math, WAD, RAY, HOUR} from '@libraries/Math.sol';
 
 /**
@@ -37,8 +37,11 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   // --- Constants ---
 
-  uint256 internal constant _MAX_SLIPPAGE_BPS = 10_000;
-  uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 200;
+  // forgefmt: disable-next-line
+  uint256 internal constant _MAX_SLIPPAGE_BPS = 100_00;
+  // forgefmt: disable-next-line
+  uint16 internal constant _DEFAULT_MIN_PROFIT_BPS = 2_00;
+  address public constant DEAD_SHARES = 0x000000000000000000000000000000000000dEaD;
 
   // --- Data ---
 
@@ -113,6 +116,9 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   /// @inheritdoc IStabilityPool
   uint256 public lastInternalCoinSweepTime;
 
+  /// @inheritdoc IStabilityPool
+  bool public deadSharesSeeded;
+
   // --- Init ---
 
   /**
@@ -132,7 +138,14 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     address _coinJoin,
     address _collateralJoinFactory,
     address _collateralAuctionHouseFactory
-  ) ERC4626(IERC20(_systemCoin)) ERC20('Staked HAI', 'sHAI') Authorizable(msg.sender) {
+  ) ERC4626(IERC20(_assertNonZeroAddress(_systemCoin))) ERC20('Staked HAI', 'sHAI') Authorizable(msg.sender) {
+    _assertNonZeroAddress(_protocolToken);
+    _assertNonZeroAddress(_oracleRelayer);
+    _assertNonZeroAddress(_emissionsController);
+    _assertNonZeroAddress(_coinJoin);
+    _assertNonZeroAddress(_collateralJoinFactory);
+    _assertNonZeroAddress(_collateralAuctionHouseFactory);
+
     systemCoin = ISystemCoin(_systemCoin);
     protocolToken = IProtocolToken(_protocolToken);
     oracleRelayer = IOracleRelayer(_oracleRelayer);
@@ -187,14 +200,16 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
 
   /// @inheritdoc IStabilityPool
   function pendingRewards(address _user) external view returns (uint256 _amount) {
+    if (_user == DEAD_SHARES) return 0;
+
     uint256 _currentIntegral = kiteRewardIntegral;
     if (kiteRewardsActive) {
-      uint256 _totalSupply = totalSupply();
-      if (_totalSupply > 0) {
+      uint256 _activeRewardSupply = _rewardSupply();
+      if (_activeRewardSupply > 0) {
         uint256 _currentKiteBalance = protocolToken.balanceOf(address(this));
         if (_currentKiteBalance > kiteRewardRemaining) {
           uint256 _newKite = _currentKiteBalance - kiteRewardRemaining;
-          _currentIntegral += (_newKite * WAD) / _totalSupply;
+          _currentIntegral += (_newKite * WAD) / _activeRewardSupply;
         }
       }
     }
@@ -237,6 +252,21 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     emit SweepInternalCoin(_exitedWad);
   }
 
+  /// @inheritdoc IStabilityPool
+  function seedDeadShares(uint256 _assets) external nonReentrant isAuthorized returns (uint256 _shares) {
+    if (deadSharesSeeded || totalSupply() != 0) revert StabilityPool_DeadSharesAlreadySeeded();
+    if (_assets == 0) revert StabilityPool_NullDeadShareAmount();
+
+    _shares = _assets;
+    deadSharesSeeded = true;
+
+    IERC20(address(systemCoin)).safeTransferFrom(msg.sender, address(this), _assets);
+    _mint(DEAD_SHARES, _shares);
+
+    emit Deposit(msg.sender, DEAD_SHARES, _assets, _shares);
+    emit SeedDeadShares(_assets, _shares);
+  }
+
   // --- Strategy Configuration ---
 
   /// @inheritdoc IStabilityPool
@@ -253,7 +283,6 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   function setStrategySteps(bytes32 _collateralType, StepConfig[] calldata _steps) external isAuthorized {
     if (_steps.length == 0) revert StabilityPool_NoStrategySteps();
 
-    delete _strategySteps[_collateralType];
     address[] memory _stepAddresses = new address[](_steps.length);
 
     for (uint256 _i = 0; _i < _steps.length; _i++) {
@@ -262,8 +291,13 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
         revert StabilityPool_InvalidStrategyStep();
       }
       if (_step.slippageBps > _MAX_SLIPPAGE_BPS) revert StabilityPool_InvalidSlippageBps();
-      _strategySteps[_collateralType].push(_step);
       _stepAddresses[_i] = _step.step;
+    }
+    _validateStrategyStepSequence(_collateralType, _steps);
+
+    delete _strategySteps[_collateralType];
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      _strategySteps[_collateralType].push(_steps[_i]);
     }
 
     emit SetStrategySteps(_collateralType, _stepAddresses);
@@ -356,19 +390,19 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_currentKiteBalance <= kiteRewardRemaining) return;
 
     uint256 _newKite = _currentKiteBalance - kiteRewardRemaining;
-    uint256 _totalSupply = totalSupply();
-    if (_totalSupply == 0) {
+    uint256 _activeRewardSupply = _rewardSupply();
+    if (_activeRewardSupply == 0) {
       // Track idle inflows so they are not retroactively distributed to future stakers.
       kiteRewardRemaining = _currentKiteBalance;
       return;
     }
 
-    kiteRewardIntegral += (_newKite * WAD) / _totalSupply;
+    kiteRewardIntegral += (_newKite * WAD) / _activeRewardSupply;
     kiteRewardRemaining = _currentKiteBalance;
   }
 
   function _checkpoint(address _user) internal {
-    if (_user == address(0)) return;
+    if (_user == address(0) || _user == DEAD_SHARES) return;
     uint256 _accrued = (balanceOf(_user) * kiteRewardIntegral) / WAD;
     uint256 _debt = rewardDebt[_user];
     if (_accrued > _debt) {
@@ -377,8 +411,12 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
   }
 
   function _syncRewardDebt(address _user) internal {
-    if (_user == address(0)) return;
+    if (_user == address(0) || _user == DEAD_SHARES) return;
     rewardDebt[_user] = (balanceOf(_user) * kiteRewardIntegral) / WAD;
+  }
+
+  function _rewardSupply() internal view returns (uint256 _supply) {
+    _supply = totalSupply() - balanceOf(DEAD_SHARES);
   }
 
   function _claim(address _user, address _receiver) internal returns (uint256 _amount) {
@@ -483,8 +521,38 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_haiOut < _haiSpent) return false;
     if (_haiSpent == 0) return true;
 
-    uint256 _requiredHai = OZMath.mulDiv(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
+    uint256 _requiredHai = FixedPointMathLib.mulDivDown(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
     return _haiOut >= _requiredHai;
+  }
+
+  function _validateStrategyStepSequence(bytes32 _collateralType, StepConfig[] calldata _steps) internal view {
+    (, address _collateralToken,) = _resolveCollateral(_collateralType);
+
+    address[][] memory _stepOutputTokens = new address[][](_steps.length);
+    uint256 _tokenCapacity = 1;
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      address[] memory _outputTokens = IStrategyStep(_steps[_i].step).outputTokens(_steps[_i].data);
+      if (_outputTokens.length == 0) revert StabilityPool_InvalidStrategyStep();
+      _stepOutputTokens[_i] = _outputTokens;
+      _tokenCapacity += _outputTokens.length;
+    }
+
+    address[] memory _availableTokens = new address[](_tokenCapacity);
+    uint256 _availableTokensLength = _addAvailableToken(_availableTokens, 0, _collateralToken);
+
+    for (uint256 _i = 0; _i < _steps.length; _i++) {
+      address _inputToken = IStrategyStep(_steps[_i].step).inputToken(_steps[_i].data);
+      _availableTokensLength = _removeAvailableToken(_availableTokens, _availableTokensLength, _inputToken);
+
+      address[] memory _outputTokens = _stepOutputTokens[_i];
+      for (uint256 _j = 0; _j < _outputTokens.length; _j++) {
+        _availableTokensLength = _addAvailableToken(_availableTokens, _availableTokensLength, _outputTokens[_j]);
+      }
+    }
+
+    if (_availableTokensLength != 1 || _availableTokens[0] != address(systemCoin)) {
+      revert StabilityPool_InvalidStrategyStep();
+    }
   }
 
   function _previewStrategy(
@@ -761,6 +829,38 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     return _length + 1;
   }
 
+  function _addAvailableToken(
+    address[] memory _tokens,
+    uint256 _length,
+    address _token
+  ) internal pure returns (uint256 _newLength) {
+    if (_token == address(0)) revert StabilityPool_InvalidStrategyStep();
+    for (uint256 _i = 0; _i < _length; _i++) {
+      if (_tokens[_i] == _token) return _length;
+    }
+
+    _tokens[_length] = _token;
+    return _length + 1;
+  }
+
+  function _removeAvailableToken(
+    address[] memory _tokens,
+    uint256 _length,
+    address _token
+  ) internal pure returns (uint256 _newLength) {
+    if (_token == address(0)) revert StabilityPool_InvalidStrategyStep();
+    for (uint256 _i = 0; _i < _length; _i++) {
+      if (_tokens[_i] == _token) {
+        _newLength = _length - 1;
+        _tokens[_i] = _tokens[_newLength];
+        _tokens[_newLength] = address(0);
+        return _newLength;
+      }
+    }
+
+    revert StabilityPool_InvalidStrategyStep();
+  }
+
   function _addVirtualBalance(
     VirtualBalance[] memory _balances,
     uint256 _length,
@@ -832,6 +932,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _assets,
     address _receiver
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _shares) {
+    if (!deadSharesSeeded) revert StabilityPool_DeadSharesNotSeeded();
     return super.deposit(_assets, _receiver);
   }
 
@@ -839,7 +940,18 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     uint256 _shares,
     address _receiver
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
+    if (!deadSharesSeeded) revert StabilityPool_DeadSharesNotSeeded();
     return super.mint(_shares, _receiver);
+  }
+
+  function maxDeposit(address _receiver) public view virtual override(ERC4626, IERC4626) returns (uint256 _maxAssets) {
+    if (!deadSharesSeeded) return 0;
+    return super.maxDeposit(_receiver);
+  }
+
+  function maxMint(address _receiver) public view virtual override(ERC4626, IERC4626) returns (uint256 _maxShares) {
+    if (!deadSharesSeeded) return 0;
+    return super.maxMint(_receiver);
   }
 
   function withdraw(
@@ -856,5 +968,10 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     address _owner
   ) public virtual override(ERC4626, IERC4626) nonReentrant returns (uint256 _assets) {
     return super.redeem(_shares, _receiver, _owner);
+  }
+
+  function _assertNonZeroAddress(address _address) internal pure returns (address _nonZeroAddress) {
+    if (_address == address(0)) revert StabilityPool_InvalidRegistryAddress();
+    return _address;
   }
 }

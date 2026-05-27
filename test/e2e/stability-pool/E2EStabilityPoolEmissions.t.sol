@@ -9,8 +9,11 @@ import {EmissionsControllerJob} from '@contracts/jobs/EmissionsControllerJob.sol
 import {IEmissionsController} from '@interfaces/IEmissionsController.sol';
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {WAD, HOUR} from '@libraries/Math.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -26,6 +29,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
 
   uint256 internal constant USER_HAI_BALANCE = 5000e18;
   uint256 internal constant USER_DEPOSIT = 1000e18;
+  uint256 internal constant DEAD_SHARES_SEED = 1000e18;
 
   bytes32 internal constant WETH_CTYPE = bytes32('WETH');
 
@@ -37,6 +41,8 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   address internal constant USDC_ADDR = 0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85;
   address internal constant BOLD_ADDR = 0x03569CC076654F82679C4BA2124D64774781B01D;
   address internal constant HAI_ADDR = 0x10398AbC267496E49106B07dd6BE13364D10dC71;
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
 
   address internal testDeployer = label('testDeployer');
   address internal user = label('user');
@@ -47,6 +53,7 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   EmissionsController internal emissionsController;
   StabilityPool internal stabilityPool;
   EmissionsControllerJob internal emissionsControllerJob;
+  DenominatedOracle internal boldUsdOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -71,6 +78,8 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     );
 
     emissionsController.setStabilityRewardsReceiver(address(stabilityPool));
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
     emissionsControllerJob =
       new EmissionsControllerJob(address(emissionsController), address(stabilityFeeTreasury), 1e18);
     vm.stopPrank();
@@ -79,8 +88,14 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     stabilityFeeTreasury.setTotalAllowance(address(emissionsControllerJob), type(uint256).max);
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
+    deal(address(systemCoin), testDeployer, DEAD_SHARES_SEED);
     deal(address(systemCoin), user, USER_HAI_BALANCE);
     deal(address(systemCoin), user2, USER_HAI_BALANCE);
+
+    vm.startPrank(testDeployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
 
     vm.prank(user);
     systemCoin.approve(address(stabilityPool), type(uint256).max);
@@ -117,9 +132,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   function test_user_does_not_earn_kite_accrued_before_depositing_hai() public {
     vm.warp(block.timestamp + 1 days);
 
+    uint256 _expectedShares = stabilityPool.previewDeposit(USER_DEPOSIT);
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(USER_DEPOSIT, user);
-    assertEq(_shares, USER_DEPOSIT);
+    assertEq(_shares, _expectedShares);
 
     uint256 _pendingBeforeClaim = stabilityPool.pendingRewards(user);
     assertEq(_pendingBeforeClaim, 0);
@@ -136,9 +152,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   }
 
   function test_user_earns_kite_after_depositing_and_time_elapsed() public {
+    uint256 _expectedShares = stabilityPool.previewDeposit(USER_DEPOSIT);
     vm.prank(user);
     uint256 _shares = stabilityPool.deposit(USER_DEPOSIT, user);
-    assertEq(_shares, USER_DEPOSIT);
+    assertEq(_shares, _expectedShares);
     assertEq(stabilityPool.pendingRewards(user), 0);
 
     vm.warp(block.timestamp + 1 days);
@@ -178,10 +195,12 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     uint256 _pendingUser1 = stabilityPool.pendingRewards(user);
     uint256 _pendingUser2 = stabilityPool.pendingRewards(user2);
 
-    uint256 _totalShares = USER_DEPOSIT + _user2Deposit;
+    uint256 _user1Shares = stabilityPool.balanceOf(user);
+    uint256 _user2Shares = stabilityPool.balanceOf(user2);
+    uint256 _totalShares = _user1Shares + _user2Shares;
     uint256 _integral = (_claimedFromController * WAD) / _totalShares;
-    uint256 _expectedUser1 = (USER_DEPOSIT * _integral) / WAD;
-    uint256 _expectedUser2 = (_user2Deposit * _integral) / WAD;
+    uint256 _expectedUser1 = (_user1Shares * _integral) / WAD;
+    uint256 _expectedUser2 = (_user2Shares * _integral) / WAD;
 
     assertEq(_pendingUser1, _expectedUser1);
     assertEq(_pendingUser2, _expectedUser2);
@@ -371,9 +390,10 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(stabilityPool.transfersEnabled(), true);
     assertEq(stabilityPool.kiteRewardsActive(), false);
 
+    uint256 _userSharesBeforeTransfer = stabilityPool.balanceOf(user);
     vm.prank(user);
-    stabilityPool.transfer(user2, USER_DEPOSIT / 2);
-    assertEq(stabilityPool.balanceOf(user2), USER_DEPOSIT / 2);
+    stabilityPool.transfer(user2, _userSharesBeforeTransfer / 2);
+    assertEq(stabilityPool.balanceOf(user2), _userSharesBeforeTransfer / 2);
 
     vm.prank(user);
     uint256 _claimed = stabilityPool.claimRewards();
@@ -418,8 +438,9 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     vm.prank(testDeployer);
     stabilityPool.enableTransfers();
 
+    uint256 _userSharesBeforeTransfer = stabilityPool.balanceOf(user);
     vm.prank(user);
-    stabilityPool.transfer(user2, USER_DEPOSIT / 2);
+    stabilityPool.transfer(user2, _userSharesBeforeTransfer / 2);
 
     vm.prank(user);
     uint256 _claimedByUser = stabilityPool.claimRewards();
@@ -430,14 +451,17 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     uint256 _claimedByUser2 = stabilityPool.claimRewards();
     assertEq(_claimedByUser2, 0);
 
-    vm.prank(user);
-    stabilityPool.withdraw(USER_DEPOSIT / 2, user, user);
-    vm.prank(user2);
-    stabilityPool.withdraw(USER_DEPOSIT / 2, user2, user2);
+    uint256 _userExitAssets = stabilityPool.maxWithdraw(user);
+    uint256 _user2ExitAssets = stabilityPool.maxWithdraw(user2);
 
-    assertEq(systemCoin.balanceOf(user), USER_HAI_BALANCE - (USER_DEPOSIT / 2));
-    assertEq(systemCoin.balanceOf(user2), USER_HAI_BALANCE + (USER_DEPOSIT / 2));
-    assertEq(stabilityPool.totalAssets(), 0);
+    vm.prank(user);
+    stabilityPool.withdraw(_userExitAssets, user, user);
+    vm.prank(user2);
+    stabilityPool.withdraw(_user2ExitAssets, user2, user2);
+
+    assertEq(systemCoin.balanceOf(user), USER_HAI_BALANCE - USER_DEPOSIT + _userExitAssets);
+    assertEq(systemCoin.balanceOf(user2), USER_HAI_BALANCE + _user2ExitAssets);
+    assertEq(stabilityPool.totalAssets(), DEAD_SHARES_SEED);
   }
 
   function test_enable_transfers_reverts_when_unauthorized() public {
@@ -509,18 +533,16 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   // --- Strategy Configuration ---
 
   function test_set_strategy_steps_configures_multi_step_strategy() public {
-    address _balancerStep = address(new BalancerV3StablePoolMathSwapStep());
-    address _erc4626Step = address(new ERC4626WithdrawalStep());
+    address _veloStep = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_balancerStep, true);
-    stabilityPool.setStepWhitelist(_erc4626Step, true);
+    stabilityPool.setStepWhitelist(_veloStep, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](2);
-    _steps[0] = IStabilityPool.StepConfig({step: _balancerStep, data: bytes('balancer-data'), slippageBps: 50});
-    _steps[1] = IStabilityPool.StepConfig({step: _erc4626Step, data: bytes('erc4626-data'), slippageBps: 100});
+    _steps[0] = IStabilityPool.StepConfig({step: _veloStep, data: _wethToUsdcVeloData(), slippageBps: 50});
+    _steps[1] = IStabilityPool.StepConfig({step: _veloStep, data: _usdcToHaiVeloData(), slippageBps: 100});
 
     stabilityPool.setStrategySteps(_cType, _steps);
     vm.stopPrank();
@@ -528,24 +550,24 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
     assertEq(stabilityPool.strategyStepsLength(_cType), 2);
 
     IStabilityPool.StepConfig memory _stored0 = stabilityPool.strategySteps(_cType, 0);
-    assertEq(_stored0.step, _balancerStep);
+    assertEq(_stored0.step, _veloStep);
     assertEq(_stored0.slippageBps, 50);
 
     IStabilityPool.StepConfig memory _stored1 = stabilityPool.strategySteps(_cType, 1);
-    assertEq(_stored1.step, _erc4626Step);
+    assertEq(_stored1.step, _veloStep);
     assertEq(_stored1.slippageBps, 100);
   }
 
   function test_clear_strategy_steps_removes_configuration() public {
-    address _balancerStep = address(new BalancerV3StablePoolMathSwapStep());
+    address _veloStep = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_balancerStep, true);
+    stabilityPool.setStepWhitelist(_veloStep, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps = new IStabilityPool.StepConfig[](1);
-    _steps[0] = IStabilityPool.StepConfig({step: _balancerStep, data: bytes('data'), slippageBps: 50});
+    _steps[0] = IStabilityPool.StepConfig({step: _veloStep, data: _wethToHaiVeloData(), slippageBps: 50});
 
     stabilityPool.setStrategySteps(_cType, _steps);
     assertEq(stabilityPool.strategyStepsLength(_cType), 1);
@@ -618,29 +640,27 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
   }
 
   function test_set_strategy_steps_overwrites_previous_config() public {
-    address _step1 = address(new BalancerV3StablePoolMathSwapStep());
-    address _step2 = address(new ERC4626WithdrawalStep());
+    address _step = address(new VeloSwapStep());
 
     vm.startPrank(testDeployer);
-    stabilityPool.setStepWhitelist(_step1, true);
-    stabilityPool.setStepWhitelist(_step2, true);
+    stabilityPool.setStepWhitelist(_step, true);
 
-    bytes32 _cType = bytes32('RETH');
+    bytes32 _cType = WETH_CTYPE;
 
     IStabilityPool.StepConfig[] memory _steps1 = new IStabilityPool.StepConfig[](2);
-    _steps1[0] = IStabilityPool.StepConfig({step: _step1, data: bytes('old-data-1'), slippageBps: 50});
-    _steps1[1] = IStabilityPool.StepConfig({step: _step2, data: bytes('old-data-2'), slippageBps: 100});
+    _steps1[0] = IStabilityPool.StepConfig({step: _step, data: _wethToUsdcVeloData(), slippageBps: 50});
+    _steps1[1] = IStabilityPool.StepConfig({step: _step, data: _usdcToHaiVeloData(), slippageBps: 100});
     stabilityPool.setStrategySteps(_cType, _steps1);
     assertEq(stabilityPool.strategyStepsLength(_cType), 2);
 
     IStabilityPool.StepConfig[] memory _steps2 = new IStabilityPool.StepConfig[](1);
-    _steps2[0] = IStabilityPool.StepConfig({step: _step2, data: bytes('new-data'), slippageBps: 200});
+    _steps2[0] = IStabilityPool.StepConfig({step: _step, data: _wethToHaiVeloData(), slippageBps: 200});
     stabilityPool.setStrategySteps(_cType, _steps2);
     vm.stopPrank();
 
     assertEq(stabilityPool.strategyStepsLength(_cType), 1);
     IStabilityPool.StepConfig memory _stored = stabilityPool.strategySteps(_cType, 0);
-    assertEq(_stored.step, _step2);
+    assertEq(_stored.step, _step);
     assertEq(_stored.slippageBps, 200);
   }
 
@@ -842,7 +862,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: WETH_ADDR,
         tokenOut: USDC_ADDR,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -855,7 +879,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: USDC_ADDR,
         tokenOut: BOLD_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -868,14 +896,45 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: USDC_ADDR,
         tokenOut: HAI_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
 
-  function _boldToHaiCurveData() internal pure returns (bytes memory _data) {
+  function _wethToHaiVeloData() internal pure returns (bytes memory _data) {
     _data = abi.encode(
-      CurveSwapStep.Data({pool: CURVE_POOL, i: int128(1), j: int128(0), tokenIn: BOLD_ADDR, tokenOut: HAI_ADDR})
+      VeloSwapStep.Data({
+        router: VELO_ROUTER,
+        factory: VELO_FACTORY,
+        tokenIn: WETH_ADDR,
+        tokenOut: HAI_ADDR,
+        stable: false,
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
+      })
+    );
+  }
+
+  function _boldToHaiCurveData() internal view returns (bytes memory _data) {
+    _data = abi.encode(
+      CurveSwapStep.Data({
+        pool: CURVE_POOL,
+        i: int128(1),
+        j: int128(0),
+        tokenIn: BOLD_ADDR,
+        tokenOut: HAI_ADDR,
+        useOracleFloor: true,
+        tokenInOracle: address(boldUsdOracle),
+        tokenOutOracle: HAI_USD_ORACLE,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+      })
     );
   }
 

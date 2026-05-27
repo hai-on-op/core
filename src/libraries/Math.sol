@@ -12,13 +12,18 @@ uint256 constant WAD = 10 ** 18;
 /// @dev Uint256 representation of 1 year in seconds
 uint256 constant YEAR = 365 days;
 /// @dev Uint256 representation of 1 hour in seconds
-uint256 constant HOUR = 3600;
+// forgefmt: disable-next-item
+uint256 constant HOUR = 3_600;
 
 /**
  * @title Math
  * @notice This library contains common math functions
  */
 library Math {
+  // --- Constants ---
+
+  uint256 internal constant _INT256_MIN_ABS = uint256(1) << 255;
+
   // --- Errors ---
 
   /// @dev Throws when trying to cast a uint256 to an int256 that overflows
@@ -36,7 +41,7 @@ library Math {
     if (_y >= 0) {
       return _x + uint256(_y);
     } else {
-      return _x - uint256(-_y);
+      return _x - _absolute(_y);
     }
   }
 
@@ -50,7 +55,7 @@ library Math {
     if (_y >= 0) {
       return _x - uint256(_y);
     } else {
-      return _x + uint256(-_y);
+      return _x + _absolute(_y);
     }
   }
 
@@ -240,6 +245,16 @@ library Math {
    * @return _z Unsigned absolute value of `_x`
    */
   function absolute(int256 _x) internal pure returns (uint256 _z) {
+    _z = _absolute(_x);
+  }
+
+  /**
+   * @notice Calculates the absolute value of a signed integer, including type(int256).min
+   * @param  _x Signed integer
+   * @return _z Unsigned absolute value of `_x`
+   */
+  function _absolute(int256 _x) internal pure returns (uint256 _z) {
+    if (_x == type(int256).min) return _INT256_MIN_ABS;
     _z = (_x < 0) ? uint256(-_x) : uint256(_x);
   }
 }

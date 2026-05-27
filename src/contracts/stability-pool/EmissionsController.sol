@@ -46,6 +46,9 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
   /// @notice Total per-second emission rate before split (stability + minting) [wad per second]
   uint256 public baseEmissionRate;
 
+  /// @notice KITE not scheduled due to integer division, carried into the next extension [wad]
+  uint256 public undistributedKiteAmount;
+
   // --- Data ---
 
   /// @inheritdoc IEmissionsController
@@ -102,6 +105,8 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     uint256 _emissionDuration,
     uint256 _deviationLimit
   ) Authorizable(msg.sender) {
+    if (address(_kiteToken) == address(0)) revert EmissionsController_InvalidKiteToken();
+    if (address(_oracleRelayer) == address(0)) revert EmissionsController_InvalidOracleRelayer();
     if (_stabilityRewardsReceiver == address(0)) revert EmissionsController_InvalidStabilityReceiver();
     if (_emissionDuration == 0) revert EmissionsController_InvalidEmissionDuration();
     if (_deviationLimit == 0) revert EmissionsController_InvalidDeviationLimit();
@@ -114,7 +119,7 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
 
     emissionStartTime = block.timestamp;
     emissionEndTime = block.timestamp + _emissionDuration;
-    baseEmissionRate = _totalKiteAmount / _emissionDuration;
+    _setBaseEmissionRate(_totalKiteAmount, _emissionDuration);
 
     // Initialize with 50/50 split
     stabilityPoolSplit = _SPLIT_BASELINE;
@@ -142,13 +147,15 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     uint256 _redemptionPrice = oracleRelayer.calcRedemptionPrice();
     if (_redemptionPrice == 0) revert EmissionsController_InvalidRedemptionPrice();
     uint256 _marketPrice = oracleRelayer.marketPrice();
+    if (_marketPrice == 0) revert EmissionsController_InvalidMarketPrice();
 
-    // Calculate deviation: (redemptionPrice - marketPrice) / redemptionPrice
+    // Calculate deviation: (redemptionPrice - marketPrice) / min(redemptionPrice, marketPrice)
     // Convert to WAD for easier calculation: deviation in WAD
     // Positive deviation: redemptionPrice > marketPrice (HAI below peg, more to stability pool)
     // Negative deviation: marketPrice > redemptionPrice (HAI above peg, more to minting)
+    uint256 _truePrice = _redemptionPrice < _marketPrice ? _redemptionPrice : _marketPrice;
     int256 _numerator = int256(_redemptionPrice) - int256(_marketPrice);
-    int256 _deviationWad = (_numerator * int256(WAD)) / int256(_redemptionPrice);
+    int256 _deviationWad = (_numerator * int256(WAD)) / int256(_truePrice);
 
     // Calculate new split
     uint256 _newStabilityPoolSplit;
@@ -256,14 +263,14 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
     uint256 _oldEndTime = emissionEndTime;
     uint256 _remainingDuration = _oldEndTime > _currentTime ? _oldEndTime - _currentTime : 0;
     uint256 _remainingAmount = baseEmissionRate * _remainingDuration;
-    uint256 _newRemainingAmount = _remainingAmount + _additionalKiteAmount;
+    uint256 _newRemainingAmount = _remainingAmount + undistributedKiteAmount + _additionalKiteAmount;
 
     uint256 _extensionStartTime = _oldEndTime > _currentTime ? _oldEndTime : _currentTime;
     uint256 _newEndTime = _extensionStartTime + _additionalDuration;
     emissionEndTime = _newEndTime;
 
     uint256 _newRemainingDuration = _newEndTime - _currentTime;
-    baseEmissionRate = _newRemainingAmount / _newRemainingDuration;
+    _setBaseEmissionRate(_newRemainingAmount, _newRemainingDuration);
     _setRatesFromCurrentSplit();
     currentRateStartTime = _currentTime;
 
@@ -343,10 +350,18 @@ contract EmissionsController is Authorizable, ReentrancyGuard, IEmissionsControl
   }
 
   /**
+   * @notice Recomputes the base rate and carries the division remainder into future extensions
+   */
+  function _setBaseEmissionRate(uint256 _emissionAmount, uint256 _emissionDuration) internal {
+    baseEmissionRate = _emissionAmount / _emissionDuration;
+    undistributedKiteAmount = _emissionAmount % _emissionDuration;
+  }
+
+  /**
    * @notice Recomputes split-side rates from the current base emission rate and split percentages
    */
   function _setRatesFromCurrentSplit() internal {
     currentStabilityPoolRate = (baseEmissionRate * stabilityPoolSplit) / _PERCENT_BASE;
-    currentMintingRate = (baseEmissionRate * mintingSplit) / _PERCENT_BASE;
+    currentMintingRate = baseEmissionRate - currentStabilityPoolRate;
   }
 }

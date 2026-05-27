@@ -74,7 +74,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenIn: TOKEN_IN,
         tokenOut: TOKEN_OUT,
         deadlineBuffer: 1 hours,
-        userData: bytes('')
+        userData: bytes(''),
+        useOracleFloor: true,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(balancerStep, _data, bytes32('BALANCER_V3_SWAP'), TOKEN_IN, TOKEN_OUT);
@@ -88,8 +92,19 @@ contract Unit_StrategyStep_Metadata is Base {
   }
 
   function test_Curve_Metadata() public view {
-    bytes memory _data =
-      abi.encode(CurveSwapStep.Data({pool: POOL, i: int128(0), j: int128(1), tokenIn: TOKEN_IN, tokenOut: TOKEN_OUT}));
+    bytes memory _data = abi.encode(
+      CurveSwapStep.Data({
+        pool: POOL,
+        i: int128(0),
+        j: int128(1),
+        tokenIn: TOKEN_IN,
+        tokenOut: TOKEN_OUT,
+        useOracleFloor: true,
+        tokenInOracle: address(1),
+        tokenOutOracle: address(2),
+        oracleToleranceBps: 0
+      })
+    );
     _assertSingleOutputMetadata(curveStep, _data, bytes32('CURVE_SWAP'), TOKEN_IN, TOKEN_OUT);
   }
 
@@ -108,7 +123,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenOut: TOKEN_OUT,
         tickSpacing: 60,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloClStep, _data, bytes32('VELO_CL_SWAP'), TOKEN_IN, TOKEN_OUT);
@@ -122,7 +141,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenA: TOKEN_A,
         tokenB: TOKEN_B,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     assertEq(veloLpRemovalStep.stepType(), bytes32('VELO_LP_REMOVE'));
@@ -143,7 +166,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenB: TOKEN_B,
         stableLp: false,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloLpRemoveAndSwapStep, _data, bytes32('VELO_LP_REMOVE_SWAP'), LP_TOKEN, TOKEN_A);
@@ -157,7 +184,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenIn: TOKEN_IN,
         tokenOut: TOKEN_OUT,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloSwapStep, _data, bytes32('VELO_SWAP'), TOKEN_IN, TOKEN_OUT);

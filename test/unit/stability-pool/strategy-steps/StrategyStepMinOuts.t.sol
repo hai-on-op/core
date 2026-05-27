@@ -89,7 +89,11 @@ contract Unit_StrategyStep_MinOutErrors is Base {
       tokenB: address(_tokenB),
       stableLp: false,
       stableSwap: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);
