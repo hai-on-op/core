@@ -7,7 +7,6 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
-import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 
 import {IStabilityPool} from '@interfaces/IStabilityPool.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
@@ -24,6 +23,7 @@ import {ISAFEEngine} from '@interfaces/ISAFEEngine.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 
+import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 import {Math, WAD, RAY, HOUR} from '@libraries/Math.sol';
 
 /**
@@ -521,7 +521,7 @@ contract StabilityPool is ERC4626, Authorizable, ReentrancyGuard, IStabilityPool
     if (_haiOut < _haiSpent) return false;
     if (_haiSpent == 0) return true;
 
-    uint256 _requiredHai = OZMath.mulDiv(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
+    uint256 _requiredHai = FixedPointMathLib.mulDivDown(_haiSpent, _MAX_SLIPPAGE_BPS + minProfitBps, _MAX_SLIPPAGE_BPS);
     return _haiOut >= _requiredHai;
   }
 

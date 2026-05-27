@@ -4,7 +4,6 @@ pragma solidity 0.8.20;
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
-import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IVeloCLRouter} from '@interfaces/external/IStrategyStepExternal.sol';
@@ -12,6 +11,7 @@ import {IVeloCLPoolLike} from '@interfaces/external/IVeloCLPoolLike.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 import {LiquidityMath} from '@libraries/LiquidityMath.sol';
+import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 import {BitMath} from '@uniswap/v3-core/contracts/libraries/BitMath.sol';
 import {SwapMath} from '@uniswap/v3-core/contracts/libraries/SwapMath.sol';
 import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
@@ -178,9 +178,9 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
 
     uint256 _tokenInUnit = 10 ** IERC20Metadata(_decoded.tokenIn).decimals();
     uint256 _tokenOutUnit = 10 ** IERC20Metadata(_decoded.tokenOut).decimals();
-    uint256 _valueWad = OZMath.mulDiv(_amountIn, _tokenInPrice, _tokenInUnit);
-    uint256 _fairOut = OZMath.mulDiv(_valueWad, _tokenOutUnit, _tokenOutPrice);
-    _minOut = OZMath.mulDiv(_fairOut, _BPS - _decoded.oracleToleranceBps, _BPS);
+    uint256 _valueWad = FixedPointMathLib.mulDivDown(_amountIn, _tokenInPrice, _tokenInUnit);
+    uint256 _fairOut = FixedPointMathLib.mulDivDown(_valueWad, _tokenOutUnit, _tokenOutPrice);
+    _minOut = FixedPointMathLib.mulDivDown(_fairOut, _BPS - _decoded.oracleToleranceBps, _BPS);
   }
 
   /**

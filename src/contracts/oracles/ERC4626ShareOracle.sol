@@ -3,9 +3,9 @@ pragma solidity 0.8.20;
 
 import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
-import {Math as OZMath} from '@openzeppelin/contracts/utils/math/Math.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IERC4626ShareOracle} from '@interfaces/oracles/IERC4626ShareOracle.sol';
+import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 
 /**
  * @title  ERC4626ShareOracle
@@ -50,7 +50,7 @@ contract ERC4626ShareOracle is IERC4626ShareOracle {
     uint256 _assetsPerShare = vault.convertToAssets(shareUnit);
     if (_assetsPerShare == 0) return (0, false);
 
-    _result = OZMath.mulDiv(_assetPrice, _assetsPerShare, assetUnit);
+    _result = FixedPointMathLib.mulDivDown(_assetPrice, _assetsPerShare, assetUnit);
     _validity = true;
   }
 
@@ -60,6 +60,6 @@ contract ERC4626ShareOracle is IERC4626ShareOracle {
     uint256 _assetsPerShare = vault.convertToAssets(shareUnit);
     if (_assetPrice == 0 || _assetsPerShare == 0) revert InvalidPriceFeed();
 
-    _result = OZMath.mulDiv(_assetPrice, _assetsPerShare, assetUnit);
+    _result = FixedPointMathLib.mulDivDown(_assetPrice, _assetsPerShare, assetUnit);
   }
 }
