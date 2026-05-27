@@ -166,7 +166,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenB: TOKEN_B,
         stableLp: false,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloLpRemoveAndSwapStep, _data, bytes32('VELO_LP_REMOVE_SWAP'), LP_TOKEN, TOKEN_A);

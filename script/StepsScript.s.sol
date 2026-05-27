@@ -406,7 +406,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenB: LUSD_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -423,7 +427,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenB: ALETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -440,7 +448,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenB: MSETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0

@@ -337,7 +337,11 @@ contract E2EVeloLPRemoveAndSwapStepForkTest is ForkedMainnetAt148368730 {
       tokenB: TOKEN_B,
       stableLp: true,
       stableSwap: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);

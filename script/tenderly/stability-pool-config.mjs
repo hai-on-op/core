@@ -225,10 +225,19 @@ function encodeYearnWithdrawal(data) {
 }
 
 function encodeVeloLpRemoveAndSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenAOracle: ethers.ZeroAddress,
+    tokenBOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
     'tuple(address router,address factory,address lpToken,address tokenA,address tokenB,' +
-      'bool stableLp,bool stableSwap,uint256 deadlineBuffer)',
-    data
+      'bool stableLp,bool stableSwap,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenAOracle,address tokenBOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 

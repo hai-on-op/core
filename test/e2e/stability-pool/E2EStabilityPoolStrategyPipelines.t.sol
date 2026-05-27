@@ -575,7 +575,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: LUSD_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -590,7 +594,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: ALETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -605,7 +613,11 @@ contract E2EStabilityPoolStrategyPipelinesForkTest is HaiTest, MainnetDeployment
         tokenB: MSETH_ADDR,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
