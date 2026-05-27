@@ -453,7 +453,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenIn: address(_tokenA),
       tokenOut: address(_tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);
@@ -479,7 +483,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenIn: address(_tokenA),
       tokenOut: address(_tokenB),
       stable: false,
-      deadlineBuffer: 0
+      deadlineBuffer: 0,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     _step.execute(abi.encode(_data), 1e18, new uint256[](0));

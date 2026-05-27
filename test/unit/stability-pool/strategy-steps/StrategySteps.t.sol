@@ -22,10 +22,14 @@ abstract contract Base is HaiTest {
 
 contract Unit_VeloSwapStep is Base {
   VeloSwapStep step;
+  OracleForTest tokenAOracle;
+  OracleForTest tokenBOracle;
 
   function setUp() public override {
     super.setUp();
     step = new VeloSwapStep();
+    tokenAOracle = new OracleForTest(2e18);
+    tokenBOracle = new OracleForTest(1e18);
   }
 
   function test_Preview() public view {
@@ -35,7 +39,11 @@ contract Unit_VeloSwapStep is Base {
       tokenIn: address(tokenA),
       tokenOut: address(tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = step.preview(abi.encode(_data), 10e18);
@@ -52,7 +60,11 @@ contract Unit_VeloSwapStep is Base {
       tokenIn: address(tokenA),
       tokenOut: address(tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);
@@ -62,6 +74,88 @@ contract Unit_VeloSwapStep is Base {
     assertEq(_out.length, 1);
     assertEq(_out[0], 20e18);
     assertEq(tokenB.balanceOf(address(step)), 20e18);
+  }
+
+  function test_Preview_OracleFloorEnabled_AllowsFairOutput() public view {
+    VeloSwapStep.Data memory _data = _oracleData();
+
+    uint256[] memory _preview = step.preview(abi.encode(_data), 10e18);
+    assertEq(_preview.length, 1);
+    assertEq(_preview[0], 20e18);
+  }
+
+  function test_Revert_Preview_WhenRouterQuoteBelowOracleFloor() public {
+    router.setSwapOutMultiplier(1e18);
+    VeloSwapStep.Data memory _data = _oracleData();
+
+    vm.expectRevert(VeloSwapStep.VeloSwapStep_OracleFloorNotMet.selector);
+    step.preview(abi.encode(_data), 10e18);
+  }
+
+  function test_Execute_OracleFloorDisabled_UsesRouterOutput() public {
+    router.setSwapOutMultiplier(1e18);
+    tokenA.mint(address(step), 10e18);
+    VeloSwapStep.Data memory _data = _defaultData();
+
+    uint256[] memory _out = step.execute(abi.encode(_data), 10e18, new uint256[](0));
+
+    assertEq(_out.length, 1);
+    assertEq(_out[0], 10e18);
+  }
+
+  function test_Revert_Execute_UsesOracleFloorWhenMinOutIsLower() public {
+    router.setSwapOutMultiplier(1e18);
+    tokenA.mint(address(step), 10e18);
+    VeloSwapStep.Data memory _data = _oracleData();
+
+    vm.expectRevert(bytes('min-out'));
+    step.execute(abi.encode(_data), 10e18, new uint256[](0));
+  }
+
+  function test_Revert_Preview_InvalidOracle() public {
+    VeloSwapStep.Data memory _data = _oracleData();
+    _data.tokenInOracle = address(0);
+
+    vm.expectRevert(VeloSwapStep.VeloSwapStep_InvalidOracle.selector);
+    step.preview(abi.encode(_data), 10e18);
+  }
+
+  function test_Revert_Preview_InvalidOraclePrice() public {
+    tokenAOracle.setPriceAndValidity(0, false);
+    VeloSwapStep.Data memory _data = _oracleData();
+
+    vm.expectRevert(VeloSwapStep.VeloSwapStep_InvalidOraclePrice.selector);
+    step.preview(abi.encode(_data), 10e18);
+  }
+
+  function test_Revert_Preview_InvalidOracleTolerance() public {
+    VeloSwapStep.Data memory _data = _oracleData();
+    _data.oracleToleranceBps = 10_001;
+
+    vm.expectRevert(VeloSwapStep.VeloSwapStep_InvalidOracleTolerance.selector);
+    step.preview(abi.encode(_data), 10e18);
+  }
+
+  function _defaultData() internal view returns (VeloSwapStep.Data memory _data) {
+    _data = VeloSwapStep.Data({
+      router: address(router),
+      factory: address(0),
+      tokenIn: address(tokenA),
+      tokenOut: address(tokenB),
+      stable: false,
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
+    });
+  }
+
+  function _oracleData() internal view returns (VeloSwapStep.Data memory _data) {
+    _data = _defaultData();
+    _data.useOracleFloor = true;
+    _data.tokenInOracle = address(tokenAOracle);
+    _data.tokenOutOracle = address(tokenBOracle);
   }
 }
 

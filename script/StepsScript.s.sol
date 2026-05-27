@@ -217,7 +217,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenIn: USDC_ADDR,
         tokenOut: BOLD_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -232,7 +236,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenIn: ALETH_ADDR,
         tokenOut: WETH_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -247,7 +255,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenIn: HAIVELO_ADDR,
         tokenOut: VELO_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -262,7 +274,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenIn: VELO_ADDR,
         tokenOut: USDC_ADDR,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0
@@ -277,7 +293,11 @@ contract StepsScript is MainnetDeployment, Common, Script {
         tokenIn: MSETH_ADDR,
         tokenOut: WETH_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     ),
     slippageBps: 0

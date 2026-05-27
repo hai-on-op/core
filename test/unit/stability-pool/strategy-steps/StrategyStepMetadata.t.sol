@@ -184,7 +184,11 @@ contract Unit_StrategyStep_Metadata is Base {
         tokenIn: TOKEN_IN,
         tokenOut: TOKEN_OUT,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
     _assertSingleOutputMetadata(veloSwapStep, _data, bytes32('VELO_SWAP'), TOKEN_IN, TOKEN_OUT);

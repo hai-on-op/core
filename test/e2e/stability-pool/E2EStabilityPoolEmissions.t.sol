@@ -862,7 +862,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: WETH_ADDR,
         tokenOut: USDC_ADDR,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -875,7 +879,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: USDC_ADDR,
         tokenOut: BOLD_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -888,7 +896,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: USDC_ADDR,
         tokenOut: HAI_ADDR,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -901,7 +913,11 @@ contract E2EStabilityPoolEmissionsForkTest is HaiTest, MainnetDeployment {
         tokenIn: WETH_ADDR,
         tokenOut: HAI_ADDR,
         stable: false,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }

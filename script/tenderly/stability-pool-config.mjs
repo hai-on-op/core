@@ -190,9 +190,18 @@ function encodeVeloClSwap(data) {
 }
 
 function encodeVeloSwap(data) {
+  const dataWithDefaults = {
+    useOracleFloor: false,
+    tokenInOracle: ethers.ZeroAddress,
+    tokenOutOracle: ethers.ZeroAddress,
+    oracleToleranceBps: 0,
+    ...data,
+  };
+
   return encodeTuple(
-    'tuple(address router,address factory,address tokenIn,address tokenOut,bool stable,uint256 deadlineBuffer)',
-    data
+    'tuple(address router,address factory,address tokenIn,address tokenOut,bool stable,uint256 deadlineBuffer,' +
+      'bool useOracleFloor,address tokenInOracle,address tokenOutOracle,uint16 oracleToleranceBps)',
+    dataWithDefaults
   );
 }
 
