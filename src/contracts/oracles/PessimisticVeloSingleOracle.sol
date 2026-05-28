@@ -313,18 +313,36 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   }
 
   /**
-   * @notice Returns the TWAP price for a token relative to the other token in its pool.
-   * @dev Note that we can customize the length of points but we default to 4 points (2 hours). Additionally, if a
-   *  pool is very small, it may not be priced as accurately if we attempt to use 1 full token to price.
-   * @param _token The address of the token to get the price of, and that we are swapping in.
-   * @param _tokenAmount Amount of the token we are swapping in.
-   * @return twapPrice Amount of other token we get when swapping in _tokenAmount looking back over our TWAP period.
+   * @notice Returns the no-slippage TWAP quote for a token relative to the other token in its pool.
+   * @dev Samples Velodrome's stored observations like pool.quote(), but computes a marginal price from the sampled
+   *  reserves instead of simulating a finite swap through the pool curve.
+   * @param _token The address of the token to price, and that we are notionally inputting.
+   * @param _tokenAmount Amount of the token we are pricing.
+   * @return twapPrice Amount of other token implied by _tokenAmount over our TWAP period.
    */
   function getTwapPrice(address _token, uint256 _tokenAmount) public view returns (uint256 twapPrice) {
     IVeloPool poolContract = IVeloPool(pool);
 
-    // swapping one of our token gets us this many otherToken, returned in decimals of the other token
-    twapPrice = poolContract.quote(_token, _tokenAmount, points);
+    uint256 length = poolContract.observationLength() - 1;
+    uint256 i = length - points;
+
+    for (; i < length;) {
+      IVeloPool.Observation memory nextObservation = poolContract.observations(i + 1);
+      IVeloPool.Observation memory currentObservation = poolContract.observations(i);
+      uint256 timeElapsed = nextObservation.timestamp - currentObservation.timestamp;
+      uint256 reserve0Average =
+        (nextObservation.reserve0Cumulative - currentObservation.reserve0Cumulative) / timeElapsed;
+      uint256 reserve1Average =
+        (nextObservation.reserve1Cumulative - currentObservation.reserve1Cumulative) / timeElapsed;
+
+      twapPrice += _getMarginalAmountOut(_token, _tokenAmount, reserve0Average, reserve1Average);
+
+      unchecked {
+        i++;
+      }
+    }
+
+    twapPrice /= points;
   }
 
   // by default we use 0.01 tokens in this function to more accurately price small pools
@@ -434,6 +452,31 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     }
   }
 
+  function _getMarginalAmountOut(
+    address _token,
+    uint256 _amountIn,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 amountOut) {
+    bool tokenInIsToken0 = _token == token0;
+
+    if (stable) {
+      uint256 normalizedReserve0 = (_reserve0 * DECIMALS) / decimals0;
+      uint256 normalizedReserve1 = (_reserve1 * DECIMALS) / decimals1;
+      (uint256 reserveA, uint256 reserveB) =
+        tokenInIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
+      uint256 normalizedAmountIn = (_amountIn * DECIMALS) / (tokenInIsToken0 ? decimals0 : decimals1);
+      uint256 normalizedAmountOut = FixedPointMathLib.mulDivDown(
+        normalizedAmountIn, _stableDerivative(reserveB, reserveA), _stableDerivative(reserveA, reserveB)
+      );
+
+      amountOut = (normalizedAmountOut * (tokenInIsToken0 ? decimals1 : decimals0)) / DECIMALS;
+    } else {
+      (uint256 reserveA, uint256 reserveB) = tokenInIsToken0 ? (_reserve0, _reserve1) : (_reserve1, _reserve0);
+      amountOut = FixedPointMathLib.mulDivDown(_amountIn, reserveB, reserveA);
+    }
+  }
+
   // solves for cases where curve is x^3 * y + y^3 * x = k
   // fair reserves math formula author: @ksyao2002
   function _calculate_stable_lp_token_price(
@@ -471,6 +514,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 newY = FixedPointMathLib.mulWadDown(y_cubed, x);
 
     return newX + newY; // 18 decimals
+  }
+
+  function _stableDerivative(uint256 x0, uint256 y) internal pure returns (uint256 derivative) {
+    derivative = 3 * FixedPointMathLib.mulWadDown(x0, FixedPointMathLib.mulWadDown(y, y))
+      + FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(x0, x0), x0);
   }
 
   /* ========== SETTERS ========== */
