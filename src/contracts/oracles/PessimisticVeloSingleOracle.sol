@@ -496,9 +496,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
     uint256 d = FixedPointMathLib.rpow(price1, 2, 1e18);
 
-    uint256 p0 = k * FixedPointMathLib.mulWadDown(a, b); // 2*18 decimals
-
-    uint256 fair = p0 / (c + d); // number of decimals is 18
+    uint256 fair = FixedPointMathLib.mulDivDownFullPrecision(k, FixedPointMathLib.mulWadDown(a, b), c + d);
 
     // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
     uint256 frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18

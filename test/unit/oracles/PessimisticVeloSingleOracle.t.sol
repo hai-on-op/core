@@ -159,6 +159,7 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   uint256 internal constant POINTS = 4;
 
   ChainlinkOracleForTest internal token0Feed;
+  ChainlinkOracleForTest internal token1Feed;
   VeloPoolForTest internal pool;
   PessimisticVeloSingleOracle internal oracle;
 
@@ -178,6 +179,22 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
     pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
     oracle =
       new PessimisticVeloSingleOracle(address(pool), address(token0Feed), address(0), 3600, 3600, POINTS, address(this));
+  }
+
+  function _deployOracleWithFeeds(
+    bool _stable,
+    uint256 _reserve0,
+    uint256 _reserve1,
+    int256 _price0,
+    int256 _price1
+  ) internal {
+    token0Feed = new ChainlinkOracleForTest(8, _price0, block.timestamp);
+    token1Feed = new ChainlinkOracleForTest(8, _price1, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, _stable, 1e18, 1e18);
+    pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool), address(token0Feed), address(token1Feed), 3600, 3600, POINTS, address(this)
+    );
   }
 
   function _mockSequencerUp() internal {
@@ -232,5 +249,12 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(price0, 200_000_000);
     assertEq(price1, 100_000_000);
+  }
+
+  function test_StableLpPrice_DoesNotOverflowForDeepHighPricedPool() public {
+    _deployOracleWithFeeds(true, 100_000e18, 100_000e18, 3000e8, 3000e8);
+    _mockSequencerUp();
+
+    assertGt(oracle.getCurrentPoolPrice(false), 0);
   }
 }
