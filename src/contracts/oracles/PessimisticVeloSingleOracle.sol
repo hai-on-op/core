@@ -51,6 +51,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @dev Set on deployment to allow pool-specific liveness/security tradeoffs.
   uint256 public immutable maxTwapObservationInterval;
 
+  /// @notice Maximum token price ratio allowed for stable Velodrome pool pricing.
+  /// @dev 18-decimal ratio where 1e18 means 1:1.
+  uint256 public immutable maxStablePriceDeviation;
+
   /// @notice Chainlink feed to check that Optimism's sequencer is online.
   /// @dev This prevents transactions sent while the sequencer is down from being executed when it comes back online.
   IChainlinkOracle public constant sequencerUptimeFeed = IChainlinkOracle(0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389);
@@ -110,6 +114,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    * @param _token1Heartbeat The heartbeat for our token1 feed (maximum time allowed before refresh).
    * @param _twapPoints Number of samples for TWAP pricing. Minimum is 4 (2 hours).
    * @param _maxTwapObservationInterval Maximum allowed age/gap for sampled Velodrome TWAP observations.
+   * @param _maxStablePriceDeviation Maximum token price ratio allowed when pricing stable pools.
    * @param _owner Owner role. Can set operators and adjust 2 vs 3 day pessimistic pricing.
    */
   constructor(
@@ -120,6 +125,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint96 _token1Heartbeat,
     uint256 _twapPoints,
     uint256 _maxTwapObservationInterval,
+    uint256 _maxStablePriceDeviation,
     address _owner
   ) Ownable(_owner) {
     // The default number of periods (points) we look back in time for TWAP pricing.
@@ -133,6 +139,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert TwapObservationIntervalTooShort();
     }
     maxTwapObservationInterval = _maxTwapObservationInterval;
+
+    if (_maxStablePriceDeviation < DECIMALS) {
+      revert StablePriceDeviationTooLow();
+    }
+    maxStablePriceDeviation = _maxStablePriceDeviation;
 
     // A heartbeat is the amount of time after which we consider a chainlink feed's price to be stale. For major
     // assets like BTC and ETH, this value is 3600 (1 hour). For less actively traded assets, this can be as high as
@@ -196,6 +207,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error TwapObservationIntervalTooShort();
   error TwapObservationTooOld();
   error TwapObservationIntervalTooLong();
+  error StablePriceDeviationTooLow();
+  error StablePriceDeviation();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -454,6 +467,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     (uint256 price0, uint256 price1) = getTokenPrices();
 
     if (stable) {
+      _validateStablePriceDeviation(price0, price1);
       fairReservesPricing =
         _calculate_stable_lp_token_price(poolContract.totalSupply(), price0, price1, reserve0, reserve1, 8);
     } else {
@@ -462,6 +476,15 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
       // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
       fairReservesPricing = (2 * p * k) / (1e8 * poolContract.totalSupply());
+    }
+  }
+
+  function _validateStablePriceDeviation(uint256 _price0, uint256 _price1) internal view {
+    (uint256 higherPrice, uint256 lowerPrice) = _price0 > _price1 ? (_price0, _price1) : (_price1, _price0);
+    uint256 priceDeviation = FixedPointMathLib.mulDivDownFullPrecision(higherPrice, DECIMALS, lowerPrice);
+
+    if (priceDeviation > maxStablePriceDeviation) {
+      revert StablePriceDeviation();
     }
   }
 

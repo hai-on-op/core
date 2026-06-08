@@ -287,6 +287,7 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   address internal token1 = label('token1');
   uint256 internal constant POINTS = 4;
   uint256 internal constant MAX_TWAP_OBSERVATION_INTERVAL = 1 hours;
+  uint256 internal constant MAX_STABLE_PRICE_DEVIATION = 1.05e18;
 
   ChainlinkOracleForTest internal token0Feed;
   ChainlinkOracleForTest internal token1Feed;
@@ -308,7 +309,15 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
     pool = new VeloPoolForTest(token0, token1, _stable, _decimals0, _decimals1);
     pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
     oracle = new PessimisticVeloSingleOracle(
-      address(pool), address(token0Feed), address(0), 3600, 3600, POINTS, MAX_TWAP_OBSERVATION_INTERVAL, address(this)
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      address(this)
     );
   }
 
@@ -331,6 +340,7 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
       3600,
       POINTS,
       MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
       address(this)
     );
   }
@@ -352,7 +362,14 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
   function test_Constructor_RevertsWhenMaxTwapObservationIntervalTooShort() public {
     vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooShort.selector);
     new PessimisticVeloSingleOracle(
-      address(0), address(0), address(0), 3600, 3600, POINTS, 30 minutes - 1, address(this)
+      address(0), address(0), address(0), 3600, 3600, POINTS, 30 minutes - 1, MAX_STABLE_PRICE_DEVIATION, address(this)
+    );
+  }
+
+  function test_Constructor_RevertsWhenMaxStablePriceDeviationTooLow() public {
+    vm.expectRevert(PessimisticVeloSingleOracle.StablePriceDeviationTooLow.selector);
+    new PessimisticVeloSingleOracle(
+      address(0), address(0), address(0), 3600, 3600, POINTS, MAX_TWAP_OBSERVATION_INTERVAL, 1e18 - 1, address(this)
     );
   }
 
@@ -492,6 +509,21 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     uint256 poolPrice = oracle.getCurrentPoolPrice(false);
 
     assertEq(oracle.getCurrentVaultPriceV2(address(vault), false), poolPrice);
+  }
+
+  function test_StableLpPrice_AllowsPriceDeviationAtThreshold() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 105_000_000, 100_000_000);
+    _mockSequencerUp();
+
+    assertGt(oracle.getCurrentPoolPrice(false), 0);
+  }
+
+  function test_StableLpPrice_RevertsWhenPriceDeviationExceedsThreshold() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 106_000_000, 100_000_000);
+    _mockSequencerUp();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.StablePriceDeviation.selector);
+    oracle.getCurrentPoolPrice(false);
   }
 
   function test_StableLpPrice_DoesNotOverflowForDeepHighPricedPool() public {
