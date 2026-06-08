@@ -327,14 +327,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 i = length - points;
 
     for (; i < length;) {
-      IVeloPool.Observation memory nextObservation = poolContract.observations(i + 1);
-      IVeloPool.Observation memory currentObservation = poolContract.observations(i);
-      uint256 timeElapsed = nextObservation.timestamp - currentObservation.timestamp;
-      uint256 reserve0Average =
-        (nextObservation.reserve0Cumulative - currentObservation.reserve0Cumulative) / timeElapsed;
-      uint256 reserve1Average =
-        (nextObservation.reserve1Cumulative - currentObservation.reserve1Cumulative) / timeElapsed;
-
+      (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
       twapPrice += _getMarginalAmountOut(_token, _tokenAmount, reserve0Average, reserve1Average);
 
       unchecked {
@@ -353,13 +346,13 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       if (token1Feed != address(0)) {
         price1 = getChainlinkPrice(1); // returned with 8 decimals
       } else {
-        // get twap price for token1. this is the amount of token1 we would get from 0.01 token0
-        price1 = (price0 * decimals1) / (getTwapPrice(token0, decimals0 / 100) * 100);
+        // derive token1's price by averaging each sampled token1/token0 price
+        price1 = _getTwapDerivedTokenPrice(token0, decimals0 / 100, price0);
       }
     } else if (token1Feed != address(0)) {
       price1 = getChainlinkPrice(1); // returned with 8 decimals
-      // get twap price for token0. this is the amount of token0 we would get from 0.01 token1
-      price0 = (price1 * decimals0) / (getTwapPrice(token1, decimals1 / 100) * 100);
+      // derive token0's price by averaging each sampled token0/token1 price
+      price0 = _getTwapDerivedTokenPrice(token1, decimals1 / 100, price1);
     }
   }
 
@@ -475,6 +468,46 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       (uint256 reserveA, uint256 reserveB) = tokenInIsToken0 ? (_reserve0, _reserve1) : (_reserve1, _reserve0);
       amountOut = FixedPointMathLib.mulDivDown(_amountIn, reserveB, reserveA);
     }
+  }
+
+  function _getTwapDerivedTokenPrice(
+    address _knownToken,
+    uint256 _knownTokenAmount,
+    uint256 _knownTokenPrice
+  ) internal view returns (uint256 twapPrice) {
+    IVeloPool poolContract = IVeloPool(pool);
+    bool knownTokenIsToken0 = _knownToken == token0;
+    uint256 knownTokenDecimals = knownTokenIsToken0 ? decimals0 : decimals1;
+    uint256 derivedTokenDecimals = knownTokenIsToken0 ? decimals1 : decimals0;
+
+    uint256 length = poolContract.observationLength() - 1;
+    uint256 i = length - points;
+
+    for (; i < length;) {
+      (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
+      uint256 amountOut = _getMarginalAmountOut(_knownToken, _knownTokenAmount, reserve0Average, reserve1Average);
+      uint256 quotePerKnownToken =
+        FixedPointMathLib.mulDivDownFullPrecision(amountOut, knownTokenDecimals, _knownTokenAmount);
+
+      twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, derivedTokenDecimals, quotePerKnownToken);
+
+      unchecked {
+        i++;
+      }
+    }
+
+    twapPrice /= points;
+  }
+
+  function _getAverageReserves(
+    IVeloPool _poolContract,
+    uint256 _index
+  ) internal view returns (uint256 reserve0Average, uint256 reserve1Average) {
+    IVeloPool.Observation memory nextObservation = _poolContract.observations(_index + 1);
+    IVeloPool.Observation memory currentObservation = _poolContract.observations(_index);
+    uint256 timeElapsed = nextObservation.timestamp - currentObservation.timestamp;
+    reserve0Average = (nextObservation.reserve0Cumulative - currentObservation.reserve0Cumulative) / timeElapsed;
+    reserve1Average = (nextObservation.reserve1Cumulative - currentObservation.reserve1Cumulative) / timeElapsed;
   }
 
   // solves for cases where curve is x^3 * y + y^3 * x = k

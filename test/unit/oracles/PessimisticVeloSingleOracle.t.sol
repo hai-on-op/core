@@ -107,6 +107,42 @@ contract VeloPoolForTest is IVeloPool {
     }
   }
 
+  function setObservationsWithReserves(
+    uint256[] memory _reserve0,
+    uint256[] memory _reserve1,
+    uint256 _period
+  ) external {
+    require(_reserve0.length == _reserve1.length && _reserve0.length > 0 && _period > 0);
+    delete _observations;
+
+    uint256 timestamp = 1;
+    uint256 reserve0Cumulative;
+    uint256 reserve1Cumulative;
+    _observations.push(
+      Observation({timestamp: timestamp, reserve0Cumulative: reserve0Cumulative, reserve1Cumulative: reserve1Cumulative})
+    );
+
+    for (uint256 i = 0; i < _reserve0.length;) {
+      timestamp += _period;
+      reserve0Cumulative += _reserve0[i] * _period;
+      reserve1Cumulative += _reserve1[i] * _period;
+      _observations.push(
+        Observation({
+          timestamp: timestamp,
+          reserve0Cumulative: reserve0Cumulative,
+          reserve1Cumulative: reserve1Cumulative
+        })
+      );
+
+      unchecked {
+        i++;
+      }
+    }
+
+    reserve0 = _reserve0[_reserve0.length - 1];
+    reserve1 = _reserve1[_reserve1.length - 1];
+  }
+
   function balanceOf(address) external pure returns (uint256 _balance) {
     return 0;
   }
@@ -249,6 +285,48 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(price0, 200_000_000);
     assertEq(price1, 100_000_000);
+  }
+
+  function test_GetTokenPrices_AveragesDerivedTokenPricePerSample() public {
+    _deployOracle(false, 1_000_000e18, 1_000_000e18);
+    _mockSequencerUp();
+
+    uint256[] memory reserve0 = new uint256[](POINTS);
+    uint256[] memory reserve1 = new uint256[](POINTS);
+    reserve0[0] = 10_000e18;
+    reserve1[0] = 1_000_000e18;
+    for (uint256 i = 1; i < POINTS;) {
+      reserve0[i] = 1_000_000e18;
+      reserve1[i] = 1_000_000e18;
+
+      unchecked {
+        i++;
+      }
+    }
+
+    pool.setObservationsWithReserves(reserve0, reserve1, 30 minutes);
+
+    (, uint256 price1) = oracle.getTokenPrices();
+
+    uint256 token0Price = 200_000_000;
+    uint256 amountIn = 1e18 / 100;
+    uint256 expectedPrice1;
+    uint256 averageQuote;
+    for (uint256 i = 0; i < POINTS;) {
+      uint256 amountOut = (amountIn * reserve1[i]) / reserve0[i];
+      expectedPrice1 += (token0Price * 1e18) / (amountOut * 100);
+      averageQuote += amountOut;
+
+      unchecked {
+        i++;
+      }
+    }
+    expectedPrice1 /= POINTS;
+
+    uint256 vulnerablePrice1 = (token0Price * 1e18) / ((averageQuote / POINTS) * 100);
+
+    assertEq(price1, expectedPrice1);
+    assertLt(vulnerablePrice1 * 10, expectedPrice1);
   }
 
   function test_StableLpPrice_DoesNotOverflowForDeepHighPricedPool() public {
