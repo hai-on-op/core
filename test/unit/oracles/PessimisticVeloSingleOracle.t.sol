@@ -202,6 +202,10 @@ contract VeloPoolForTest is IVeloPool {
     reserve1 = _reserve1;
   }
 
+  function setTotalSupply(uint256 _totalSupply) external {
+    totalSupply = _totalSupply;
+  }
+
   function balanceOf(address) external pure returns (uint256 _balance) {
     return 0;
   }
@@ -705,5 +709,13 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     _mockSequencerUp();
 
     assertGt(oracle.getCurrentPoolPrice(false), 0);
+  }
+
+  function test_StableLpPrice_DoesNotOverflowWhenLargeReservesStillHaveRepresentableLpPrice() public {
+    _deployOracleWithFeeds(true, 20_000_000_000e18, 20_000_000_000e18, 1e8, 1e8);
+    pool.setTotalSupply(40_000_000_000e18);
+    _mockSequencerUp();
+
+    assertEq(oracle.getCurrentPoolPrice(false), 1e8);
   }
 }

@@ -110,6 +110,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Velodrome observations are normally recorded after this period elapses.
   uint256 internal constant VELO_OBSERVATION_PERIOD = 30 minutes;
 
+  /// @notice Maximum scaled reserve or reserve-value root used in stable LP fourth-power math.
+  uint256 internal constant STABLE_LP_PRICING_SCALE_LIMIT = 1e27;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -640,10 +643,14 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 reserve1,
     uint256 priceDecimals
   ) internal pure returns (uint256) {
-    uint256 k = _getK(reserve0, reserve1);
     // fair_reserves = ( (k * (price0 ** 3) * (price1 ** 3)) )^(1/4) / ((price0 ** 2) + (price1 ** 2));
     price0 *= 1e18 / (10 ** priceDecimals); // convert to 18 dec
     price1 *= 1e18 / (10 ** priceDecimals);
+    uint256 stablePricingScale = _getStablePricingScale(reserve0, reserve1, price0, price1);
+    reserve0 /= stablePricingScale;
+    reserve1 /= stablePricingScale;
+
+    uint256 k = _getK(reserve0, reserve1);
     uint256 a = FixedPointMathLib.rpow(price0, 3, 1e18); // keep same decimals as chainlink
     uint256 b = FixedPointMathLib.rpow(price1, 3, 1e18);
     uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
@@ -654,7 +661,39 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
     uint256 frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18
 
-    return 2 * ((frth_fair * (10 ** priceDecimals)) / total_supply); // converts to chainlink decimals
+    return _scaleStableLpTokenPrice(total_supply, frth_fair, stablePricingScale, priceDecimals);
+  }
+
+  function _scaleStableLpTokenPrice(
+    uint256 _totalSupply,
+    uint256 _frthFair,
+    uint256 _stablePricingScale,
+    uint256 _priceDecimals
+  ) internal pure returns (uint256 _price) {
+    _price = FixedPointMathLib.mulDivDownFullPrecision(
+      2 * _frthFair, _stablePricingScale * (10 ** _priceDecimals), _totalSupply
+    ); // converts to chainlink decimals
+  }
+
+  function _getStablePricingScale(
+    uint256 _reserve0,
+    uint256 _reserve1,
+    uint256 _price0,
+    uint256 _price1
+  ) internal pure returns (uint256 stablePricingScale) {
+    uint256 maxReserve = _reserve0 > _reserve1 ? _reserve0 : _reserve1;
+    uint256 maxPrice = _price0 > _price1 ? _price0 : _price1;
+    uint256 maxReserveValue = FixedPointMathLib.mulDivDownFullPrecision(maxReserve, maxPrice, DECIMALS);
+
+    stablePricingScale = _ceilDiv(maxReserve, STABLE_LP_PRICING_SCALE_LIMIT);
+    uint256 valueScale = _ceilDiv(maxReserveValue, STABLE_LP_PRICING_SCALE_LIMIT);
+    if (valueScale > stablePricingScale) stablePricingScale = valueScale;
+    if (stablePricingScale == 0) stablePricingScale = 1;
+  }
+
+  function _ceilDiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    if (_x == 0) return 0;
+    return ((_x - 1) / _y) + 1;
   }
 
   function _getK(uint256 x, uint256 y) internal pure returns (uint256) {
