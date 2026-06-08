@@ -58,6 +58,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @dev 18-decimal ratio where 1e18 means 1:1.
   uint256 public immutable maxStablePriceDeviation;
 
+  /// @notice Maximum age allowed for the latest successful pessimistic price update.
+  uint256 public immutable maxPessimisticPriceAge;
+
   /// @notice Chainlink feed to check that Optimism's sequencer is online.
   /// @dev This prevents transactions sent while the sequencer is down from being executed when it comes back online.
   IChainlinkOracle public constant sequencerUptimeFeed = IChainlinkOracle(0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389);
@@ -118,6 +121,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    * @param _twapPoints Number of samples for TWAP pricing. Minimum is 4 (2 hours).
    * @param _maxTwapObservationInterval Maximum allowed age/gap for sampled Velodrome TWAP observations.
    * @param _maxStablePriceDeviation Maximum token price ratio allowed when pricing stable pools.
+   * @param _maxPessimisticPriceAge Maximum age allowed for cached pessimistic pricing.
    * @param _owner Owner role. Can set operators and adjust 2 vs 3 day pessimistic pricing.
    */
   constructor(
@@ -129,6 +133,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 _twapPoints,
     uint256 _maxTwapObservationInterval,
     uint256 _maxStablePriceDeviation,
+    uint256 _maxPessimisticPriceAge,
     address _owner
   ) Ownable(_owner) {
     // The default number of periods (points) we look back in time for TWAP pricing.
@@ -147,6 +152,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert StablePriceDeviationTooLow();
     }
     maxStablePriceDeviation = _maxStablePriceDeviation;
+
+    if (_maxPessimisticPriceAge == 0) {
+      revert PessimisticPriceAgeTooShort();
+    }
+    maxPessimisticPriceAge = _maxPessimisticPriceAge;
 
     // A heartbeat is the amount of time after which we consider a chainlink feed's price to be stale. For major
     // assets like BTC and ETH, this value is 3600 (1 hour). For less actively traded assets, this can be as high as
@@ -213,6 +223,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error StablePriceDeviationTooLow();
   error StablePriceDeviation();
   error NoPostSequencerRecoveryPriceUpdate();
+  error PessimisticPriceAgeTooShort();
+  error PessimisticPriceStale();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -419,6 +431,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 sequencerStartedAt = _checkSequencerUpAndGracePeriodOver();
     if (lastPriceUpdateTime <= sequencerStartedAt) {
       revert NoPostSequencerRecoveryPriceUpdate();
+    }
+    if (block.timestamp - lastPriceUpdateTime > maxPessimisticPriceAge) {
+      revert PessimisticPriceStale();
     }
 
     // start off with our standard price
