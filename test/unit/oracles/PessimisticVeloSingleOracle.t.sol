@@ -60,6 +60,11 @@ contract ChainlinkOracleForTest is IChainlinkOracle {
   function latestTimestamp() external view returns (uint256 _latestTimestamp) {
     return _updatedAt;
   }
+
+  function set(int256 __answer, uint256 __updatedAt) external {
+    _answer = __answer;
+    _updatedAt = __updatedAt;
+  }
 }
 
 contract VeloPoolForTest is IVeloPool {
@@ -87,17 +92,20 @@ contract VeloPoolForTest is IVeloPool {
   }
 
   function setConstantObservations(uint256 _reserve0, uint256 _reserve1, uint256 _observationCount) external {
+    require(_observationCount > 0);
     delete _observations;
     reserve0 = _reserve0;
     reserve1 = _reserve1;
 
+    uint256 firstTimestamp = block.timestamp - ((_observationCount - 1) * 30 minutes);
+
     for (uint256 i = 0; i < _observationCount;) {
-      uint256 timestamp = i + 1;
+      uint256 timestamp = firstTimestamp + (i * 30 minutes);
       _observations.push(
         Observation({
           timestamp: timestamp,
-          reserve0Cumulative: _reserve0 * timestamp,
-          reserve1Cumulative: _reserve1 * timestamp
+          reserve0Cumulative: _reserve0 * i * 30 minutes,
+          reserve1Cumulative: _reserve1 * i * 30 minutes
         })
       );
 
@@ -115,7 +123,7 @@ contract VeloPoolForTest is IVeloPool {
     require(_reserve0.length == _reserve1.length && _reserve0.length > 0 && _period > 0);
     delete _observations;
 
-    uint256 timestamp = 1;
+    uint256 timestamp = block.timestamp - (_reserve0.length * _period);
     uint256 reserve0Cumulative;
     uint256 reserve1Cumulative;
     _observations.push(
@@ -126,6 +134,52 @@ contract VeloPoolForTest is IVeloPool {
       timestamp += _period;
       reserve0Cumulative += _reserve0[i] * _period;
       reserve1Cumulative += _reserve1[i] * _period;
+      _observations.push(
+        Observation({
+          timestamp: timestamp,
+          reserve0Cumulative: reserve0Cumulative,
+          reserve1Cumulative: reserve1Cumulative
+        })
+      );
+
+      unchecked {
+        i++;
+      }
+    }
+
+    reserve0 = _reserve0[_reserve0.length - 1];
+    reserve1 = _reserve1[_reserve1.length - 1];
+  }
+
+  function setObservationsWithPeriods(
+    uint256[] memory _reserve0,
+    uint256[] memory _reserve1,
+    uint256[] memory _periods
+  ) external {
+    require(_reserve0.length == _reserve1.length && _reserve0.length == _periods.length && _reserve0.length > 0);
+    delete _observations;
+
+    uint256 window;
+    for (uint256 i = 0; i < _periods.length;) {
+      require(_periods[i] > 0);
+      window += _periods[i];
+
+      unchecked {
+        i++;
+      }
+    }
+
+    uint256 timestamp = block.timestamp - window;
+    uint256 reserve0Cumulative;
+    uint256 reserve1Cumulative;
+    _observations.push(
+      Observation({timestamp: timestamp, reserve0Cumulative: reserve0Cumulative, reserve1Cumulative: reserve1Cumulative})
+    );
+
+    for (uint256 i = 0; i < _reserve0.length;) {
+      timestamp += _periods[i];
+      reserve0Cumulative += _reserve0[i] * _periods[i];
+      reserve1Cumulative += _reserve1[i] * _periods[i];
       _observations.push(
         Observation({
           timestamp: timestamp,
@@ -193,6 +247,7 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   address internal token0 = label('token0');
   address internal token1 = label('token1');
   uint256 internal constant POINTS = 4;
+  uint256 internal constant MAX_TWAP_OBSERVATION_INTERVAL = 1 hours;
 
   ChainlinkOracleForTest internal token0Feed;
   ChainlinkOracleForTest internal token1Feed;
@@ -213,8 +268,9 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
     token0Feed = new ChainlinkOracleForTest(8, 200_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, _stable, _decimals0, _decimals1);
     pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
-    oracle =
-      new PessimisticVeloSingleOracle(address(pool), address(token0Feed), address(0), 3600, 3600, POINTS, address(this));
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool), address(token0Feed), address(0), 3600, 3600, POINTS, MAX_TWAP_OBSERVATION_INTERVAL, address(this)
+    );
   }
 
   function _deployOracleWithFeeds(
@@ -229,7 +285,14 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
     pool = new VeloPoolForTest(token0, token1, _stable, 1e18, 1e18);
     pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
     oracle = new PessimisticVeloSingleOracle(
-      address(pool), address(token0Feed), address(token1Feed), 3600, 3600, POINTS, address(this)
+      address(pool),
+      address(token0Feed),
+      address(token1Feed),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      address(this)
     );
   }
 
@@ -247,6 +310,13 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
 }
 
 contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleOracleTest {
+  function test_Constructor_RevertsWhenMaxTwapObservationIntervalTooShort() public {
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooShort.selector);
+    new PessimisticVeloSingleOracle(
+      address(0), address(0), address(0), 3600, 3600, POINTS, 30 minutes - 1, address(this)
+    );
+  }
+
   function test_Volatile_ReturnsNoSlippageMarginalPrice() public {
     _deployOracle(false, 100e18, 200e18);
 
@@ -327,6 +397,42 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(price1, expectedPrice1);
     assertLt(vulnerablePrice1 * 10, expectedPrice1);
+  }
+
+  function test_GetTokenPrices_RevertsWhenLatestTwapObservationIsTooOld() public {
+    _deployOracle(false, 1_000_000e18, 1_000_000e18);
+    vm.warp(block.timestamp + 1 hours + 1);
+    token0Feed.set(200_000_000, block.timestamp);
+    _mockSequencerUp();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationTooOld.selector);
+    oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_RevertsWhenTwapObservationIntervalIsTooLong() public {
+    _deployOracle(false, 1_000_000e18, 1_000_000e18);
+    _mockSequencerUp();
+
+    uint256[] memory reserve0 = new uint256[](POINTS);
+    uint256[] memory reserve1 = new uint256[](POINTS);
+    uint256[] memory periods = new uint256[](POINTS);
+    reserve0[0] = 1_000_000e18;
+    reserve1[0] = 1_000_000e18;
+    periods[0] = 1 hours + 1;
+    for (uint256 i = 1; i < POINTS;) {
+      reserve0[i] = 1_000_000e18;
+      reserve1[i] = 1_000_000e18;
+      periods[i] = 30 minutes;
+
+      unchecked {
+        i++;
+      }
+    }
+
+    pool.setObservationsWithPeriods(reserve0, reserve1, periods);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooLong.selector);
+    oracle.getTokenPrices();
   }
 
   function test_StableLpPrice_DoesNotOverflowForDeepHighPricedPool() public {

@@ -47,6 +47,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @dev Set on deployment, minimum is 4 (2 hours).
   uint256 public immutable points;
 
+  /// @notice Maximum age/gap allowed for Velodrome TWAP observations.
+  /// @dev Set on deployment to allow pool-specific liveness/security tradeoffs.
+  uint256 public immutable maxTwapObservationInterval;
+
   /// @notice Chainlink feed to check that Optimism's sequencer is online.
   /// @dev This prevents transactions sent while the sequencer is down from being executed when it comes back online.
   IChainlinkOracle public constant sequencerUptimeFeed = IChainlinkOracle(0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389);
@@ -93,6 +97,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   // our pool/LP token decimals, just in case velodrome has weird pools in the future with different decimals
   uint256 internal constant DECIMALS = 10 ** 18;
 
+  /// @notice Velodrome observations are normally recorded after this period elapses.
+  uint256 internal constant VELO_OBSERVATION_PERIOD = 30 minutes;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -102,6 +109,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    * @param _token0Heartbeat The heartbeat for our token0 feed (maximum time allowed before refresh).
    * @param _token1Heartbeat The heartbeat for our token1 feed (maximum time allowed before refresh).
    * @param _twapPoints Number of samples for TWAP pricing. Minimum is 4 (2 hours).
+   * @param _maxTwapObservationInterval Maximum allowed age/gap for sampled Velodrome TWAP observations.
    * @param _owner Owner role. Can set operators and adjust 2 vs 3 day pessimistic pricing.
    */
   constructor(
@@ -111,6 +119,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint96 _token0Heartbeat,
     uint96 _token1Heartbeat,
     uint256 _twapPoints,
+    uint256 _maxTwapObservationInterval,
     address _owner
   ) Ownable(_owner) {
     // The default number of periods (points) we look back in time for TWAP pricing.
@@ -119,6 +128,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert TooFewTwapPoints();
     }
     points = _twapPoints;
+
+    if (_maxTwapObservationInterval < VELO_OBSERVATION_PERIOD) {
+      revert TwapObservationIntervalTooShort();
+    }
+    maxTwapObservationInterval = _maxTwapObservationInterval;
 
     // A heartbeat is the amount of time after which we consider a chainlink feed's price to be stale. For major
     // assets like BTC and ETH, this value is 3600 (1 hour). For less actively traded assets, this can be as high as
@@ -179,6 +193,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error GracePeriodNotOver();
   error NotOperator();
   error NoRecentPriceUpdates();
+  error TwapObservationIntervalTooShort();
+  error TwapObservationTooOld();
+  error TwapObservationIntervalTooLong();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -323,8 +340,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   function getTwapPrice(address _token, uint256 _tokenAmount) public view returns (uint256 twapPrice) {
     IVeloPool poolContract = IVeloPool(pool);
 
-    uint256 length = poolContract.observationLength() - 1;
-    uint256 i = length - points;
+    (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
 
     for (; i < length;) {
       (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
@@ -480,8 +496,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 knownTokenDecimals = knownTokenIsToken0 ? decimals0 : decimals1;
     uint256 derivedTokenDecimals = knownTokenIsToken0 ? decimals1 : decimals0;
 
-    uint256 length = poolContract.observationLength() - 1;
-    uint256 i = length - points;
+    (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
 
     for (; i < length;) {
       (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
@@ -499,6 +514,16 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     twapPrice /= points;
   }
 
+  function _getTwapStartIndex(IVeloPool _poolContract) internal view returns (uint256 startIndex, uint256 length) {
+    length = _poolContract.observationLength() - 1;
+    startIndex = length - points;
+
+    IVeloPool.Observation memory latestObservation = _poolContract.observations(length);
+    if (block.timestamp - latestObservation.timestamp > maxTwapObservationInterval) {
+      revert TwapObservationTooOld();
+    }
+  }
+
   function _getAverageReserves(
     IVeloPool _poolContract,
     uint256 _index
@@ -506,6 +531,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     IVeloPool.Observation memory nextObservation = _poolContract.observations(_index + 1);
     IVeloPool.Observation memory currentObservation = _poolContract.observations(_index);
     uint256 timeElapsed = nextObservation.timestamp - currentObservation.timestamp;
+    if (timeElapsed > maxTwapObservationInterval) {
+      revert TwapObservationIntervalTooLong();
+    }
+
     reserve0Average = (nextObservation.reserve0Cumulative - currentObservation.reserve0Cumulative) / timeElapsed;
     reserve1Average = (nextObservation.reserve1Cumulative - currentObservation.reserve1Cumulative) / timeElapsed;
   }
