@@ -414,12 +414,13 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
     // increment our counter whether we store the price or not
     uint256 day = currentDay();
+    bool isFirstUpdate = dailyUpdates[day] == 0;
     dailyUpdates[day] += 1;
     lastPriceUpdateTime = block.timestamp;
 
     // store price if it's today's low
     uint256 todaysLow = dailyLow[day];
-    if (todaysLow == 0 || currentPrice < todaysLow) {
+    if (isFirstUpdate || currentPrice < todaysLow) {
       dailyLow[day] = currentPrice;
       emit RecordDailyLow(currentPrice);
     }
@@ -457,13 +458,13 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 yesterdaysLow = dailyLow[day - 1];
 
     // calculate price based on two-day low
-    adjustedPrice = todaysLow > yesterdaysLow && yesterdaysLow > 0 ? yesterdaysLow : todaysLow;
+    adjustedPrice = dailyUpdates[day - 1] > 0 && todaysLow > yesterdaysLow ? yesterdaysLow : todaysLow;
 
     // if using three-day low, compare again
     if (useThreeDayLow) {
       uint256 dayBeforeYesterdaysLow = dailyLow[day - 2];
       adjustedPrice =
-        adjustedPrice > dayBeforeYesterdaysLow && dayBeforeYesterdaysLow > 0 ? dayBeforeYesterdaysLow : adjustedPrice;
+        dailyUpdates[day - 2] > 0 && adjustedPrice > dayBeforeYesterdaysLow ? dayBeforeYesterdaysLow : adjustedPrice;
     }
   }
 

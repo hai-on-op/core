@@ -669,6 +669,50 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
+  function test_UpdatePrice_DoesNotOverwriteSameDayZeroLowWithPositivePrice() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    pool.setReserves(0, 1e18);
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    assertEq(oracle.dailyUpdates(day), 1);
+    assertEq(oracle.dailyLow(day), 0);
+    assertEq(oracle.getCurrentPoolPrice(true), 0);
+
+    pool.setReserves(1e18, 1e18);
+    oracle.updatePrice();
+
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertEq(oracle.dailyLow(day), 0);
+    assertEq(oracle.getCurrentPoolPrice(true), 0);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticIncludesYesterdayZeroLow() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    pool.setReserves(0, 1e18);
+    oracle.updatePrice();
+    uint256 yesterday = oracle.currentDay();
+
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(100_000_000, block.timestamp);
+    token1Feed.set(100_000_000, block.timestamp);
+    pool.setConstantObservations(1e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    uint256 today = oracle.currentDay();
+
+    assertEq(today, yesterday + 1);
+    assertEq(oracle.dailyLow(yesterday), 0);
+    assertGt(oracle.dailyLow(today), 0);
+    assertEq(oracle.getCurrentPoolPrice(true), 0);
+  }
+
   function test_GetCurrentVaultPriceV3_UsesVaultShareDecimals() public {
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
     _mockSequencerUp();
