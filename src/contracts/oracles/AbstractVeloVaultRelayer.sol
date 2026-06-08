@@ -13,6 +13,12 @@ import {Math, WAD} from '@libraries/Math.sol';
  */
 abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
   using Math for uint256;
+  // --- Constants ---
+
+  uint256 internal constant _BPS = 10_000;
+  uint256 public constant PRICE_PER_FULL_SHARE_UPDATE_DELAY = 1 hours;
+  uint256 public constant MAX_PRICE_PER_FULL_SHARE_INCREASE_BPS = 100;
+
   // --- Registry ---
 
   /// @inheritdoc IAbstractVeloVaultRelayer
@@ -25,6 +31,12 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
 
   /// @inheritdoc IBaseOracle
   string public symbol;
+
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  uint256 public acceptedPricePerFullShare;
+
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  uint256 public lastPricePerFullShareUpdateTime;
 
   // --- Init ---
 
@@ -61,12 +73,17 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     return _getPriceValue();
   }
 
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  function updatePricePerFullShare() external returns (bool _updated) {
+    return _updatePricePerFullShare();
+  }
+
   function _getPriceValue() internal view returns (uint256 _combinedPriceValue) {
     // 1 yvToken or mooToken
     uint256 _baseTokenBalance = 1_000_000_000_000_000_000;
 
     // # of velo LP tokens in 1 yvToken
-    uint256 _veloLpBalance = _baseTokenBalance.wmul(_getPricePerFullShare());
+    uint256 _veloLpBalance = _baseTokenBalance.wmul(acceptedPricePerFullShare);
 
     // price of 1 velo LP token in chainlink price decimals (8)
     uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(true);
@@ -78,6 +95,46 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     }
 
     return _price;
+  }
+
+  function _initializePricePerFullShare() internal {
+    uint256 _pricePerFullShare = _getPricePerFullShare();
+    if (_pricePerFullShare == 0) {
+      revert AbstractVeloVaultRelayer_InvalidPricePerFullShare();
+    }
+
+    acceptedPricePerFullShare = _pricePerFullShare;
+    lastPricePerFullShareUpdateTime = block.timestamp;
+
+    emit UpdatePricePerFullShare(_pricePerFullShare);
+  }
+
+  function _updatePricePerFullShare() internal returns (bool _updated) {
+    uint256 _pricePerFullShare = _getPricePerFullShare();
+    if (_pricePerFullShare == 0) {
+      revert AbstractVeloVaultRelayer_InvalidPricePerFullShare();
+    }
+
+    uint256 _acceptedPricePerFullShare = acceptedPricePerFullShare;
+
+    if (_pricePerFullShare > _acceptedPricePerFullShare) {
+      if (block.timestamp < lastPricePerFullShareUpdateTime + PRICE_PER_FULL_SHARE_UPDATE_DELAY) {
+        return false;
+      }
+
+      uint256 _maxPricePerFullShare =
+        (_acceptedPricePerFullShare * (_BPS + MAX_PRICE_PER_FULL_SHARE_INCREASE_BPS)) / _BPS;
+      if (_pricePerFullShare > _maxPricePerFullShare) {
+        _pricePerFullShare = _maxPricePerFullShare;
+      }
+    }
+
+    acceptedPricePerFullShare = _pricePerFullShare;
+    lastPricePerFullShareUpdateTime = block.timestamp;
+
+    emit UpdatePricePerFullShare(_pricePerFullShare);
+
+    return true;
   }
 
   /// @notice Virtual function to be implemented by child contracts

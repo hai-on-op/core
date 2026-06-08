@@ -43,6 +43,7 @@ contract BeefyVeloVaultRelayer is AbstractVeloVaultRelayer, IBeefyVeloVaultRelay
     }
 
     beefyVault = _beefyVault;
+    _initializePricePerFullShare();
   }
 
   function _getPricePerFullShare() internal view override returns (uint256 _pricePerFullShare) {

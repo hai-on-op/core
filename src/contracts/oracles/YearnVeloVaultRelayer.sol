@@ -43,6 +43,7 @@ contract YearnVeloVaultRelayer is AbstractVeloVaultRelayer, IYearnVeloVaultRelay
     }
 
     yearnVault = _yearnVault;
+    _initializePricePerFullShare();
   }
 
   function _getPricePerFullShare() internal view override returns (uint256 _pricePerFullShare) {
