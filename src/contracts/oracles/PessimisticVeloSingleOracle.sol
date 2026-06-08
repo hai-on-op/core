@@ -504,7 +504,29 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       uint256 p = FixedPointMathLib.sqrt(price0 * 1e16 * price1); // boost this to 1e16 to give us more precision
 
       // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
-      fairReservesPricing = (2 * p * k) / (1e8 * poolContract.totalSupply());
+      uint256 totalSupply = poolContract.totalSupply();
+      fairReservesPricing = (2 * p * k) / (1e8 * totalSupply);
+      fairReservesPricing =
+        _capVolatileSingleFeedPrice(fairReservesPricing, totalSupply, reserve0, reserve1, price0, price1);
+    }
+  }
+
+  function _capVolatileSingleFeedPrice(
+    uint256 _lpPrice,
+    uint256 _totalSupply,
+    uint256 _reserve0,
+    uint256 _reserve1,
+    uint256 _price0,
+    uint256 _price1
+  ) internal view returns (uint256 cappedPrice) {
+    cappedPrice = _lpPrice;
+
+    if (token0Feed != address(0) && token1Feed == address(0)) {
+      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve0, _price0, _totalSupply);
+      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
+    } else if (token1Feed != address(0) && token0Feed == address(0)) {
+      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve1, _price1, _totalSupply);
+      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
     }
   }
 

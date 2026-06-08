@@ -197,6 +197,11 @@ contract VeloPoolForTest is IVeloPool {
     reserve1 = _reserve1[_reserve1.length - 1];
   }
 
+  function setReserves(uint256 _reserve0, uint256 _reserve1) external {
+    reserve0 = _reserve0;
+    reserve1 = _reserve1;
+  }
+
   function balanceOf(address) external pure returns (uint256 _balance) {
     return 0;
   }
@@ -486,6 +491,60 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(price1, expectedPrice1);
     assertLt(vulnerablePrice1 * 10, expectedPrice1);
+  }
+
+  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken0PricingByCurrentFedReserve() public {
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, false, 1e6, 1e18);
+    pool.setConstantObservations(1000e6, 1e18, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    (, uint256 derivedToken1Price) = oracle.getTokenPrices();
+    assertEq(derivedToken1Price, 1000e8);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
+
+    pool.setReserves(10e6, 100e18);
+
+    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
+  }
+
+  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken1PricingByCurrentFedReserve() public {
+    token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, false, 1e18, 1e6);
+    pool.setConstantObservations(1e18, 1000e6, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(0),
+      address(token1Feed),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    (uint256 derivedToken0Price,) = oracle.getTokenPrices();
+    assertEq(derivedToken0Price, 1000e8);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
+
+    pool.setReserves(100e18, 10e6);
+
+    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
   }
 
   function test_GetTokenPrices_RevertsWhenLatestTwapObservationIsTooOld() public {
