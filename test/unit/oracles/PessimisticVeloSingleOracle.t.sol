@@ -451,6 +451,32 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(price1, 100_000_000);
   }
 
+  function test_GetTokenPrices_DerivesSingleFeedPriceWithoutTinyRawQuoteRounding() public {
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, false, 1e6, 1e8);
+    pool.setConstantObservations(600_000e6, 1e8, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    uint256 tinyRawQuote = oracle.getTwapPrice(token0, 1e6 / 100);
+    (, uint256 price1) = oracle.getTokenPrices();
+
+    assertEq(tinyRawQuote, 1);
+    assertEq(price1, 600_000e8);
+    assertEq((uint256(100_000_000) * 1e8) / (tinyRawQuote * 100), 1_000_000e8);
+  }
+
   function test_GetTokenPrices_AveragesDerivedTokenPricePerSample() public {
     _deployOracle(false, 1_000_000e18, 1_000_000e18);
     _mockSequencerUp();

@@ -373,7 +373,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     twapPrice /= points;
   }
 
-  // by default we use 0.01 tokens in this function to more accurately price small pools
+  // derive missing token prices directly from TWAP reserve ratios to avoid precision loss from tiny raw quotes
   function getTokenPrices() public view returns (uint256 price0, uint256 price1) {
     // check if we have chainlink feeds or TWAP for each token
     if (token0Feed != address(0)) {
@@ -382,12 +382,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
         price1 = getChainlinkPrice(1); // returned with 8 decimals
       } else {
         // derive token1's price by averaging each sampled token1/token0 price
-        price1 = _getTwapDerivedTokenPrice(token0, decimals0 / 100, price0);
+        price1 = _getTwapDerivedTokenPrice(token0, price0);
       }
     } else if (token1Feed != address(0)) {
       price1 = getChainlinkPrice(1); // returned with 8 decimals
       // derive token0's price by averaging each sampled token0/token1 price
-      price0 = _getTwapDerivedTokenPrice(token1, decimals1 / 100, price1);
+      price0 = _getTwapDerivedTokenPrice(token1, price1);
     }
   }
 
@@ -566,23 +566,25 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
   function _getTwapDerivedTokenPrice(
     address _knownToken,
-    uint256 _knownTokenAmount,
     uint256 _knownTokenPrice
   ) internal view returns (uint256 twapPrice) {
     IVeloPool poolContract = IVeloPool(pool);
     bool knownTokenIsToken0 = _knownToken == token0;
-    uint256 knownTokenDecimals = knownTokenIsToken0 ? decimals0 : decimals1;
-    uint256 derivedTokenDecimals = knownTokenIsToken0 ? decimals1 : decimals0;
 
     (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
 
     for (; i < length;) {
       (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
-      uint256 amountOut = _getMarginalAmountOut(_knownToken, _knownTokenAmount, reserve0Average, reserve1Average);
-      uint256 quotePerKnownToken =
-        FixedPointMathLib.mulDivDownFullPrecision(amountOut, knownTokenDecimals, _knownTokenAmount);
+      (uint256 knownReserve, uint256 derivedReserve) =
+        _getNormalizedReservePair(knownTokenIsToken0, reserve0Average, reserve1Average);
 
-      twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, derivedTokenDecimals, quotePerKnownToken);
+      if (stable) {
+        uint256 knownDerivative = _stableDerivative(knownReserve, derivedReserve);
+        uint256 derivedDerivative = _stableDerivative(derivedReserve, knownReserve);
+        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownDerivative, derivedDerivative);
+      } else {
+        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownReserve, derivedReserve);
+      }
 
       unchecked {
         i++;
@@ -590,6 +592,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     }
 
     twapPrice /= points;
+  }
+
+  function _getNormalizedReservePair(
+    bool _knownTokenIsToken0,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 knownReserve, uint256 derivedReserve) {
+    uint256 normalizedReserve0 = (_reserve0 * DECIMALS) / decimals0;
+    uint256 normalizedReserve1 = (_reserve1 * DECIMALS) / decimals1;
+    (knownReserve, derivedReserve) =
+      _knownTokenIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
   }
 
   function _getTwapStartIndex(IVeloPool _poolContract) internal view returns (uint256 startIndex, uint256 length) {
