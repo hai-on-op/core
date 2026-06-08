@@ -238,10 +238,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert WrongVaultForPool();
     }
 
+    uint256 assetsPerShare = vault.convertToAssets(10 ** vault.decimals());
+
     if (_usePessimisticPricing) {
-      return (_getAdjustedPrice(_pool) * vault.convertToAssets(DECIMALS)) / DECIMALS;
+      return (_getAdjustedPrice(_pool) * assetsPerShare) / DECIMALS;
     } else {
-      return (_getFairReservesPricing(_pool) * vault.convertToAssets(DECIMALS)) / DECIMALS;
+      return (_getFairReservesPricing(_pool) * assetsPerShare) / DECIMALS;
     }
   }
 
@@ -259,10 +261,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert WrongVaultForPool();
     }
 
+    uint256 assetsPerShare = ShareValueHelper.sharesToAmount(_vault, 10 ** vault.decimals());
+
     if (_usePessimisticPricing) {
-      return (_getAdjustedPrice(_pool) * ShareValueHelper.sharesToAmount(_vault, DECIMALS)) / DECIMALS;
+      return (_getAdjustedPrice(_pool) * assetsPerShare) / DECIMALS;
     } else {
-      return (_getFairReservesPricing(_pool) * ShareValueHelper.sharesToAmount(_vault, DECIMALS)) / DECIMALS;
+      return (_getFairReservesPricing(_pool) * assetsPerShare) / DECIMALS;
     }
   }
 

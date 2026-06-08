@@ -242,6 +242,45 @@ contract VeloPoolForTest is IVeloPool {
   }
 }
 
+contract Erc4626VaultForTest {
+  address public immutable asset;
+  uint8 public immutable decimals;
+  uint256 public immutable assetsPerShare;
+
+  constructor(address _asset, uint8 _decimals, uint256 _assetsPerShare) {
+    asset = _asset;
+    decimals = _decimals;
+    assetsPerShare = _assetsPerShare;
+  }
+
+  function convertToAssets(uint256 _shares) external view returns (uint256 _assets) {
+    return (_shares * assetsPerShare) / (10 ** decimals);
+  }
+}
+
+contract YearnV2VaultForTest {
+  address public immutable token;
+  uint256 public immutable decimals;
+  uint256 public immutable totalSupply;
+  uint256 public immutable totalAssets;
+  uint256 public immutable lastReport;
+
+  uint256 public constant lockedProfit = 0;
+  uint256 public constant lockedProfitDegradation = 0;
+
+  constructor(address _token, uint256 _decimals, uint256 _totalSupply, uint256 _totalAssets) {
+    token = _token;
+    decimals = _decimals;
+    totalSupply = _totalSupply;
+    totalAssets = _totalAssets;
+    lastReport = block.timestamp;
+  }
+
+  function pricePerShare() external pure returns (uint256 _pricePerShare) {
+    return 1e18;
+  }
+}
+
 abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   address internal constant SEQUENCER_UPTIME_FEED = 0x371EAD81c9102C9BF4874A9075FFFf170F2Ee389;
   address internal token0 = label('token0');
@@ -433,6 +472,26 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooLong.selector);
     oracle.getTokenPrices();
+  }
+
+  function test_GetCurrentVaultPriceV3_UsesVaultShareDecimals() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+
+    Erc4626VaultForTest vault = new Erc4626VaultForTest(address(pool), 6, 1e18);
+    uint256 poolPrice = oracle.getCurrentPoolPrice(false);
+
+    assertEq(oracle.getCurrentVaultPriceV3(address(vault), false), poolPrice);
+  }
+
+  function test_GetCurrentVaultPriceV2_UsesVaultShareDecimals() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+
+    YearnV2VaultForTest vault = new YearnV2VaultForTest(address(pool), 6, 1e6, 1e18);
+    uint256 poolPrice = oracle.getCurrentPoolPrice(false);
+
+    assertEq(oracle.getCurrentVaultPriceV2(address(vault), false), poolPrice);
   }
 
   function test_StableLpPrice_DoesNotOverflowForDeepHighPricedPool() public {
