@@ -38,6 +38,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Number of times our token's price was checked on a given day.
   mapping(uint256 => uint256) public dailyUpdates; // day => number of updates
 
+  /// @notice Last time the daily low state was updated from live pricing.
+  uint256 public lastPriceUpdateTime;
+
   /// @notice Whether we use a three-day low instead of a two-day low.
   /// @dev May only be updated by owner. Realistically most useful when price updating is public, as this
   ///  guarantees any price observations used must be at least 24 hours apart.
@@ -209,6 +212,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error TwapObservationIntervalTooLong();
   error StablePriceDeviationTooLow();
   error StablePriceDeviation();
+  error NoPostSequencerRecoveryPriceUpdate();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -327,21 +331,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert PriceInvalid();
     }
 
-    // make sure the sequencer is up
-    // uint80 roundID int256 sequencerAnswer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
-    (, int256 sequencerAnswer, uint256 startedAt,,) = sequencerUptimeFeed.latestRoundData();
-
-    // Answer == 0: L2 Sequencer is up
-    // Answer == 1: L2 Sequencer is down
-    if (sequencerAnswer == 1) {
-      revert SequencerDown();
-    }
-
-    // Make sure a grace period of one hour has passed after the sequencer is back up.
-    uint256 timeSinceUp = block.timestamp - startedAt;
-    if (timeSinceUp < 3600) {
-      revert GracePeriodNotOver();
-    }
+    _checkSequencerUpAndGracePeriodOver();
 
     currentPrice = uint256(price);
   }
@@ -410,6 +400,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // increment our counter whether we store the price or not
     uint256 day = currentDay();
     dailyUpdates[day] += 1;
+    lastPriceUpdateTime = block.timestamp;
 
     // store price if it's today's low
     uint256 todaysLow = dailyLow[day];
@@ -425,6 +416,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
   // adjust our reported pool price as needed for 48-hour lows and hard upper/lower limits
   function _getAdjustedPrice(address _pool) internal view returns (uint256 adjustedPrice) {
+    uint256 sequencerStartedAt = _checkSequencerUpAndGracePeriodOver();
+    if (lastPriceUpdateTime <= sequencerStartedAt) {
+      revert NoPostSequencerRecoveryPriceUpdate();
+    }
+
     // start off with our standard price
     uint256 day = currentDay();
 
@@ -450,6 +446,24 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       uint256 dayBeforeYesterdaysLow = dailyLow[day - 2];
       adjustedPrice =
         adjustedPrice > dayBeforeYesterdaysLow && dayBeforeYesterdaysLow > 0 ? dayBeforeYesterdaysLow : adjustedPrice;
+    }
+  }
+
+  function _checkSequencerUpAndGracePeriodOver() internal view returns (uint256 startedAt) {
+    // uint80 roundID int256 sequencerAnswer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
+    int256 sequencerAnswer;
+    (, sequencerAnswer, startedAt,,) = sequencerUptimeFeed.latestRoundData();
+
+    // Answer == 0: L2 Sequencer is up
+    // Answer == 1: L2 Sequencer is down
+    if (sequencerAnswer == 1) {
+      revert SequencerDown();
+    }
+
+    // Make sure a grace period of one hour has passed after the sequencer is back up.
+    uint256 timeSinceUp = block.timestamp - startedAt;
+    if (timeSinceUp < 3600) {
+      revert GracePeriodNotOver();
     }
   }
 

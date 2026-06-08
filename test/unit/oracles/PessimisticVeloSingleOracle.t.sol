@@ -346,10 +346,15 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   }
 
   function _mockSequencerUp() internal {
+    _mockSequencer(0, block.timestamp - 2 hours);
+  }
+
+  function _mockSequencer(int256 _answer, uint256 _startedAt) internal {
+    vm.clearMockedCalls();
     vm.mockCall(
       SEQUENCER_UPTIME_FEED,
       abi.encodeCall(IChainlinkOracle.latestRoundData, ()),
-      abi.encode(uint256(1), int256(0), block.timestamp - 2 hours, block.timestamp - 2 hours, uint256(1))
+      abi.encode(uint256(1), _answer, _startedAt, _startedAt, uint256(1))
     );
   }
 
@@ -489,6 +494,39 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooLong.selector);
     oracle.getTokenPrices();
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticRevertsDuringSequencerGracePeriod() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    _mockSequencer(0, block.timestamp - 30 minutes);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.GracePeriodNotOver.selector);
+    oracle.getCurrentPoolPrice(true);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticRequiresPostSequencerRecoveryUpdate() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    vm.warp(block.timestamp + 2 hours);
+    uint256 sequencerStartedAt = block.timestamp - 90 minutes;
+    _mockSequencer(0, sequencerStartedAt);
+    token0Feed.set(100_000_000, block.timestamp);
+    token1Feed.set(100_000_000, block.timestamp);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.NoPostSequencerRecoveryPriceUpdate.selector);
+    oracle.getCurrentPoolPrice(true);
+
+    oracle.updatePrice();
+
+    assertGt(oracle.lastPriceUpdateTime(), sequencerStartedAt);
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
   function test_GetCurrentVaultPriceV3_UsesVaultShareDecimals() public {
