@@ -5,14 +5,12 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
-import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  AbstractVeloVaultRelayer
  * @notice Abstract contract for Velo vault relayers (Beefy, Yearn, etc.)
  */
 abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
-  using Math for uint256;
   // --- Constants ---
 
   uint256 internal constant _BPS = 10_000;
@@ -61,16 +59,20 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
   }
 
   /// @inheritdoc IBaseOracle
-  /// @notice This function always returns `_validity` as `true` since there are no conditions where the result would be invalid.
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
-    uint256 _totalValue = _getPriceValue();
+    try veloLpOracle.getCurrentPoolPrice(true) returns (uint256 _veloLpPrice) {
+      if (_veloLpPrice == 0) return (0, false);
 
-    return (_totalValue, true);
+      _result = _calculatePriceValue(_veloLpPrice);
+      _validity = _result > 0;
+    } catch {
+      return (0, false);
+    }
   }
   /// @inheritdoc IBaseOracle
 
   function read() external view returns (uint256 _result) {
-    return _getPriceValue();
+    return _getPriceValue(veloLpOracle.getCurrentPoolPrice(true));
   }
 
   /// @inheritdoc IAbstractVeloVaultRelayer
@@ -78,23 +80,24 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     return _updatePricePerFullShare();
   }
 
-  function _getPriceValue() internal view returns (uint256 _combinedPriceValue) {
-    // 1 yvToken or mooToken
-    uint256 _baseTokenBalance = 1_000_000_000_000_000_000;
-
-    // # of velo LP tokens in 1 yvToken
-    uint256 _veloLpBalance = _baseTokenBalance.wmul(acceptedPricePerFullShare);
-
-    // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(true);
-
-    uint256 _price = (_veloLpBalance * _veloLpPrice) / 1e8;
+  function _getPriceValue(uint256 _veloLpPrice) internal view returns (uint256 _combinedPriceValue) {
+    uint256 _price = _calculatePriceValue(_veloLpPrice);
 
     if (_price == 0) {
       revert AbstractVeloVaultRelayer_ZeroPrice();
     }
 
     return _price;
+  }
+
+  function _calculatePriceValue(uint256 _veloLpPrice) internal view returns (uint256 _price) {
+    // # of velo LP tokens in 1 yvToken
+    uint256 _veloLpBalance = acceptedPricePerFullShare;
+    if (_veloLpPrice != 0 && _veloLpBalance > type(uint256).max / _veloLpPrice) {
+      return 0;
+    }
+
+    _price = (_veloLpBalance * _veloLpPrice) / 1e8;
   }
 
   function _initializePricePerFullShare() internal {

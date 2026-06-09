@@ -7,13 +7,28 @@ import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 
 contract PessimisticVeloLpOracleForTest is IPessimisticVeloLpOracle {
+  error PriceUnavailable();
+
   uint256 internal _price;
+  bool internal _revertOnRead;
 
   constructor(uint256 __price) {
     _price = __price;
   }
 
+  function setPrice(uint256 __price) external {
+    _price = __price;
+  }
+
+  function setRevertOnRead(bool __revertOnRead) external {
+    _revertOnRead = __revertOnRead;
+  }
+
   function getCurrentPoolPrice(bool) external view returns (uint256 _currentPoolPrice) {
+    if (_revertOnRead) {
+      revert PriceUnavailable();
+    }
+
     return _price;
   }
 }
@@ -57,6 +72,31 @@ contract Unit_AbstractVeloVaultRelayer is HaiTest {
 
     assertTrue(valid);
     assertEq(result, 2e18);
+  }
+
+  function test_GetResultWithValidity_ReturnsInvalidWhenLpOracleReverts() public {
+    veloLpOracle.setRevertOnRead(true);
+
+    (uint256 result, bool valid) = relayer.getResultWithValidity();
+
+    assertEq(result, 0);
+    assertFalse(valid);
+  }
+
+  function test_Read_RevertsWhenLpOracleReverts() public {
+    veloLpOracle.setRevertOnRead(true);
+
+    vm.expectRevert(PessimisticVeloLpOracleForTest.PriceUnavailable.selector);
+    relayer.read();
+  }
+
+  function test_GetResultWithValidity_ReturnsInvalidWhenLpOraclePriceIsZero() public {
+    veloLpOracle.setPrice(0);
+
+    (uint256 result, bool valid) = relayer.getResultWithValidity();
+
+    assertEq(result, 0);
+    assertFalse(valid);
   }
 
   function test_UpdatePricePerFullShare_AcceptsDecreaseImmediately() public {
