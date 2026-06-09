@@ -113,6 +113,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Maximum scaled reserve or reserve-value root used in stable LP fourth-power math.
   uint256 internal constant STABLE_LP_PRICING_SCALE_LIMIT = 1e27;
 
+  /// @notice Maximum normalized reserve size used when computing stable TWAP derivative ratios.
+  uint256 internal constant STABLE_DERIVATIVE_SCALE_LIMIT = 1e27;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -557,9 +560,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       (uint256 reserveA, uint256 reserveB) =
         tokenInIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
       uint256 normalizedAmountIn = (_amountIn * DECIMALS) / (tokenInIsToken0 ? decimals0 : decimals1);
-      uint256 normalizedAmountOut = FixedPointMathLib.mulDivDown(
-        normalizedAmountIn, _stableDerivative(reserveB, reserveA), _stableDerivative(reserveA, reserveB)
-      );
+      (uint256 derivativeA, uint256 derivativeB) = _getScaledStableDerivativePair(reserveA, reserveB);
+      uint256 normalizedAmountOut = FixedPointMathLib.mulDivDown(normalizedAmountIn, derivativeB, derivativeA);
 
       amountOut = (normalizedAmountOut * (tokenInIsToken0 ? decimals1 : decimals0)) / DECIMALS;
     } else {
@@ -583,8 +585,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
         _getNormalizedReservePair(knownTokenIsToken0, reserve0Average, reserve1Average);
 
       if (stable) {
-        uint256 knownDerivative = _stableDerivative(knownReserve, derivedReserve);
-        uint256 derivedDerivative = _stableDerivative(derivedReserve, knownReserve);
+        (uint256 knownDerivative, uint256 derivedDerivative) =
+          _getScaledStableDerivativePair(knownReserve, derivedReserve);
         twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownDerivative, derivedDerivative);
       } else {
         twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownReserve, derivedReserve);
@@ -721,6 +723,28 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   function _ceilDiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
     if (_x == 0) return 0;
     return ((_x - 1) / _y) + 1;
+  }
+
+  function _getScaledStableDerivativePair(
+    uint256 _reserveA,
+    uint256 _reserveB
+  ) internal pure returns (uint256 derivativeA, uint256 derivativeB) {
+    (uint256 scaledReserveA, uint256 scaledReserveB) = _scaleStableDerivativeReserves(_reserveA, _reserveB);
+
+    derivativeA = _stableDerivative(scaledReserveA, scaledReserveB);
+    derivativeB = _stableDerivative(scaledReserveB, scaledReserveA);
+  }
+
+  function _scaleStableDerivativeReserves(
+    uint256 _reserveA,
+    uint256 _reserveB
+  ) internal pure returns (uint256 scaledReserveA, uint256 scaledReserveB) {
+    uint256 maxReserve = _reserveA > _reserveB ? _reserveA : _reserveB;
+    uint256 scale = _ceilDiv(maxReserve, STABLE_DERIVATIVE_SCALE_LIMIT);
+    if (scale <= 1) return (_reserveA, _reserveB);
+
+    scaledReserveA = _ceilDiv(_reserveA, scale);
+    scaledReserveB = _ceilDiv(_reserveB, scale);
   }
 
   function _getK(uint256 x, uint256 y) internal pure returns (uint256) {

@@ -445,6 +445,18 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertApproxEqAbs(oracle.getTwapPrice(token0, 100e6), expectedToken0ToToken1 * 100, 100);
   }
 
+  function test_StableSingleFeedTwap_DoesNotOverflowForVeryLargeReserveObservations() public {
+    uint256 largeReserve = 50_000_000_000_000e18;
+    _deployOracle(true, largeReserve, largeReserve);
+    _mockSequencerUp();
+
+    assertEq(oracle.getTwapPrice(token0, 1e18), 1e18);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+    assertEq(price0, 200_000_000);
+    assertEq(price1, price0);
+  }
+
   function test_GetTokenPrices_UsesNoSlippageTwapPrice() public {
     _deployOracle(false, 100e18, 200e18);
     _mockSequencerUp();
