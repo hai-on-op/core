@@ -73,6 +73,7 @@ contract Unit_BeefyVeloVaultRelayerFactory_DeployBeefyVeloVaultRelayer is Base {
 
   function _mockValues(string memory _symbol) internal {
     _mockSymbol(_symbol);
+    vm.mockCall(address(mockBeefyVault), abi.encodeCall(mockBeefyVault.getPricePerFullShare, ()), abi.encode(1e18));
   }
 
   function test_Revert_Unauthorized() public {

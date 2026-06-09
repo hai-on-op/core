@@ -5,14 +5,18 @@ import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
-import {Math, WAD} from '@libraries/Math.sol';
 
 /**
  * @title  AbstractVeloVaultRelayer
  * @notice Abstract contract for Velo vault relayers (Beefy, Yearn, etc.)
  */
 abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
-  using Math for uint256;
+  // --- Constants ---
+
+  uint256 internal constant _BPS = 10_000;
+  uint256 public constant PRICE_PER_FULL_SHARE_UPDATE_DELAY = 1 hours;
+  uint256 public constant MAX_PRICE_PER_FULL_SHARE_INCREASE_BPS = 100;
+
   // --- Registry ---
 
   /// @inheritdoc IAbstractVeloVaultRelayer
@@ -25,6 +29,12 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
 
   /// @inheritdoc IBaseOracle
   string public symbol;
+
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  uint256 public acceptedPricePerFullShare;
+
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  uint256 public lastPricePerFullShareUpdateTime;
 
   // --- Init ---
 
@@ -49,35 +59,85 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
   }
 
   /// @inheritdoc IBaseOracle
-  /// @notice This function always returns `_validity` as `true` since there are no conditions where the result would be invalid.
   function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
-    uint256 _totalValue = _getPriceValue();
+    try veloLpOracle.getCurrentPoolPrice(true) returns (uint256 _veloLpPrice) {
+      if (_veloLpPrice == 0) return (0, false);
 
-    return (_totalValue, true);
+      _result = _calculatePriceValue(_veloLpPrice);
+      _validity = _result > 0;
+    } catch {
+      return (0, false);
+    }
   }
   /// @inheritdoc IBaseOracle
 
   function read() external view returns (uint256 _result) {
-    return _getPriceValue();
+    return _getPriceValue(veloLpOracle.getCurrentPoolPrice(true));
   }
 
-  function _getPriceValue() internal view returns (uint256 _combinedPriceValue) {
-    // 1 yvToken or mooToken
-    uint256 _baseTokenBalance = 1_000_000_000_000_000_000;
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  function updatePricePerFullShare() external returns (bool _updated) {
+    return _updatePricePerFullShare();
+  }
 
-    // # of velo LP tokens in 1 yvToken
-    uint256 _veloLpBalance = _baseTokenBalance.wmul(_getPricePerFullShare());
-
-    // price of 1 velo LP token in chainlink price decimals (8)
-    uint256 _veloLpPrice = veloLpOracle.getCurrentPoolPrice(true);
-
-    uint256 _price = (_veloLpBalance * _veloLpPrice) / 1e8;
+  function _getPriceValue(uint256 _veloLpPrice) internal view returns (uint256 _combinedPriceValue) {
+    uint256 _price = _calculatePriceValue(_veloLpPrice);
 
     if (_price == 0) {
       revert AbstractVeloVaultRelayer_ZeroPrice();
     }
 
     return _price;
+  }
+
+  function _calculatePriceValue(uint256 _veloLpPrice) internal view returns (uint256 _price) {
+    // # of velo LP tokens in 1 yvToken
+    uint256 _veloLpBalance = acceptedPricePerFullShare;
+    if (_veloLpPrice != 0 && _veloLpBalance > type(uint256).max / _veloLpPrice) {
+      return 0;
+    }
+
+    _price = (_veloLpBalance * _veloLpPrice) / 1e8;
+  }
+
+  function _initializePricePerFullShare() internal {
+    uint256 _pricePerFullShare = _getPricePerFullShare();
+    if (_pricePerFullShare == 0) {
+      revert AbstractVeloVaultRelayer_InvalidPricePerFullShare();
+    }
+
+    acceptedPricePerFullShare = _pricePerFullShare;
+    lastPricePerFullShareUpdateTime = block.timestamp;
+
+    emit UpdatePricePerFullShare(_pricePerFullShare);
+  }
+
+  function _updatePricePerFullShare() internal returns (bool _updated) {
+    uint256 _pricePerFullShare = _getPricePerFullShare();
+    if (_pricePerFullShare == 0) {
+      revert AbstractVeloVaultRelayer_InvalidPricePerFullShare();
+    }
+
+    uint256 _acceptedPricePerFullShare = acceptedPricePerFullShare;
+
+    if (_pricePerFullShare > _acceptedPricePerFullShare) {
+      if (block.timestamp < lastPricePerFullShareUpdateTime + PRICE_PER_FULL_SHARE_UPDATE_DELAY) {
+        return false;
+      }
+
+      uint256 _maxPricePerFullShare =
+        (_acceptedPricePerFullShare * (_BPS + MAX_PRICE_PER_FULL_SHARE_INCREASE_BPS)) / _BPS;
+      if (_pricePerFullShare > _maxPricePerFullShare) {
+        _pricePerFullShare = _maxPricePerFullShare;
+      }
+    }
+
+    acceptedPricePerFullShare = _pricePerFullShare;
+    lastPricePerFullShareUpdateTime = block.timestamp;
+
+    emit UpdatePricePerFullShare(_pricePerFullShare);
+
+    return true;
   }
 
   /// @notice Virtual function to be implemented by child contracts

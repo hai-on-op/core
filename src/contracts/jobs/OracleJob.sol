@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {IOracleJob} from '@interfaces/jobs/IOracleJob.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
+import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {IDelayedOracle} from '@interfaces/oracles/IDelayedOracle.sol';
 import {IPIDRateSetter} from '@interfaces/IPIDRateSetter.sol';
 
@@ -64,6 +65,12 @@ contract OracleJob is Authorizable, Modifiable, Job, IOracleJob {
     if (!shouldWorkUpdateCollateralPrice) revert NotWorkable();
 
     IDelayedOracle _delayedOracle = IDelayedOracle(address(oracleRelayer.cParams(_cType).oracle));
+    (bool _success, bytes memory _returnData) =
+      address(_delayedOracle).staticcall(abi.encodeCall(IDelayedOracle.priceSource, ()));
+    if (_success && _returnData.length >= 32) {
+      address _priceSource = abi.decode(_returnData, (address));
+      address(_priceSource).call(abi.encodeCall(IAbstractVeloVaultRelayer.updatePricePerFullShare, ()));
+    }
     if (!_delayedOracle.updateResult()) revert OracleJob_InvalidPrice();
 
     oracleRelayer.updateCollateralPrice(_cType);

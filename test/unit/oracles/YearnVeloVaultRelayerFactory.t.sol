@@ -73,6 +73,7 @@ contract Unit_YearnVeloVaultRelayerFactory_DeployYearnVeloVaultRelayer is Base {
 
   function _mockValues(string memory _symbol) internal {
     _mockSymbol(_symbol);
+    vm.mockCall(address(mockYearnVault), abi.encodeCall(mockYearnVault.pricePerShare, ()), abi.encode(1e18));
   }
 
   function test_Revert_Unauthorized() public {
