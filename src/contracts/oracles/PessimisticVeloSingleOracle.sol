@@ -234,6 +234,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error InvalidDerivedPrice();
   error InvalidLpPrice();
   error NoValidPriceUpdates();
+  error PessimisticPriceWindowNotReady();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -469,6 +470,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       }
     }
 
+    _requirePopulatedPessimisticWindow(day);
+
     adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day]);
 
     if (day > 0 && dailyUpdates[day - 1] > 0) {
@@ -563,6 +566,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     if (_candidatePrice == 0) return _currentPrice;
     if (_currentPrice == 0 || _candidatePrice < _currentPrice) return _candidatePrice;
     return _currentPrice;
+  }
+
+  function _requirePopulatedPessimisticWindow(uint256 _day) internal view {
+    if (!useThreeDayLow) return;
+    if (_day < 2 || !_hasValidDailyLow(_day) || !_hasValidDailyLow(_day - 1) || !_hasValidDailyLow(_day - 2)) {
+      revert PessimisticPriceWindowNotReady();
+    }
+  }
+
+  function _hasValidDailyLow(uint256 _day) internal view returns (bool _valid) {
+    _valid = dailyUpdates[_day] > 0 && dailyLow[_day] > 0;
   }
 
   function _getMarginalAmountOut(

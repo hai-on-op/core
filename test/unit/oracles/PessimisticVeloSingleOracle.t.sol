@@ -720,6 +720,36 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
+  function test_GetCurrentPoolPrice_ThreeDayLowRequiresFullWindow() public {
+    vm.warp(10 days);
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.setUseThreeDayLow(true);
+
+    oracle.updatePrice();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.PessimisticPriceWindowNotReady.selector);
+    oracle.getCurrentPoolPrice(true);
+
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(100_000_000, block.timestamp);
+    token1Feed.set(100_000_000, block.timestamp);
+    oracle.updatePrice();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.PessimisticPriceWindowNotReady.selector);
+    oracle.getCurrentPoolPrice(true);
+
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(100_000_000, block.timestamp);
+    token1Feed.set(100_000_000, block.timestamp);
+    oracle.updatePrice();
+
+    assertEq(oracle.getCurrentPoolPrice(true), 200_000_000);
+  }
+
   function test_UpdatePrice_RevertsBeforeRecordingZeroLpPrice() public {
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
     _mockSequencerUp();
