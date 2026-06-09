@@ -116,6 +116,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Maximum normalized reserve size used when computing stable TWAP derivative ratios.
   uint256 internal constant STABLE_DERIVATIVE_SCALE_LIMIT = 1e27;
 
+  /// @notice Maximum normalized reserve size used before volatile geometric-mean scaling.
+  uint256 internal constant VOLATILE_GEOMEAN_SCALE_LIMIT = 1e27;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -512,8 +515,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     (uint256 reserve0, uint256 reserve1,) = poolContract.getReserves();
 
     // make sure our reserves are normalized to 18 decimals (looking at you, USDC)
-    reserve0 = (reserve0 * DECIMALS) / decimals0;
-    reserve1 = (reserve1 * DECIMALS) / decimals1;
+    reserve0 = _normalizeReserve(reserve0, decimals0);
+    reserve1 = _normalizeReserve(reserve1, decimals1);
 
     // pull our prices
     (uint256 price0, uint256 price1) = getTokenPrices();
@@ -523,12 +526,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       fairReservesPricing =
         _calculate_stable_lp_token_price(poolContract.totalSupply(), price0, price1, reserve0, reserve1, 8);
     } else {
-      uint256 k = FixedPointMathLib.sqrt(reserve0 * reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
+      uint256 k = _getVolatileGeometricMean(reserve0, reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
       uint256 p = FixedPointMathLib.sqrt(price0 * 1e16 * price1); // boost this to 1e16 to give us more precision
 
       // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
       uint256 totalSupply = poolContract.totalSupply();
-      fairReservesPricing = (2 * p * k) / (1e8 * totalSupply);
+      fairReservesPricing = FixedPointMathLib.mulDivDownFullPrecision(2 * p, k, totalSupply) / 1e8;
       fairReservesPricing =
         _capVolatileSingleFeedPrice(fairReservesPricing, totalSupply, reserve0, reserve1, price0, price1);
     }
@@ -568,6 +571,24 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     return _currentPrice;
   }
 
+  function _normalizeReserve(uint256 _reserve, uint256 _decimals) internal pure returns (uint256 _normalizedReserve) {
+    _normalizedReserve = FixedPointMathLib.mulDivDownFullPrecision(_reserve, DECIMALS, _decimals);
+  }
+
+  function _getVolatileGeometricMean(uint256 _reserve0, uint256 _reserve1) internal pure returns (uint256 _k) {
+    if (_reserve0 == 0 || _reserve1 == 0) return 0;
+
+    uint256 maxReserve = _reserve0 > _reserve1 ? _reserve0 : _reserve1;
+    uint256 scale = _ceilDiv(maxReserve, VOLATILE_GEOMEAN_SCALE_LIMIT);
+    if (scale <= 1) return FixedPointMathLib.sqrt(_reserve0 * _reserve1);
+
+    uint256 scaledReserve0 = _reserve0 / scale;
+    uint256 scaledReserve1 = _reserve1 / scale;
+    if (scaledReserve0 == 0 || scaledReserve1 == 0) return 0;
+
+    _k = FixedPointMathLib.sqrt(scaledReserve0 * scaledReserve1) * scale;
+  }
+
   function _requirePopulatedPessimisticWindow(uint256 _day) internal view {
     if (!useThreeDayLow) return;
     if (_day < 2 || !_hasValidDailyLow(_day) || !_hasValidDailyLow(_day - 1) || !_hasValidDailyLow(_day - 2)) {
@@ -588,15 +609,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     bool tokenInIsToken0 = _token == token0;
 
     if (stable) {
-      uint256 normalizedReserve0 = (_reserve0 * DECIMALS) / decimals0;
-      uint256 normalizedReserve1 = (_reserve1 * DECIMALS) / decimals1;
+      uint256 normalizedReserve0 = _normalizeReserve(_reserve0, decimals0);
+      uint256 normalizedReserve1 = _normalizeReserve(_reserve1, decimals1);
       (uint256 reserveA, uint256 reserveB) =
         tokenInIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
-      uint256 normalizedAmountIn = (_amountIn * DECIMALS) / (tokenInIsToken0 ? decimals0 : decimals1);
+      uint256 normalizedAmountIn = _normalizeReserve(_amountIn, tokenInIsToken0 ? decimals0 : decimals1);
       (uint256 derivativeA, uint256 derivativeB) = _getScaledStableDerivativePair(reserveA, reserveB);
       uint256 normalizedAmountOut = FixedPointMathLib.mulDivDown(normalizedAmountIn, derivativeB, derivativeA);
 
-      amountOut = (normalizedAmountOut * (tokenInIsToken0 ? decimals1 : decimals0)) / DECIMALS;
+      amountOut = FixedPointMathLib.mulDivDownFullPrecision(
+        normalizedAmountOut, tokenInIsToken0 ? decimals1 : decimals0, DECIMALS
+      );
     } else {
       (uint256 reserveA, uint256 reserveB) = tokenInIsToken0 ? (_reserve0, _reserve1) : (_reserve1, _reserve0);
       amountOut = FixedPointMathLib.mulDivDown(_amountIn, reserveB, reserveA);
@@ -638,8 +661,8 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 _reserve0,
     uint256 _reserve1
   ) internal view returns (uint256 knownReserve, uint256 derivedReserve) {
-    uint256 normalizedReserve0 = (_reserve0 * DECIMALS) / decimals0;
-    uint256 normalizedReserve1 = (_reserve1 * DECIMALS) / decimals1;
+    uint256 normalizedReserve0 = _normalizeReserve(_reserve0, decimals0);
+    uint256 normalizedReserve1 = _normalizeReserve(_reserve1, decimals1);
     (knownReserve, derivedReserve) =
       _knownTokenIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
   }
