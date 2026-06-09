@@ -231,6 +231,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error NoPostSequencerRecoveryPriceUpdate();
   error PessimisticPriceAgeTooShort();
   error PessimisticPriceStale();
+  error InvalidDerivedPrice();
+  error InvalidLpPrice();
+  error NoValidPriceUpdates();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -389,11 +392,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       } else {
         // derive token1's price by averaging each sampled token1/token0 price
         price1 = _getTwapDerivedTokenPrice(token0, price0);
+        if (price1 == 0) {
+          revert InvalidDerivedPrice();
+        }
       }
     } else if (token1Feed != address(0)) {
       price1 = getChainlinkPrice(1); // returned with 8 decimals
       // derive token0's price by averaging each sampled token0/token1 price
       price0 = _getTwapDerivedTokenPrice(token1, price1);
+      if (price0 == 0) {
+        revert InvalidDerivedPrice();
+      }
     }
   }
 
@@ -414,6 +423,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   function _updatePrice() internal {
     // get current fair reserves pricing
     uint256 currentPrice = _getFairReservesPricing(pool);
+    if (currentPrice == 0) {
+      revert InvalidLpPrice();
+    }
 
     // increment our counter whether we store the price or not
     uint256 day = currentDay();
@@ -448,26 +460,27 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
     // if we haven't updated yet today, pretend it's yesterday instead
     if (dailyUpdates[day] == 0) {
+      if (day == 0) {
+        revert NoRecentPriceUpdates();
+      }
       day -= 1;
       if (dailyUpdates[day] == 0) {
         revert NoRecentPriceUpdates();
       }
     }
 
-    // get today's low
-    uint256 todaysLow = dailyLow[day];
+    adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day]);
 
-    // get yesterday's low
-    uint256 yesterdaysLow = dailyLow[day - 1];
+    if (day > 0 && dailyUpdates[day - 1] > 0) {
+      adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day - 1]);
+    }
 
-    // calculate price based on two-day low
-    adjustedPrice = dailyUpdates[day - 1] > 0 && todaysLow > yesterdaysLow ? yesterdaysLow : todaysLow;
+    if (useThreeDayLow && day > 1 && dailyUpdates[day - 2] > 0) {
+      adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day - 2]);
+    }
 
-    // if using three-day low, compare again
-    if (useThreeDayLow) {
-      uint256 dayBeforeYesterdaysLow = dailyLow[day - 2];
-      adjustedPrice =
-        dailyUpdates[day - 2] > 0 && adjustedPrice > dayBeforeYesterdaysLow ? dayBeforeYesterdaysLow : adjustedPrice;
+    if (adjustedPrice == 0) {
+      revert NoValidPriceUpdates();
     }
   }
 
@@ -544,6 +557,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     if (priceDeviation > maxStablePriceDeviation) {
       revert StablePriceDeviation();
     }
+  }
+
+  function _minNonZeroPrice(uint256 _currentPrice, uint256 _candidatePrice) internal pure returns (uint256 _price) {
+    if (_candidatePrice == 0) return _currentPrice;
+    if (_currentPrice == 0 || _candidatePrice < _currentPrice) return _candidatePrice;
+    return _currentPrice;
   }
 
   function _getMarginalAmountOut(

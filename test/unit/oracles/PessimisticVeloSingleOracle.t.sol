@@ -373,6 +373,10 @@ abstract contract PessimisticVeloSingleOracleTest is HaiTest {
   function _stableDerivative(uint256 x0, uint256 y) internal pure returns (uint256 derivative) {
     derivative = 3 * ((x0 * ((y * y) / 1e18)) / 1e18) + ((((x0 * x0) / 1e18) * x0) / 1e18);
   }
+
+  function _mappingSlot(uint256 _key, uint256 _slot) internal pure returns (bytes32 _storageSlot) {
+    _storageSlot = keccak256(abi.encode(_key, _slot));
+  }
 }
 
 contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleOracleTest {
@@ -491,6 +495,14 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(tinyRawQuote, 1);
     assertEq(price1, 600_000e8);
     assertEq((uint256(100_000_000) * 1e8) / (tinyRawQuote * 100), 1_000_000e8);
+  }
+
+  function test_GetTokenPrices_RevertsWhenDerivedTokenPriceRoundsToZero() public {
+    _deployOracle(false, 1e18, 1_000_000_000e18);
+    _mockSequencerUp();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.InvalidDerivedPrice.selector);
+    oracle.getTokenPrices();
   }
 
   function test_GetTokenPrices_AveragesDerivedTokenPricePerSample() public {
@@ -681,35 +693,38 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
-  function test_UpdatePrice_DoesNotOverwriteSameDayZeroLowWithPositivePrice() public {
+  function test_UpdatePrice_RevertsBeforeRecordingZeroLpPrice() public {
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
     _mockSequencerUp();
     oracle.setOperator(address(this), true);
 
     pool.setReserves(0, 1e18);
+    vm.expectRevert(PessimisticVeloSingleOracle.InvalidLpPrice.selector);
     oracle.updatePrice();
     uint256 day = oracle.currentDay();
 
-    assertEq(oracle.dailyUpdates(day), 1);
+    assertEq(oracle.dailyUpdates(day), 0);
     assertEq(oracle.dailyLow(day), 0);
-    assertEq(oracle.getCurrentPoolPrice(true), 0);
 
     pool.setReserves(1e18, 1e18);
     oracle.updatePrice();
 
-    assertEq(oracle.dailyUpdates(day), 2);
-    assertEq(oracle.dailyLow(day), 0);
-    assertEq(oracle.getCurrentPoolPrice(true), 0);
+    assertEq(oracle.dailyUpdates(day), 1);
+    assertEq(oracle.dailyLow(day), 200_000_000);
+    assertEq(oracle.getCurrentPoolPrice(true), 200_000_000);
   }
 
-  function test_GetCurrentPoolPrice_PessimisticIncludesYesterdayZeroLow() public {
+  function test_GetCurrentPoolPrice_PessimisticIgnoresLegacyZeroLow() public {
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
     _mockSequencerUp();
     oracle.setOperator(address(this), true);
 
-    pool.setReserves(0, 1e18);
-    oracle.updatePrice();
     uint256 yesterday = oracle.currentDay();
+    vm.store(address(oracle), _mappingSlot(yesterday, 3), bytes32(uint256(1)));
+    vm.store(address(oracle), bytes32(uint256(4)), bytes32(block.timestamp));
+
+    vm.expectRevert(PessimisticVeloSingleOracle.NoValidPriceUpdates.selector);
+    oracle.getCurrentPoolPrice(true);
 
     vm.warp(block.timestamp + 1 days);
     _mockSequencerUp();
@@ -722,7 +737,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(today, yesterday + 1);
     assertEq(oracle.dailyLow(yesterday), 0);
     assertGt(oracle.dailyLow(today), 0);
-    assertEq(oracle.getCurrentPoolPrice(true), 0);
+    assertEq(oracle.getCurrentPoolPrice(true), oracle.dailyLow(today));
   }
 
   function test_GetCurrentVaultPriceV3_UsesVaultShareDecimals() public {
