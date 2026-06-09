@@ -265,6 +265,33 @@ contract Erc4626VaultForTest {
   function convertToAssets(uint256 _shares) external view returns (uint256 _assets) {
     return (_shares * assetsPerShare) / (10 ** decimals);
   }
+
+  function previewRedeem(uint256 _shares) external view returns (uint256 _assets) {
+    return (_shares * assetsPerShare) / (10 ** decimals);
+  }
+}
+
+contract FeeChargingErc4626VaultForTest {
+  address public immutable asset;
+  uint8 public immutable decimals;
+  uint256 public immutable assetsPerShare;
+  uint256 public immutable redeemFeeBps;
+
+  constructor(address _asset, uint8 _decimals, uint256 _assetsPerShare, uint256 _redeemFeeBps) {
+    asset = _asset;
+    decimals = _decimals;
+    assetsPerShare = _assetsPerShare;
+    redeemFeeBps = _redeemFeeBps;
+  }
+
+  function convertToAssets(uint256 _shares) external view returns (uint256 _assets) {
+    return (_shares * assetsPerShare) / (10 ** decimals);
+  }
+
+  function previewRedeem(uint256 _shares) external view returns (uint256 _assets) {
+    uint256 grossAssets = (_shares * assetsPerShare) / (10 ** decimals);
+    return (grossAssets * (10_000 - redeemFeeBps)) / 10_000;
+  }
 }
 
 contract YearnV2VaultForTest {
@@ -748,6 +775,18 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     uint256 poolPrice = oracle.getCurrentPoolPrice(false);
 
     assertEq(oracle.getCurrentVaultPriceV3(address(vault), false), poolPrice);
+  }
+
+  function test_GetCurrentVaultPriceV3_UsesPreviewRedeemNetOfFees() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+
+    FeeChargingErc4626VaultForTest vault = new FeeChargingErc4626VaultForTest(address(pool), 18, 1e18, 1000);
+    uint256 poolPrice = oracle.getCurrentPoolPrice(false);
+
+    assertEq(vault.convertToAssets(1e18), 1e18);
+    assertEq(vault.previewRedeem(1e18), 0.9e18);
+    assertEq(oracle.getCurrentVaultPriceV3(address(vault), false), (poolPrice * 90) / 100);
   }
 
   function test_GetCurrentVaultPriceV2_UsesVaultShareDecimals() public {

@@ -276,7 +276,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert WrongVaultForPool();
     }
 
-    uint256 assetsPerShare = vault.convertToAssets(10 ** vault.decimals());
+    uint256 assetsPerShare = vault.previewRedeem(10 ** vault.decimals());
 
     if (_usePessimisticPricing) {
       return (_getAdjustedPrice(_pool) * assetsPerShare) / DECIMALS;
