@@ -114,11 +114,16 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
 
   function _updatePricePerFullShare() internal returns (bool _updated) {
     uint256 _pricePerFullShare = _getPricePerFullShare();
-    if (_pricePerFullShare == 0) {
-      revert AbstractVeloVaultRelayer_InvalidPricePerFullShare();
-    }
-
     uint256 _acceptedPricePerFullShare = acceptedPricePerFullShare;
+
+    if (_pricePerFullShare == 0) {
+      acceptedPricePerFullShare = 0;
+      lastPricePerFullShareUpdateTime = block.timestamp;
+
+      emit UpdatePricePerFullShare(0);
+
+      return true;
+    }
 
     if (_pricePerFullShare > _acceptedPricePerFullShare) {
       if (block.timestamp < lastPricePerFullShareUpdateTime + PRICE_PER_FULL_SHARE_UPDATE_DELAY) {

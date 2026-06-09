@@ -4,6 +4,7 @@ pragma solidity 0.8.20;
 import {AbstractVeloVaultRelayer} from '@contracts/oracles/AbstractVeloVaultRelayer.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
+import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 
 contract PessimisticVeloLpOracleForTest is IPessimisticVeloLpOracle {
@@ -110,6 +111,24 @@ contract Unit_AbstractVeloVaultRelayer is HaiTest {
 
     (uint256 result,) = relayer.getResultWithValidity();
     assertEq(result, 1e18);
+  }
+
+  function test_UpdatePricePerFullShare_AcceptsZeroAsInvalidatingDecrease() public {
+    relayer.setPricePerFullShare(0);
+
+    bool updated = relayer.updatePricePerFullShare();
+
+    assertTrue(updated);
+    assertEq(relayer.acceptedPricePerFullShare(), 0);
+    assertEq(relayer.lastPricePerFullShareUpdateTime(), block.timestamp);
+
+    (uint256 result, bool valid) = relayer.getResultWithValidity();
+
+    assertEq(result, 0);
+    assertFalse(valid);
+
+    vm.expectRevert(IAbstractVeloVaultRelayer.AbstractVeloVaultRelayer_ZeroPrice.selector);
+    relayer.read();
   }
 
   function test_UpdatePricePerFullShare_DoesNotAcceptIncreaseBeforeDelay() public {
