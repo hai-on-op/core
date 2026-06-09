@@ -762,4 +762,11 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(oracle.getCurrentPoolPrice(false), 1e8);
   }
+
+  function test_StableLpPrice_DoesNotRoundToZeroForSubMillidollarAssets() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 50_000, 50_000);
+    _mockSequencerUp();
+
+    assertEq(oracle.getCurrentPoolPrice(false), 100_000);
+  }
 }

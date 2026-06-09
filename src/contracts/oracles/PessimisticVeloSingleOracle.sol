@@ -647,33 +647,59 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // fair_reserves = ( (k * (price0 ** 3) * (price1 ** 3)) )^(1/4) / ((price0 ** 2) + (price1 ** 2));
     price0 *= 1e18 / (10 ** priceDecimals); // convert to 18 dec
     price1 *= 1e18 / (10 ** priceDecimals);
+    uint256 stablePriceScale = _getStablePriceScale(price0, price1);
+    price0 *= stablePriceScale;
+    price1 *= stablePriceScale;
+
     uint256 stablePricingScale = _getStablePricingScale(reserve0, reserve1, price0, price1);
     reserve0 /= stablePricingScale;
     reserve1 /= stablePricingScale;
 
-    uint256 k = _getK(reserve0, reserve1);
-    uint256 a = FixedPointMathLib.rpow(price0, 3, 1e18); // keep same decimals as chainlink
-    uint256 b = FixedPointMathLib.rpow(price1, 3, 1e18);
-    uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
-    uint256 d = FixedPointMathLib.rpow(price1, 2, 1e18);
+    uint256 frth_fair;
+    {
+      uint256 k = _getK(reserve0, reserve1);
+      uint256 a = FixedPointMathLib.rpow(price0, 3, 1e18); // keep same decimals as chainlink
+      uint256 b = FixedPointMathLib.rpow(price1, 3, 1e18);
+      uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
+      uint256 d = FixedPointMathLib.rpow(price1, 2, 1e18);
 
-    uint256 fair = FixedPointMathLib.mulDivDownFullPrecision(k, FixedPointMathLib.mulWadDown(a, b), c + d);
+      uint256 fair = _getStableFair(k, a, b, c + d);
 
-    // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
-    uint256 frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18
+      // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
+      frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18
+    }
 
-    return _scaleStableLpTokenPrice(total_supply, frth_fair, stablePricingScale, priceDecimals);
+    return _scaleStableLpTokenPrice(total_supply, frth_fair, stablePricingScale, stablePriceScale, priceDecimals);
   }
 
   function _scaleStableLpTokenPrice(
     uint256 _totalSupply,
     uint256 _frthFair,
     uint256 _stablePricingScale,
+    uint256 _stablePriceScale,
     uint256 _priceDecimals
   ) internal pure returns (uint256 _price) {
-    _price = FixedPointMathLib.mulDivDownFullPrecision(
-      2 * _frthFair, _stablePricingScale * (10 ** _priceDecimals), _totalSupply
-    ); // converts to chainlink decimals
+    uint256 fairReserve =
+      FixedPointMathLib.mulDivDownFullPrecision(2 * _frthFair, _stablePricingScale, _stablePriceScale);
+
+    _price = FixedPointMathLib.mulDivDownFullPrecision(fairReserve, 10 ** _priceDecimals, _totalSupply);
+  }
+
+  function _getStableFair(
+    uint256 _k,
+    uint256 _a,
+    uint256 _b,
+    uint256 _denominator
+  ) internal pure returns (uint256 _fair) {
+    uint256 kTimesA = FixedPointMathLib.mulDivDownFullPrecision(_k, _a, _denominator);
+    _fair = FixedPointMathLib.mulDivDownFullPrecision(kTimesA, _b, DECIMALS);
+  }
+
+  function _getStablePriceScale(uint256 _price0, uint256 _price1) internal pure returns (uint256 _stablePriceScale) {
+    uint256 maxPrice = _price0 > _price1 ? _price0 : _price1;
+    if (maxPrice >= DECIMALS) return 1;
+
+    _stablePriceScale = _ceilDiv(DECIMALS, maxPrice);
   }
 
   function _getStablePricingScale(
