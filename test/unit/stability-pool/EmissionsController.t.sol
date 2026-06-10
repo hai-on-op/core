@@ -168,6 +168,14 @@ contract Unit_EmissionsController_UpdateSplit is Base {
     vm.expectRevert(IEmissionsController.EmissionsController_InvalidRedemptionPrice.selector);
     emissionsController.updateRewardSplit();
   }
+
+  function test_Revert_InvalidMarketPrice() public {
+    vm.warp(block.timestamp + HOUR + 1);
+
+    mockOracleRelayer.setPrices(1e27, 0);
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidMarketPrice.selector);
+    emissionsController.updateRewardSplit();
+  }
 }
 
 abstract contract Base_EmissionsControllerCore is HaiTest {
@@ -290,6 +298,22 @@ abstract contract Base_EmissionsControllerEdgeCases is HaiTest {
 }
 
 contract Unit_EmissionsController_ConstructorReverts is HaiTest {
+  function test_Revert_Constructor_InvalidKiteToken() public {
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidKiteToken.selector);
+    new EmissionsController(
+      ERC20ForTest(address(0)), IOracleRelayer(address(_oracle)), address(this), YEAR * 100 * WAD, YEAR, 0.1e18
+    );
+  }
+
+  function test_Revert_Constructor_InvalidOracleRelayer() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+
+    vm.expectRevert(IEmissionsController.EmissionsController_InvalidOracleRelayer.selector);
+    new EmissionsController(_kite, IOracleRelayer(address(0)), address(this), YEAR * 100 * WAD, YEAR, 0.1e18);
+  }
+
   function test_Revert_Constructor_InvalidStabilityReceiver() public {
     ERC20ForTest _kite = new ERC20ForTest();
     MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
@@ -335,20 +359,49 @@ contract Unit_EmissionsController_CustomDuration is HaiTest {
     assertEq(_controller.currentStabilityPoolRate(), (_expectedRate * 50) / 100);
     assertEq(_controller.currentMintingRate(), (_expectedRate * 50) / 100);
   }
+
+  function test_Constructor_CarriesRateDivisionRemainder() public {
+    uint256 _totalKite = 10e18 + 9;
+    uint256 _duration = 10;
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, _totalKite, _duration, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), _totalKite / _duration);
+    assertEq(_controller.undistributedKiteAmount(), _totalKite % _duration);
+  }
+
+  function test_Constructor_SplitRatesAddUpToBaseRate() public {
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, 101, 1, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), 101);
+    assertEq(_controller.currentStabilityPoolRate(), 50);
+    assertEq(_controller.currentMintingRate(), 51);
+    assertEq(_controller.currentStabilityPoolRate() + _controller.currentMintingRate(), _controller.baseEmissionRate());
+  }
 }
 
 contract Unit_EmissionsController_UpdateSplitLinear is Base_EmissionsControllerEdgeCases {
   function test_UpdateSplit_LinearBranch_UpdatesRatesAndTimestamps() public {
     vm.warp(block.timestamp + HOUR + 1);
-    oracle.setPrices(1e27, 95e25); // +5% deviation => 75/25 split for 10% limit
+    oracle.setPrices(1e27, 95e25); // +5.26% deviation vs market price => 76/24 split for 10% limit
 
     emissionsController.updateRewardSplit();
 
     uint256 _totalRate = TOTAL_KITE / YEAR;
-    assertEq(emissionsController.stabilityPoolSplit(), 75);
-    assertEq(emissionsController.mintingSplit(), 25);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_totalRate * 75) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_totalRate * 25) / 100);
+    assertEq(emissionsController.stabilityPoolSplit(), 76);
+    assertEq(emissionsController.mintingSplit(), 24);
+    uint256 _expectedStabilityRate = (_totalRate * 76) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _totalRate - _expectedStabilityRate);
     assertEq(emissionsController.currentRateStartTime(), block.timestamp);
     assertEq(emissionsController.lastSplitUpdateTime(), block.timestamp);
   }
@@ -436,8 +489,9 @@ contract Unit_EmissionsController_Extension is Base_EmissionsControllerEdgeCases
 
     assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
     assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+    uint256 _expectedStabilityRate = (_expectedBaseRate * 50) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _expectedBaseRate - _expectedStabilityRate);
     assertEq(emissionsController.currentRateStartTime(), _now);
   }
 
@@ -461,8 +515,34 @@ contract Unit_EmissionsController_Extension is Base_EmissionsControllerEdgeCases
     assertEq(emissionsController.emissionEndTime(), _expectedEndTime);
     assertEq(emissionsController.baseEmissionRate(), _expectedBaseRate);
     assertEq(emissionsController.lastCheckpointTime(), _now);
-    assertEq(emissionsController.currentStabilityPoolRate(), (_expectedBaseRate * 50) / 100);
-    assertEq(emissionsController.currentMintingRate(), (_expectedBaseRate * 50) / 100);
+    uint256 _expectedStabilityRate = (_expectedBaseRate * 50) / 100;
+    assertEq(emissionsController.currentStabilityPoolRate(), _expectedStabilityRate);
+    assertEq(emissionsController.currentMintingRate(), _expectedBaseRate - _expectedStabilityRate);
+  }
+
+  function test_ExtendEmissions_CarriesUndistributedRemainderIntoNewRate() public {
+    uint256 _totalKite = 10e18 + 9;
+    uint256 _duration = 10;
+    ERC20ForTest _kite = new ERC20ForTest();
+    MockOracleRelayerForTest _oracle = new MockOracleRelayerForTest();
+
+    vm.prank(deployer);
+    EmissionsController _controller =
+      new EmissionsController(_kite, IOracleRelayer(address(_oracle)), receiver, _totalKite, _duration, 0.1e18);
+
+    assertEq(_controller.baseEmissionRate(), 1e18);
+    assertEq(_controller.undistributedKiteAmount(), 9);
+
+    uint256 _additionalDuration = 1;
+    uint256 _expectedRemainingAmount =
+      _controller.baseEmissionRate() * _duration + _controller.undistributedKiteAmount();
+    uint256 _expectedRemainingDuration = _duration + _additionalDuration;
+
+    vm.prank(deployer);
+    _controller.extendEmissions(0, _additionalDuration);
+
+    assertEq(_controller.baseEmissionRate(), _expectedRemainingAmount / _expectedRemainingDuration);
+    assertEq(_controller.undistributedKiteAmount(), _expectedRemainingAmount % _expectedRemainingDuration);
   }
 }
 

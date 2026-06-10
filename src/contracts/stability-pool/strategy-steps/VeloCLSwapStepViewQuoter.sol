@@ -2,13 +2,16 @@
 pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
 import {IVeloCLRouter} from '@interfaces/external/IStrategyStepExternal.sol';
 import {IVeloCLPoolLike} from '@interfaces/external/IVeloCLPoolLike.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 import {LiquidityMath} from '@libraries/LiquidityMath.sol';
+import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 import {BitMath} from '@uniswap/v3-core/contracts/libraries/BitMath.sol';
 import {SwapMath} from '@uniswap/v3-core/contracts/libraries/SwapMath.sol';
 import {TickMath} from '@uniswap/v3-core/contracts/libraries/TickMath.sol';
@@ -30,6 +33,10 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
   error VeloCLSwapStepViewQuoter_InvalidSqrtPriceLimitX96();
   error VeloCLSwapStepViewQuoter_QuoteLoopExceeded();
   error VeloCLSwapStepViewQuoter_InvalidMaxQuoteSteps();
+  error VeloCLSwapStepViewQuoter_InvalidOracle();
+  error VeloCLSwapStepViewQuoter_InvalidOraclePrice();
+  error VeloCLSwapStepViewQuoter_InvalidOracleTolerance();
+  error VeloCLSwapStepViewQuoter_OracleFloorNotMet();
 
   // --- Data ---
 
@@ -41,6 +48,10 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     int24 tickSpacing;
     uint160 sqrtPriceLimitX96;
     uint256 deadlineBuffer;
+    bool useOracleFloor;
+    address tokenInOracle;
+    address tokenOutOracle;
+    uint16 oracleToleranceBps;
   }
 
   struct QuoteState {
@@ -66,6 +77,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
   // --- Constants ---
 
   bytes32 internal constant _STEP_TYPE = bytes32('VELO_CL_SWAP');
+  uint256 internal constant _BPS = 10_000;
   uint256 public immutable maxQuoteSteps;
 
   constructor(uint256 _maxQuoteSteps) {
@@ -109,8 +121,11 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     _amountsOut = new uint256[](1);
     if (_amountIn == 0) return _amountsOut;
 
-    IERC20(_decoded.tokenIn).forceApprove(_decoded.router, _amountIn);
     uint256 _minOut = _minOuts.length > 0 ? _minOuts[0] : 0;
+    uint256 _oracleFloor = _oracleMinOut(_decoded, _amountIn);
+    if (_oracleFloor > _minOut) _minOut = _oracleFloor;
+
+    IERC20(_decoded.tokenIn).forceApprove(_decoded.router, _amountIn);
     IVeloCLRouter.ExactInputSingleParams memory _params = IVeloCLRouter.ExactInputSingleParams({
       tokenIn: _decoded.tokenIn,
       tokenOut: _decoded.tokenOut,
@@ -122,6 +137,7 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
       sqrtPriceLimitX96: _decoded.sqrtPriceLimitX96
     });
     _amountsOut[0] = IVeloCLRouter(_decoded.router).exactInputSingle(_params);
+    IERC20(_decoded.tokenIn).forceApprove(_decoded.router, 0);
   }
 
   // --- Internal Methods ---
@@ -143,6 +159,28 @@ contract VeloCLSwapStepViewQuoter is IStrategyStep {
     _amountsOut[0] = _quoteExactInputSingleView(
       _decoded.pool, _zeroForOne, _decoded.tickSpacing, _feePips, _amountIn, _decoded.sqrtPriceLimitX96
     );
+    if (_amountsOut[0] < _oracleMinOut(_decoded, _amountIn)) revert VeloCLSwapStepViewQuoter_OracleFloorNotMet();
+  }
+
+  function _oracleMinOut(Data memory _decoded, uint256 _amountIn) internal view returns (uint256 _minOut) {
+    if (!_decoded.useOracleFloor) return 0;
+
+    if (_decoded.tokenInOracle == address(0) || _decoded.tokenOutOracle == address(0)) {
+      revert VeloCLSwapStepViewQuoter_InvalidOracle();
+    }
+    if (_decoded.oracleToleranceBps > _BPS) revert VeloCLSwapStepViewQuoter_InvalidOracleTolerance();
+
+    (uint256 _tokenInPrice, bool _validTokenInPrice) = IBaseOracle(_decoded.tokenInOracle).getResultWithValidity();
+    (uint256 _tokenOutPrice, bool _validTokenOutPrice) = IBaseOracle(_decoded.tokenOutOracle).getResultWithValidity();
+    if (!_validTokenInPrice || !_validTokenOutPrice || _tokenInPrice == 0 || _tokenOutPrice == 0) {
+      revert VeloCLSwapStepViewQuoter_InvalidOraclePrice();
+    }
+
+    uint256 _tokenInUnit = 10 ** IERC20Metadata(_decoded.tokenIn).decimals();
+    uint256 _tokenOutUnit = 10 ** IERC20Metadata(_decoded.tokenOut).decimals();
+    uint256 _valueWad = FixedPointMathLib.mulDivDown(_amountIn, _tokenInPrice, _tokenInUnit);
+    uint256 _fairOut = FixedPointMathLib.mulDivDown(_valueWad, _tokenOutUnit, _tokenOutPrice);
+    _minOut = FixedPointMathLib.mulDivDown(_fairOut, _BPS - _decoded.oracleToleranceBps, _BPS);
   }
 
   /**

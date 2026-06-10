@@ -16,7 +16,11 @@ import {ITaxCollector} from '@interfaces/ITaxCollector.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {ICollateralJoin} from '@interfaces/utils/ICollateralJoin.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
 import {IWeth} from '@interfaces/external/IWeth.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -35,6 +39,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   uint256 internal constant DEVIATION_LIMIT = 0.1e18;
   uint256 internal constant EMISSIONS_DURATION = 365 days;
   uint256 internal constant POOL_HAI_DEPOSIT = 50_000e18;
+  uint256 internal constant DEAD_SHARES_SEED = 1000e18;
 
   bytes32 internal constant WETH_CTYPE = bytes32('WETH');
   bytes32 internal constant RETH_CTYPE = bytes32('RETH');
@@ -50,6 +55,7 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   address internal constant RETH = 0x9Bcef72be871e61ED4fBbc7630889beE758eb81D;
   address internal constant WA_OPT_WETH = 0x464b808c2C7E04b07e860fDF7a91870620246148;
   address internal constant ALETH = 0x3E29D3A9316dAB217754d13b28646B76607c5f04;
+  address internal constant OP = 0x4200000000000000000000000000000000000042;
   address internal constant LUSD = 0xc40F949F8a4e094D1b49a23ea9241D289B7b2819;
 
   address internal constant VELO_CL_ROUTER = 0x0792a633F0c19c351081CF4B211F68F79bCc9676;
@@ -63,6 +69,12 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   address internal constant ALETH_WETH_VELO_POOL = 0xa1055762336F92b4B8d2eDC032A0Ce45ead6280a;
   address internal constant BOLD_LUSD_VELO_BEEFY_VAULT = 0xC06C0A19d0A3eD7B3BA9D7c3101B6BC9634b84a9;
   address internal constant ALETH_WETH_YEARN_VAULT = 0xf7D66b41Cd4241eae450fd9D2d6995754634D9f3;
+
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant BALANCER_ORACLE_TOLERANCE_BPS = 200;
+  uint16 internal constant CURVE_ORACLE_TOLERANCE_BPS = 200;
 
   uint256 internal constant SAFE_WETH_COLLATERAL_WEI = 3e18;
   uint256 internal constant SAFE_RETH_COLLATERAL_WEI = 3e18;
@@ -94,6 +106,8 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
   BeefyVaultWithdrawalStep internal beefyStep;
   YearnVaultWithdrawalStep internal yearnStep;
   CurveSwapStep internal curveStep;
+  DenominatedOracle internal boldUsdOracle;
+  ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
     vm.createSelectFork(vm.rpcUrl('mainnet'), FORK_BLOCK);
@@ -124,6 +138,9 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     beefyStep = new BeefyVaultWithdrawalStep();
     yearnStep = new YearnVaultWithdrawalStep();
     curveStep = new CurveSwapStep();
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_BOLD_HAI_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
+    waOptWethUsdOracle = new ERC4626ShareOracle(IERC4626(WA_OPT_WETH), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
 
     stabilityPool.setStepWhitelist(address(balancerV3Step), true);
     stabilityPool.setStepWhitelist(address(erc4626Step), true);
@@ -146,10 +163,16 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
 
     // Ensure OP has a non-empty strategy to hit collateral-type mismatch branch.
     vm.prank(testDeployer);
-    stabilityPool.setStrategySteps(OP_CTYPE, _wethPipeline());
+    stabilityPool.setStrategySteps(OP_CTYPE, _opToHaiPipeline());
 
     deal(address(protocolToken), address(emissionsController), TOTAL_KITE);
+    deal(address(systemCoin), testDeployer, DEAD_SHARES_SEED);
     deal(address(systemCoin), depositor, POOL_HAI_DEPOSIT);
+
+    vm.startPrank(testDeployer);
+    systemCoin.approve(address(stabilityPool), DEAD_SHARES_SEED);
+    stabilityPool.seedDeadShares(DEAD_SHARES_SEED);
+    vm.stopPrank();
 
     vm.startPrank(depositor);
     systemCoin.approve(address(stabilityPool), type(uint256).max);
@@ -404,7 +427,10 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     bytes4 _selectorWithOverride = _getCoverAndRepayDebtRevertSelector(
       _auctionHouseWithOverride, _auctionIdWithOverride, _bidWithOverride, YV_VELO_ALETH_WETH_CTYPE
     );
-    assertEq(_selectorWithOverride, bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()')));
+    bool _isExpectedOverrideSelector = _selectorWithOverride
+      == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'))
+      || _selectorWithOverride == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
+    assertTrue(_isExpectedOverrideSelector, 'unexpected selector with step override slippage enabled');
 
     IStabilityPool.StepConfig[] memory _stepsWithoutOverride = _yvVeloAlethWethPipeline();
     for (uint256 _i = 0; _i < _stepsWithoutOverride.length; _i++) {
@@ -432,11 +458,9 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
       assertTrue(_profitWithoutOverride >= 0, 'expected non-negative profit when step override slippage is disabled');
     } else {
       bytes4 _selectorWithoutOverride = _revertSelector(_returnDataWithoutOverride);
-      assertEq(
-        _selectorWithoutOverride,
-        IStabilityPool.StabilityPool_NotProfitable.selector,
-        'unexpected selector when step override slippage is disabled'
-      );
+      bool _isExpectedSelector = _selectorWithoutOverride == IStabilityPool.StabilityPool_NotProfitable.selector
+        || _selectorWithoutOverride == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
+      assertTrue(_isExpectedSelector, 'unexpected selector when step override slippage is disabled');
     }
   }
 
@@ -482,7 +506,8 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     } else {
       bytes4 _selector = _revertSelector(_returnData);
       bool _isExpected = _selector == IStabilityPool.StabilityPool_NotProfitable.selector
-        || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'));
+        || _selector == bytes4(keccak256('VeloLPRemoveAndSwapStep_InsufficientOutput()'))
+        || _selector == bytes4(keccak256('CurveSwapStep_OracleFloorNotMet()'));
       assertTrue(_isExpected, 'unexpected revert selector for non-profitable cover');
     }
   }
@@ -747,6 +772,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
     _steps[2] = IStabilityPool.StepConfig({step: address(curveStep), data: _boldToHaiCurveData(), slippageBps: 200});
   }
 
+  function _opToHaiPipeline() internal view returns (IStabilityPool.StepConfig[] memory _steps) {
+    _steps = new IStabilityPool.StepConfig[](1);
+    _steps[0] = IStabilityPool.StepConfig({step: address(veloSwapStep), data: _opToHaiVeloData(), slippageBps: 200});
+  }
+
   function _rethPipeline() internal view returns (IStabilityPool.StepConfig[] memory _steps) {
     _steps = new IStabilityPool.StepConfig[](5);
     _steps[0] = IStabilityPool.StepConfig({
@@ -796,7 +826,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenOut: USDC,
         tickSpacing: 100,
         sqrtPriceLimitX96: 0,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -809,18 +843,49 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenIn: USDC,
         tokenOut: BOLD,
         stable: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
 
-  function _boldToHaiCurveData() internal pure returns (bytes memory _data) {
+  function _opToHaiVeloData() internal pure returns (bytes memory _data) {
     _data = abi.encode(
-      CurveSwapStep.Data({pool: CURVE_BOLD_HAI_POOL, i: int128(1), j: int128(0), tokenIn: BOLD, tokenOut: HAI})
+      VeloSwapStep.Data({
+        router: VELO_ROUTER,
+        factory: VELO_FACTORY,
+        tokenIn: OP,
+        tokenOut: HAI,
+        stable: false,
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenInOracle: address(0),
+        tokenOutOracle: address(0),
+        oracleToleranceBps: 0
+      })
     );
   }
 
-  function _rethToWaOptWethBalancerV3Data() internal pure returns (bytes memory _data) {
+  function _boldToHaiCurveData() internal view returns (bytes memory _data) {
+    _data = abi.encode(
+      CurveSwapStep.Data({
+        pool: CURVE_BOLD_HAI_POOL,
+        i: int128(1),
+        j: int128(0),
+        tokenIn: BOLD,
+        tokenOut: HAI,
+        useOracleFloor: true,
+        tokenInOracle: address(boldUsdOracle),
+        tokenOutOracle: HAI_USD_ORACLE,
+        oracleToleranceBps: CURVE_ORACLE_TOLERANCE_BPS
+      })
+    );
+  }
+
+  function _rethToWaOptWethBalancerV3Data() internal view returns (bytes memory _data) {
     _data = abi.encode(
       BalancerV3StablePoolMathSwapStep.Data({
         router: BALANCER_V3_ROUTER,
@@ -828,7 +893,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenIn: RETH,
         tokenOut: WA_OPT_WETH,
         deadlineBuffer: 1 hours,
-        userData: bytes('')
+        userData: bytes(''),
+        useOracleFloor: true,
+        tokenInOracle: RETH_USD_ORACLE,
+        tokenOutOracle: address(waOptWethUsdOracle),
+        oracleToleranceBps: BALANCER_ORACLE_TOLERANCE_BPS
       })
     );
   }
@@ -869,7 +938,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenB: LUSD,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }
@@ -884,7 +957,11 @@ contract E2EStabilityPoolCoverAndRepayDebtForkTest is HaiTest, MainnetDeployment
         tokenB: ALETH,
         stableLp: true,
         stableSwap: true,
-        deadlineBuffer: 1 hours
+        deadlineBuffer: 1 hours,
+        useOracleFloor: false,
+        tokenAOracle: address(0),
+        tokenBOracle: address(0),
+        oracleToleranceBps: 0
       })
     );
   }

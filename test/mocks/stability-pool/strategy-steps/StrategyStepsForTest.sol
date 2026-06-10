@@ -170,10 +170,15 @@ contract MockBalancerV3Vault {}
 
 contract MockBalancerV3Router {
   uint256 public outMultiplier = 3e18; // 3x in WAD
+  uint256 public lastDeadline;
   address public immutable mockVault;
 
   constructor(address _vault) {
     mockVault = _vault;
+  }
+
+  function setOutMultiplier(uint256 _outMultiplier) external {
+    outMultiplier = _outMultiplier;
   }
 
   function getVault() external view returns (address) {
@@ -186,10 +191,11 @@ contract MockBalancerV3Router {
     IERC20 _tokenOut,
     uint256 _exactAmountIn,
     uint256 _minAmountOut,
-    uint256,
+    uint256 _deadline,
     bytes calldata
   ) external returns (uint256 _amountOut) {
     // Push model: tokens should already be at the vault
+    lastDeadline = _deadline;
     require(IERC20(_tokenIn).balanceOf(mockVault) >= _exactAmountIn, 'tokens-not-at-vault');
     _amountOut = (_exactAmountIn * outMultiplier) / 1e18;
     require(_amountOut >= _minAmountOut, 'min-out');
@@ -353,6 +359,14 @@ contract MockERC4626Vault is ERC20ForTest {
     assetToken = ERC20ForTest(_assetToken);
   }
 
+  function asset() external view returns (address _asset) {
+    return address(assetToken);
+  }
+
+  function convertToAssets(uint256 _shares) external view returns (uint256 _assets) {
+    _assets = (_shares * assetsPerShare) / 1e18;
+  }
+
   function previewRedeem(uint256 _shares) external view returns (uint256 _assets) {
     _assets = (_shares * assetsPerShare) / 1e18;
   }
@@ -405,6 +419,8 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
   uint256 public swapOutMultiplier = 2e18; // 2x in WAD
   uint256 public removeAperLp = 10e18;
   uint256 public removeBperLp = 5e18;
+  uint256 public lastRemoveLiquidityDeadline;
+  uint256 public lastSwapDeadline;
 
   function setSwapOutMultiplier(uint256 _multiplier) external {
     swapOutMultiplier = _multiplier;
@@ -426,8 +442,9 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
     uint256,
     Route[] calldata _routes,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256[] memory _amounts) {
+    lastSwapDeadline = _deadline;
     ERC20ForTest(_routes[0].from).transferFrom(msg.sender, address(this), _amountIn);
     uint256 _amountOut = (_amountIn * swapOutMultiplier) / 1e18;
     ERC20ForTest(_routes[0].to).mint(_to, _amountOut);
@@ -445,8 +462,9 @@ contract MockVeloRouterForTest is IVelodromeRouterV2 {
     uint256,
     uint256,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256 _amountA, uint256 _amountB) {
+    lastRemoveLiquidityDeadline = _deadline;
     _amountA = (_liquidity * removeAperLp) / 1e18;
     _amountB = (_liquidity * removeBperLp) / 1e18;
     ERC20ForTest(_tokenA).mint(_to, _amountA);
@@ -660,6 +678,7 @@ contract MockVeloRouter {
   uint256 public swapOutMultiplier = 2e18; // 2x in WAD
   uint256 public removeAperLp = 5e18;
   uint256 public removeBperLp = 10e18;
+  uint256 public lastRemoveLiquidityDeadline;
 
   function setSwapOutMultiplier(uint256 _multiplier) external {
     swapOutMultiplier = _multiplier;
@@ -708,8 +727,9 @@ contract MockVeloRouter {
     uint256 _amountAMin,
     uint256 _amountBMin,
     address _to,
-    uint256
+    uint256 _deadline
   ) external returns (uint256 _amountA, uint256 _amountB) {
+    lastRemoveLiquidityDeadline = _deadline;
     _amountA = (_liquidity * removeAperLp) / 1e18;
     _amountB = (_liquidity * removeBperLp) / 1e18;
     require(_amountA >= _amountAMin && _amountB >= _amountBMin, 'min-out');
@@ -744,6 +764,8 @@ contract MockVeloCLRouterForTest {
   ERC20ForTest public tokenIn;
   ERC20ForTest public tokenOut;
   uint256 public outMultiplier = 2e18; // 2x in WAD
+  uint256 public amountToSpend;
+  bool public useAmountToSpend;
 
   address public lastRecipient;
   uint256 public lastAmountIn;
@@ -760,6 +782,11 @@ contract MockVeloCLRouterForTest {
     outMultiplier = _outMultiplier;
   }
 
+  function setAmountToSpend(uint256 _amountToSpend) external {
+    amountToSpend = _amountToSpend;
+    useAmountToSpend = true;
+  }
+
   function exactInputSingle(IVeloCLRouter.ExactInputSingleParams calldata _params)
     external
     returns (uint256 _amountOut)
@@ -770,7 +797,8 @@ contract MockVeloCLRouterForTest {
     lastTickSpacing = _params.tickSpacing;
     lastSqrtPriceLimit = _params.sqrtPriceLimitX96;
 
-    tokenIn.transferFrom(msg.sender, address(this), _params.amountIn);
+    uint256 _amountSpent = useAmountToSpend ? amountToSpend : _params.amountIn;
+    tokenIn.transferFrom(msg.sender, address(this), _amountSpent);
     _amountOut = (_params.amountIn * outMultiplier) / 1e18;
     require(_amountOut >= _params.amountOutMinimum, 'min-out');
     tokenOut.mint(_params.recipient, _amountOut);
