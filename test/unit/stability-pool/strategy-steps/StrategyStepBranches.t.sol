@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
+import {OracleForTest} from '@test/mocks/OracleForTest.sol';
 
 import {BeefyVaultWithdrawalStep} from '@contracts/stability-pool/strategy-steps/BeefyVaultWithdrawalStep.sol';
 import {YearnVaultWithdrawalStep} from '@contracts/stability-pool/strategy-steps/YearnVaultWithdrawalStep.sol';
@@ -123,7 +124,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenB: address(_tokenB),
       stableLp: false,
       stableSwap: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256 _expectedPreviewOut =
@@ -159,7 +164,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenB: address(_tokenB),
       stableLp: true,
       stableSwap: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 50e18);
@@ -170,6 +179,129 @@ contract Unit_StrategyStep_Branches is Base {
     _minOuts[0] = _preview[0];
     uint256[] memory _out = _step.execute(abi.encode(_data), 50e18, _minOuts);
     assertEq(_out[0], 437_500_000_000_000_000_000);
+  }
+
+  function test_VeloLPRemoveAndSwap_Preview_OracleFloorEnabled_AllowsFairOutput() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    OracleForTest _tokenAOracle = new OracleForTest(2e18);
+    OracleForTest _tokenBOracle = new OracleForTest(1e18);
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _lpToken.setState(1000e18, 2000e18, 100e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 1 hours,
+      useOracleFloor: true,
+      tokenAOracle: address(_tokenAOracle),
+      tokenBOracle: address(_tokenBOracle),
+      oracleToleranceBps: 0
+    });
+
+    uint256[] memory _preview = _step.preview(abi.encode(_data), 50e18);
+    assertEq(_preview.length, 1);
+    assertEq(_preview[0], 2000e18);
+  }
+
+  function test_Revert_VeloLPRemoveAndSwap_Preview_WhenQuoteBelowOracleFloor() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    OracleForTest _tokenAOracle = new OracleForTest(2e18);
+    OracleForTest _tokenBOracle = new OracleForTest(1e18);
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _router.setSwapOutMultiplier(0);
+    _lpToken.setState(1000e18, 2000e18, 100e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 1 hours,
+      useOracleFloor: true,
+      tokenAOracle: address(_tokenAOracle),
+      tokenBOracle: address(_tokenBOracle),
+      oracleToleranceBps: 0
+    });
+
+    vm.expectRevert(VeloLPRemoveAndSwapStep.VeloLPRemoveAndSwapStep_OracleFloorNotMet.selector);
+    _step.preview(abi.encode(_data), 10e18);
+  }
+
+  function test_Revert_VeloLPRemoveAndSwap_Execute_UsesOracleFloorWhenMinOutIsLower() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    OracleForTest _tokenAOracle = new OracleForTest(2e18);
+    OracleForTest _tokenBOracle = new OracleForTest(1e18);
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _router.setRemovePerLp(1e18, 0);
+    _lpToken.setState(1000e18, 2000e18, 900e18);
+    _lpToken.mint(address(_step), 100e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 1 hours,
+      useOracleFloor: true,
+      tokenAOracle: address(_tokenAOracle),
+      tokenBOracle: address(_tokenBOracle),
+      oracleToleranceBps: 0
+    });
+
+    vm.expectRevert(VeloLPRemoveAndSwapStep.VeloLPRemoveAndSwapStep_InsufficientOutput.selector);
+    _step.execute(abi.encode(_data), 100e18, new uint256[](0));
+  }
+
+  function test_Revert_VeloLPRemoveAndSwap_Preview_InvalidPairTokens() public {
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    ERC20ForTest _wrongTokenB = new ERC20ForTest();
+    MockVeloPairForTest _lpToken = new MockVeloPairForTest(address(_tokenA), address(_tokenB));
+
+    _lpToken.setState(1000e18, 500e18, 100e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_wrongTokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
+    });
+
+    vm.expectRevert(VeloLPRemoveAndSwapStep.VeloLPRemoveAndSwapStep_InvalidPairTokens.selector);
+    _step.preview(abi.encode(_data), 10e18);
   }
 
   function test_VeloLPRemoveAndSwap_ExecuteZeroAmount() public {
@@ -185,12 +317,48 @@ contract Unit_StrategyStep_Branches is Base {
       tokenB: address(0xBBBB),
       stableLp: false,
       stableSwap: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _out = _step.execute(abi.encode(_data), 0, _minOuts);
     assertEq(_out.length, 1);
     assertEq(_out[0], 0);
+  }
+
+  function test_VeloLPRemoveAndSwap_Execute_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+
+    VeloLPRemoveAndSwapStep _step = new VeloLPRemoveAndSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+    ERC20ForTest _lpToken = new ERC20ForTest();
+
+    _lpToken.mint(address(_step), 1e18);
+
+    VeloLPRemoveAndSwapStep.Data memory _data = VeloLPRemoveAndSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      lpToken: address(_lpToken),
+      tokenA: address(_tokenA),
+      tokenB: address(_tokenB),
+      stableLp: false,
+      stableSwap: false,
+      deadlineBuffer: 0,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
+    });
+
+    _step.execute(abi.encode(_data), 1e18, new uint256[](0));
+
+    assertEq(_router.lastRemoveLiquidityDeadline(), block.timestamp + 1);
+    assertEq(_router.lastSwapDeadline(), block.timestamp + 1);
   }
 
   function test_VeloLPRemoval_Preview_TokenOrderFlipBranch() public {
@@ -209,7 +377,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenA: address(_tokenA),
       tokenB: address(_tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 10e18);
@@ -231,7 +403,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenA: address(_tokenA),
       tokenB: address(_tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = _step.preview(abi.encode(_data), 10e18);
@@ -248,7 +424,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenA: address(0xAAAA),
       tokenB: address(0xBBBB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](2);
@@ -273,7 +453,11 @@ contract Unit_StrategyStep_Branches is Base {
       tokenIn: address(_tokenA),
       tokenOut: address(_tokenB),
       stable: false,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);
@@ -281,6 +465,34 @@ contract Unit_StrategyStep_Branches is Base {
     uint256[] memory _out = _step.execute(abi.encode(_data), 0, _minOuts);
     assertEq(_out.length, 1);
     assertEq(_out[0], 0);
+  }
+
+  function test_VeloSwap_Execute_UsesFixedDeadlineOffset() public {
+    vm.warp(1000);
+
+    VeloSwapStep _step = new VeloSwapStep();
+    MockVeloRouterForTest _router = new MockVeloRouterForTest();
+    ERC20ForTest _tokenA = new ERC20ForTest();
+    ERC20ForTest _tokenB = new ERC20ForTest();
+
+    _tokenA.mint(address(_step), 1e18);
+
+    VeloSwapStep.Data memory _data = VeloSwapStep.Data({
+      router: address(_router),
+      factory: address(0),
+      tokenIn: address(_tokenA),
+      tokenOut: address(_tokenB),
+      stable: false,
+      deadlineBuffer: 0,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
+    });
+
+    _step.execute(abi.encode(_data), 1e18, new uint256[](0));
+
+    assertEq(_router.lastSwapDeadline(), block.timestamp + 1);
   }
 
   function test_ERC4626Withdraw_Execute_ZeroAmount() public {

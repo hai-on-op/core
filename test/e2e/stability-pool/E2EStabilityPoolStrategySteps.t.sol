@@ -3,6 +3,11 @@ pragma solidity 0.8.20;
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import {IERC4626} from '@openzeppelin/contracts/interfaces/IERC4626.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
+import {CurveStableSwapNGRelayer} from '@contracts/oracles/CurveStableSwapNGRelayer.sol';
+import {DenominatedOracle} from '@contracts/oracles/DenominatedOracle.sol';
+import {ERC4626ShareOracle} from '@contracts/oracles/ERC4626ShareOracle.sol';
 import {BalancerV3StablePoolMathSwapStep} from
   '@contracts/stability-pool/strategy-steps/BalancerV3StablePoolMathSwapStep.sol';
 import {ERC4626WithdrawalStep} from '@contracts/stability-pool/strategy-steps/ERC4626WithdrawalStep.sol';
@@ -28,14 +33,19 @@ contract E2EBalancerV3StablePoolMathSwapStepForkTest is ForkedMainnetAt148368730
 
   address internal constant RETH = 0x9Bcef72be871e61ED4fBbc7630889beE758eb81D;
   address internal constant WA_OPT_WETH = 0x464b808c2C7E04b07e860fDF7a91870620246148;
+  address internal constant RETH_USD_ORACLE = 0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740;
+  address internal constant WETH_USD_ORACLE = 0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36;
+  uint16 internal constant ORACLE_TOLERANCE_BPS = 200;
 
   uint256 internal constant AMOUNT_IN = 8_633_153_881_674_896; // ~0.00863 rETH
 
   BalancerV3StablePoolMathSwapStep internal step;
+  ERC4626ShareOracle internal waOptWethUsdOracle;
 
   function setUp() public {
     _forkMainnetAtPinnedBlock();
     step = new BalancerV3StablePoolMathSwapStep();
+    waOptWethUsdOracle = new ERC4626ShareOracle(IERC4626(WA_OPT_WETH), IBaseOracle(WETH_USD_ORACLE), 'waOptWETH / USD');
   }
 
   function test_balancer_v3_stable_pool_math_swap_step_preview_and_execute() public {
@@ -47,7 +57,11 @@ contract E2EBalancerV3StablePoolMathSwapStepForkTest is ForkedMainnetAt148368730
       tokenIn: RETH,
       tokenOut: WA_OPT_WETH,
       deadlineBuffer: 1 hours,
-      userData: bytes('')
+      userData: bytes(''),
+      useOracleFloor: true,
+      tokenInOracle: RETH_USD_ORACLE,
+      tokenOutOracle: address(waOptWethUsdOracle),
+      oracleToleranceBps: ORACLE_TOLERANCE_BPS
     });
 
     uint256[] memory _preview = step.preview(abi.encode(_data), AMOUNT_IN);
@@ -128,21 +142,35 @@ contract E2ECurveSwapStepForkTest is ForkedMainnetAt148368730 {
   address internal constant CURVE_POOL = 0xC4ea2ED83bC9207398fa5dB31Ee4E7477dC34fd5;
   address internal constant HAI = 0x10398AbC267496E49106B07dd6BE13364D10dC71;
   address internal constant BOLD = 0x03569CC076654F82679C4BA2124D64774781B01D;
+  address internal constant HAI_USD_ORACLE = 0x8c212bCaE328669c8b045D467CB78b88e0BE0D39;
+  uint16 internal constant ORACLE_TOLERANCE_BPS = 200;
 
   uint256 internal constant AMOUNT_IN = 1e16; // 0.01 BOLD
 
   CurveSwapStep internal step;
+  DenominatedOracle internal boldUsdOracle;
 
   function setUp() public {
     _forkMainnetAtPinnedBlock();
     step = new CurveSwapStep();
+    IBaseOracle _haiBoldOracle = new CurveStableSwapNGRelayer(CURVE_POOL, 0, 1);
+    boldUsdOracle = new DenominatedOracle(_haiBoldOracle, IBaseOracle(HAI_USD_ORACLE), true);
   }
 
   function test_curve_swap_step() public {
     deal(BOLD, address(step), AMOUNT_IN);
 
-    CurveSwapStep.Data memory _data =
-      CurveSwapStep.Data({pool: CURVE_POOL, i: int128(1), j: int128(0), tokenIn: BOLD, tokenOut: HAI});
+    CurveSwapStep.Data memory _data = CurveSwapStep.Data({
+      pool: CURVE_POOL,
+      i: int128(1),
+      j: int128(0),
+      tokenIn: BOLD,
+      tokenOut: HAI,
+      useOracleFloor: true,
+      tokenInOracle: address(boldUsdOracle),
+      tokenOutOracle: HAI_USD_ORACLE,
+      oracleToleranceBps: ORACLE_TOLERANCE_BPS
+    });
 
     uint256[] memory _minOuts = new uint256[](1);
     uint256[] memory _out = step.execute(abi.encode(_data), AMOUNT_IN, _minOuts);
@@ -186,7 +214,11 @@ contract E2EVeloCLSwapStepViewQuoterForkTest is ForkedMainnetAt148368730 {
       tokenOut: USDC,
       tickSpacing: TICK_SPACING,
       sqrtPriceLimitX96: 0,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _preview = step.preview(abi.encode(_data), AMOUNT_IN);
@@ -259,7 +291,11 @@ contract E2EVeloLPRemovalStepForkTest is ForkedMainnetAt148368730 {
       tokenA: TOKEN_A,
       tokenB: TOKEN_B,
       stable: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](2);
@@ -301,7 +337,11 @@ contract E2EVeloLPRemoveAndSwapStepForkTest is ForkedMainnetAt148368730 {
       tokenB: TOKEN_B,
       stableLp: true,
       stableSwap: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenAOracle: address(0),
+      tokenBOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);
@@ -339,7 +379,11 @@ contract E2EVeloSwapStepForkTest is ForkedMainnetAt148368730 {
       tokenIn: TOKEN_IN,
       tokenOut: TOKEN_OUT,
       stable: true,
-      deadlineBuffer: 1 hours
+      deadlineBuffer: 1 hours,
+      useOracleFloor: false,
+      tokenInOracle: address(0),
+      tokenOutOracle: address(0),
+      oracleToleranceBps: 0
     });
 
     uint256[] memory _minOuts = new uint256[](1);

@@ -36,5 +36,6 @@ fuzz_runs = 5000
 src = 'test'
 
 [rpc_endpoints]
+eth_mainnet = "${ETH_MAINNET_RPC}"
 mainnet = "${OP_MAINNET_RPC}"
 testnet = "${OP_SEPOLIA_RPC}"

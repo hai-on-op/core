@@ -1,0 +1,1030 @@
+{
+  "chainId": "99910",
+  "rpcUrl": "https://virtual.rpc.tenderly.co/hai-on-op/hai/private/stability-pool-testing/59036890-38f1-47c5-b9c6-d34ff6735197",
+  "generatedAt": "2026-03-08T03:49:02.811Z",
+  "restoreOraclesAfter": false,
+  "config": {
+    "poolHaiDeposit": "300000000000000000000000",
+    "emissionsTotalKite": "1000000000000000000000000",
+    "emissionDurationSeconds": 31536000,
+    "auctionsPerCollateral": 3,
+    "auctionAgeSeconds": 86400,
+    "stepSlippageBps": 200,
+    "maxQuoteSteps": 4096,
+    "cTypeAllowlist": [
+      "WETH",
+      "WSTETH",
+      "ALETH",
+      "RETH",
+      "HAIVELOV2",
+      "TBTC",
+      "MSETH",
+      "OP",
+      "MOO-VELO-BOLD-LUSD",
+      "YV-VELO-ALETH-WETH",
+      "YV-VELO-MSETH-WETH"
+    ]
+  },
+  "roles": {
+    "deployer": "0x1000000000000000000000000000000000000001",
+    "staker": "0x1000000000000000000000000000000000000002",
+    "safeOwners": [
+      "0x10000000000000000000000000000000000003E8",
+      "0x10000000000000000000000000000000000003E9",
+      "0x10000000000000000000000000000000000003EA",
+      "0x10000000000000000000000000000000000003eB",
+      "0x10000000000000000000000000000000000003Ec",
+      "0x10000000000000000000000000000000000003ed",
+      "0x10000000000000000000000000000000000003eE",
+      "0x10000000000000000000000000000000000003ef",
+      "0x10000000000000000000000000000000000003f0",
+      "0x10000000000000000000000000000000000003F1",
+      "0x10000000000000000000000000000000000003F2",
+      "0x10000000000000000000000000000000000003F3",
+      "0x10000000000000000000000000000000000003f4",
+      "0x10000000000000000000000000000000000003F5",
+      "0x10000000000000000000000000000000000003F6",
+      "0x10000000000000000000000000000000000003F7",
+      "0x10000000000000000000000000000000000003F8",
+      "0x10000000000000000000000000000000000003F9",
+      "0x10000000000000000000000000000000000003Fa",
+      "0x10000000000000000000000000000000000003fb",
+      "0x10000000000000000000000000000000000003Fc",
+      "0x10000000000000000000000000000000000003fd",
+      "0x10000000000000000000000000000000000003Fe",
+      "0x10000000000000000000000000000000000003FF",
+      "0x1000000000000000000000000000000000000400",
+      "0x1000000000000000000000000000000000000401",
+      "0x1000000000000000000000000000000000000402",
+      "0x1000000000000000000000000000000000000403",
+      "0x1000000000000000000000000000000000000404",
+      "0x1000000000000000000000000000000000000405",
+      "0x1000000000000000000000000000000000000406",
+      "0x1000000000000000000000000000000000000407",
+      "0x1000000000000000000000000000000000000408"
+    ]
+  },
+  "mainnetDeployment": {
+    "timelock": "0xd68e7D20008a223dD48A6076AAf5EDd4fe80a899",
+    "systemCoin": "0x10398AbC267496E49106B07dd6BE13364D10dC71",
+    "protocolToken": "0xf467C7d5a4A9C4687fFc7986aC6aD5A4c81E1404",
+    "safeEngine": "0x9Ff826860689483181C5FAc9628fd2F70275A700",
+    "oracleRelayer": "0x6270403b908505F02Da05BE5c1956aBB59FDb3A6",
+    "liquidationEngine": "0x8Be588895BE9B75F9a9dAee185e0c2ad89891b56",
+    "coinJoin": "0x30Ce72230A47A0967B7e52A1bAE0178DbD7c6eA3",
+    "collateralJoinFactory": "0xfE7987b1Ee45a8d592B15e8E924d50BFC8536143",
+    "collateralAuctionHouseFactory": "0x81c5C2DA8C1a74c6077B03aD69ca04b74b94B427"
+  },
+  "deployedContracts": {
+    "emissionsController": "0xBa773610D67C591ffBc6ccF1F86C7b944AABe04d",
+    "stabilityPool": "0x3C89EDF442D529f656ede4A868Cd8e559C967b84",
+    "strategySteps": {
+      "balancerV3Step": "0x9490aD6FDC3914F6dEd76d3bB259c26BeE12F0d5",
+      "erc4626Step": "0x85634885520f88902382d689c43D4029f07c2Cbb",
+      "curveStep": "0xd491BF8a20d73015e49Fe436D9B6659Ead9C204e",
+      "veloSwapStep": "0x34b118eB4c95C3527245C95Ab37Ca28DE16B0C4B",
+      "veloCLStep": "0x01439425A77D6834E1bc2a356b8Ed7fc04Ed99a7",
+      "veloLPRemovalStep": "0xa86032C7fBd8Cf246B9D17eBA1423775fC6EcBF6",
+      "veloLPRemoveAndSwapStep": "0xa216824bE56bd85B7841209B8Ee57566cBd3af23",
+      "beefyStep": "0xE4191f2Cbab084D48b0959A4472A8889f8d264bC",
+      "yearnStep": "0x129Db681f53157f1C9b7088158327d64b2588e65"
+    }
+  },
+  "collaterals": [
+    {
+      "cTypeName": "WETH",
+      "cTypeBytes32": "0x5745544800000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0xbE57D71e81F83a536937f07E0B3f48dd6f55376B",
+      "collateralAuctionHouseAddress": "0x2c6c978B3e707482236De7d23E3A375270F41175",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003E8",
+          "collateralToken": "0x4200000000000000000000000000000000000006",
+          "multiplier": "0",
+          "collateralWei": "531804194190904172",
+          "collateralWad": "531804194190904172",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000835"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003E9",
+          "collateralToken": "0x4200000000000000000000000000000000000006",
+          "multiplier": "0",
+          "collateralWei": "531804194190904172",
+          "collateralWad": "531804194190904172",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000835"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003EA",
+          "collateralToken": "0x4200000000000000000000000000000000000006",
+          "multiplier": "0",
+          "collateralWei": "531804194190904172",
+          "collateralWad": "531804194190904172",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000835"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003E8",
+          "auctionId": "44"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003E9",
+          "auctionId": "45"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003EA",
+          "auctionId": "46"
+        }
+      ],
+      "oracle": {
+        "original": "0x2fC0cb2c5065a79bC2db79e4fbD537b7CaCF6f36",
+        "staged": "0x1366a3aBBE2060eac76c97Fa1Ba9fB975fc1Ecb1",
+        "originalPrice": "1976900000000000000000",
+        "stagedPrice": "395380000000000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "44",
+          "owner": "0x10000000000000000000000000000000000003E8",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "144542604204208017",
+          "expectedHai": "777812527747300967206",
+          "estimatedCollateralBought": "531804194190904172",
+          "estimatedCollateralWei": "531804194190904172"
+        },
+        {
+          "auctionId": "45",
+          "owner": "0x10000000000000000000000000000000000003E9",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "144542604204208017",
+          "expectedHai": "777812527747300967206",
+          "estimatedCollateralBought": "531804194190904172",
+          "estimatedCollateralWei": "531804194190904172"
+        },
+        {
+          "auctionId": "46",
+          "owner": "0x10000000000000000000000000000000000003EA",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "144542604204208017",
+          "expectedHai": "777812527747300967206",
+          "estimatedCollateralBought": "531804194190904172",
+          "estimatedCollateralWei": "531804194190904172"
+        }
+      ]
+    },
+    {
+      "cTypeName": "WSTETH",
+      "cTypeBytes32": "0x5753544554480000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x77a82b65F8FA7da357A047B897C0339bD0B0B361",
+      "collateralAuctionHouseAddress": "0x375686A4cD77DD8e86dD06353E0b42bC53cB3704",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003eB",
+          "collateralToken": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
+          "multiplier": "0",
+          "collateralWei": "454426569549508465",
+          "collateralWad": "454426569549508465",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000001112"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Ec",
+          "collateralToken": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
+          "multiplier": "0",
+          "collateralWei": "454426569549508465",
+          "collateralWad": "454426569549508465",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000001112"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003ed",
+          "collateralToken": "0x1F32b1c2345538c0c6f582fCB022739c4A194Ebb",
+          "multiplier": "0",
+          "collateralWei": "454426569549508465",
+          "collateralWad": "454426569549508465",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000001112"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003eB",
+          "auctionId": "25"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Ec",
+          "auctionId": "26"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003ed",
+          "auctionId": "27"
+        }
+      ],
+      "oracle": {
+        "original": "0xB64c0f551C006d932484a6F86Ea7A20D73e4f77C",
+        "staged": "0x6C6d8827167C05F4B57951162E7a9873E0798d50",
+        "originalPrice": "2424176994236695282124",
+        "stagedPrice": "484835398847339056",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "25",
+          "owner": "0x10000000000000000000000000000000000003eB",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "151456339679669226",
+          "expectedHai": "816066969287570208131",
+          "estimatedCollateralBought": "454426569549508465",
+          "estimatedCollateralWei": "454426569549508465"
+        },
+        {
+          "auctionId": "26",
+          "owner": "0x10000000000000000000000000000000000003Ec",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "151456339679669226",
+          "expectedHai": "816066969287570208131",
+          "estimatedCollateralBought": "454426569549508465",
+          "estimatedCollateralWei": "454426569549508465"
+        },
+        {
+          "auctionId": "27",
+          "owner": "0x10000000000000000000000000000000000003ed",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "151456339679669226",
+          "expectedHai": "816066969287570208131",
+          "estimatedCollateralBought": "454426569549508465",
+          "estimatedCollateralWei": "454426569549508465"
+        }
+      ]
+    },
+    {
+      "cTypeName": "OP",
+      "cTypeBytes32": "0x4f50000000000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x994fa61F9305Bdd6e5E6bA84015Ee28b109C827A",
+      "collateralAuctionHouseAddress": "0x6b5c2deA8b9b13A043DDc25C6581cD6D87a2A881",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003eE",
+          "collateralToken": "0x4200000000000000000000000000000000000042",
+          "multiplier": "0",
+          "collateralWei": "12955703505939417035687",
+          "collateralWad": "12955703505939417035687",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000000"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003ef",
+          "collateralToken": "0x4200000000000000000000000000000000000042",
+          "multiplier": "0",
+          "collateralWei": "12955703505939417035687",
+          "collateralWad": "12955703505939417035687",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000000"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003f0",
+          "collateralToken": "0x4200000000000000000000000000000000000042",
+          "multiplier": "0",
+          "collateralWei": "12955703505939417035687",
+          "collateralWad": "12955703505939417035687",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000000"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003eE",
+          "auctionId": "102"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003ef",
+          "auctionId": "103"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003f0",
+          "auctionId": "104"
+        }
+      ],
+      "oracle": {
+        "original": "0x519011D32806f324364201C5C98579aEC55D9011",
+        "staged": "0x564c2e0b8286DAFe38d6c97531cA15ADdE106d4F",
+        "originalPrice": "119934840000000000",
+        "stagedPrice": "23986968000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "102",
+          "owner": "0x10000000000000000000000000000000000003eE",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "201763309234729966",
+          "expectedHai": "1148857628215147592264",
+          "estimatedCollateralBought": "12955703505939417035687",
+          "estimatedCollateralWei": "12955703505939417035687"
+        },
+        {
+          "auctionId": "103",
+          "owner": "0x10000000000000000000000000000000000003ef",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "201763309234729966",
+          "expectedHai": "1148857628215147592264",
+          "estimatedCollateralBought": "12955703505939417035687",
+          "estimatedCollateralWei": "12955703505939417035687"
+        },
+        {
+          "auctionId": "104",
+          "owner": "0x10000000000000000000000000000000000003f0",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "201763309234729966",
+          "expectedHai": "1148857628215147592264",
+          "estimatedCollateralBought": "12955703505939417035687",
+          "estimatedCollateralWei": "12955703505939417035687"
+        }
+      ]
+    },
+    {
+      "cTypeName": "RETH",
+      "cTypeBytes32": "0x5245544800000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x8FacB2Fc0a6bC9b82a17C5f4092FAdbc415b8FFA",
+      "collateralAuctionHouseAddress": "0xf8C655Ed6475BeFFBD2964EFEC592bbD21757804",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003F1",
+          "collateralToken": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D",
+          "multiplier": "0",
+          "collateralWei": "483528424100874517",
+          "collateralWad": "483528424100874517",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000256"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F2",
+          "collateralToken": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D",
+          "multiplier": "0",
+          "collateralWei": "483528424100874517",
+          "collateralWad": "483528424100874517",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000256"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F3",
+          "collateralToken": "0x9Bcef72be871e61ED4fBbc7630889beE758eb81D",
+          "multiplier": "0",
+          "collateralWei": "483528424100874517",
+          "collateralWad": "483528424100874517",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000256"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003F1",
+          "auctionId": "7"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F2",
+          "auctionId": "8"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F3",
+          "auctionId": "9"
+        }
+      ],
+      "oracle": {
+        "original": "0xB43314DBdb9b8036E7012A3cDc267E2105Ee8740",
+        "staged": "0xb3606fF4842c42a75949062A537366ADE595897D",
+        "originalPrice": "2286551743092524630451",
+        "stagedPrice": "457310348618504926",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "7",
+          "owner": "0x10000000000000000000000000000000000003F1",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "152006604591408212",
+          "expectedHai": "817814395725395269639",
+          "estimatedCollateralBought": "483528424100874517",
+          "estimatedCollateralWei": "483528424100874517"
+        },
+        {
+          "auctionId": "8",
+          "owner": "0x10000000000000000000000000000000000003F2",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "152006604591408212",
+          "expectedHai": "817814395725395269639",
+          "estimatedCollateralBought": "483528424100874517",
+          "estimatedCollateralWei": "483528424100874517"
+        },
+        {
+          "auctionId": "9",
+          "owner": "0x10000000000000000000000000000000000003F3",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "152006604591408212",
+          "expectedHai": "817814395725395269639",
+          "estimatedCollateralBought": "483528424100874517",
+          "estimatedCollateralWei": "483528424100874517"
+        }
+      ]
+    },
+    {
+      "cTypeName": "TBTC",
+      "cTypeBytes32": "0x5442544300000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x99E2b46c584382D9668a1DBc64A9a23D2828F74B",
+      "collateralAuctionHouseAddress": "0xed335cD79C6eCa0522F661eBb81cE22DC3E395d4",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003f4",
+          "collateralToken": "0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40",
+          "multiplier": "0",
+          "collateralWei": "16151219947172341",
+          "collateralWad": "16151219947172341",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000030166"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F5",
+          "collateralToken": "0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40",
+          "multiplier": "0",
+          "collateralWei": "16151219947172341",
+          "collateralWad": "16151219947172341",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000030166"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F6",
+          "collateralToken": "0x6c84a8f1c29108F47a79964b5Fe888D4f4D0dE40",
+          "multiplier": "0",
+          "collateralWei": "16151219947172341",
+          "collateralWad": "16151219947172341",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000030166"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003f4",
+          "auctionId": "1"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F5",
+          "auctionId": "2"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F6",
+          "auctionId": "3"
+        }
+      ],
+      "oracle": {
+        "original": "0x5EcC1Eb614e11e0078e80cCA5C148796f7224Cc9",
+        "staged": "0xaA61499B32983B8F0A8b4084542a880F25dA76F7",
+        "originalPrice": "67820041500600000000000",
+        "stagedPrice": "13564008300120000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "1",
+          "owner": "0x10000000000000000000000000000000000003f4",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "142232621413776659",
+          "expectedHai": "810288686782482151481",
+          "estimatedCollateralBought": "16151219947172341",
+          "estimatedCollateralWei": "16151219947172341"
+        },
+        {
+          "auctionId": "2",
+          "owner": "0x10000000000000000000000000000000000003F5",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "142232621413776659",
+          "expectedHai": "810288686782482151481",
+          "estimatedCollateralBought": "16151219947172341",
+          "estimatedCollateralWei": "16151219947172341"
+        },
+        {
+          "auctionId": "3",
+          "owner": "0x10000000000000000000000000000000000003F6",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "142232621413776659",
+          "expectedHai": "810288686782482151481",
+          "estimatedCollateralBought": "16151219947172341",
+          "estimatedCollateralWei": "16151219947172341"
+        }
+      ]
+    },
+    {
+      "cTypeName": "ALETH",
+      "cTypeBytes32": "0x414c455448000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x338988367a3684b6B0380Ea1490D316c3A622136",
+      "collateralAuctionHouseAddress": "0x2a60D97A815Eb59e2d5a216098138b698D31fCc2",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003F7",
+          "collateralToken": "0x3E29D3A9316dAB217754d13b28646B76607c5f04",
+          "multiplier": "0",
+          "collateralWei": "576954304974667083",
+          "collateralWad": "576954304974667083",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000762"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F8",
+          "collateralToken": "0x3E29D3A9316dAB217754d13b28646B76607c5f04",
+          "multiplier": "0",
+          "collateralWei": "576954304974667083",
+          "collateralWad": "576954304974667083",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000762"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F9",
+          "collateralToken": "0x3E29D3A9316dAB217754d13b28646B76607c5f04",
+          "multiplier": "0",
+          "collateralWei": "576954304974667083",
+          "collateralWad": "576954304974667083",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000762"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003F7",
+          "auctionId": "3"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F8",
+          "auctionId": "4"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003F9",
+          "auctionId": "5"
+        }
+      ],
+      "oracle": {
+        "original": "0x8B2A3b9C680Cc83e510e0090D5151e9143B4d0F0",
+        "staged": "0xCC86c78274D4c02dAbe5A421500C4B1FcC183859",
+        "originalPrice": "1866779820680000000000",
+        "stagedPrice": "373355964136000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "3",
+          "owner": "0x10000000000000000000000000000000000003F7",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "139852536522941793",
+          "expectedHai": "797190449124529855329",
+          "estimatedCollateralBought": "576954304974667083",
+          "estimatedCollateralWei": "576954304974667083"
+        },
+        {
+          "auctionId": "4",
+          "owner": "0x10000000000000000000000000000000000003F8",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "139852536522941793",
+          "expectedHai": "797190449124529855329",
+          "estimatedCollateralBought": "576954304974667083",
+          "estimatedCollateralWei": "576954304974667083"
+        },
+        {
+          "auctionId": "5",
+          "owner": "0x10000000000000000000000000000000000003F9",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "139852536522941793",
+          "expectedHai": "797190449124529855329",
+          "estimatedCollateralBought": "576954304974667083",
+          "estimatedCollateralWei": "576954304974667083"
+        }
+      ]
+    },
+    {
+      "cTypeName": "YV-VELO-ALETH-WETH",
+      "cTypeBytes32": "0x59562d56454c4f2d414c4554482d574554480000000000000000000000000000",
+      "collateralJoinAddress": "0x1cBaC5EA7D32E8BEDa702C0071F5D93cd1318149",
+      "collateralAuctionHouseAddress": "0x94dBe090F4CAac23136a83bcd94111868bd7eb3a",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003Fa",
+          "collateralToken": "0xf7D66b41Cd4241eae450fd9D2d6995754634D9f3",
+          "multiplier": "0",
+          "collateralWei": "155048495982437583",
+          "collateralWad": "155048495982437583",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000251"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003fb",
+          "collateralToken": "0xf7D66b41Cd4241eae450fd9D2d6995754634D9f3",
+          "multiplier": "0",
+          "collateralWei": "155048495982437583",
+          "collateralWad": "155048495982437583",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000251"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Fc",
+          "collateralToken": "0xf7D66b41Cd4241eae450fd9D2d6995754634D9f3",
+          "multiplier": "0",
+          "collateralWei": "155048495982437583",
+          "collateralWad": "155048495982437583",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000251"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003Fa",
+          "auctionId": "3"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003fb",
+          "auctionId": "4"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Fc",
+          "auctionId": "5"
+        }
+      ],
+      "oracle": {
+        "original": "0xE26a31c330eA62aa5bcF306574982A87FCE658cC",
+        "staged": "0x32B58887D9747759C3A5205Ec6a7fA4E1CD6eD6a",
+        "originalPrice": "4540263746477815711502",
+        "stagedPrice": "908052749295563142",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "3",
+          "owner": "0x10000000000000000000000000000000000003Fa",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "86031111291355372",
+          "expectedHai": "518836701823433057055",
+          "estimatedCollateralBought": "155048495982437583",
+          "estimatedCollateralWei": "155048495982437583"
+        },
+        {
+          "auctionId": "4",
+          "owner": "0x10000000000000000000000000000000000003fb",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "86031111291355372",
+          "expectedHai": "518836701823433057055",
+          "estimatedCollateralBought": "155048495982437583",
+          "estimatedCollateralWei": "155048495982437583"
+        },
+        {
+          "auctionId": "5",
+          "owner": "0x10000000000000000000000000000000000003Fc",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "86031111291355372",
+          "expectedHai": "518836701823433057055",
+          "estimatedCollateralBought": "155048495982437583",
+          "estimatedCollateralWei": "155048495982437583"
+        }
+      ]
+    },
+    {
+      "cTypeName": "MSETH",
+      "cTypeBytes32": "0x4d53455448000000000000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x5C9ffB1Cbc258f1dEe1F7Bc29c75a65A965CC526",
+      "collateralAuctionHouseAddress": "0x08d9565f961c757bA6A3e323601faa23CF75D5A2",
+      "stagedSafes": [
+        {
+          "owner": "0x10000000000000000000000000000000000003fd",
+          "collateralToken": "0x1610e3c85dd44Af31eD7f33a63642012Dca0C5A5",
+          "multiplier": "0",
+          "collateralWei": "543365535141977922",
+          "collateralWad": "543365535141977922",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000945"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Fe",
+          "collateralToken": "0x1610e3c85dd44Af31eD7f33a63642012Dca0C5A5",
+          "multiplier": "0",
+          "collateralWei": "543365535141977922",
+          "collateralWad": "543365535141977922",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000945"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003FF",
+          "collateralToken": "0x1610e3c85dd44Af31eD7f33a63642012Dca0C5A5",
+          "multiplier": "0",
+          "collateralWei": "543365535141977922",
+          "collateralWad": "543365535141977922",
+          "debtWad": "500000000000000000000",
+          "maxDebtWad": "600000000000000000945"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x10000000000000000000000000000000000003fd",
+          "auctionId": "4"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003Fe",
+          "auctionId": "5"
+        },
+        {
+          "owner": "0x10000000000000000000000000000000000003FF",
+          "auctionId": "6"
+        }
+      ],
+      "oracle": {
+        "original": "0x431C32ae868505093Cd9E4F761B63a60002DD26F",
+        "staged": "0xa64EdE71319Ef6023dd5BFA3C9c53441E06cE458",
+        "originalPrice": "1972102193660000000000",
+        "stagedPrice": "394420438732000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "4",
+          "owner": "0x10000000000000000000000000000000000003fd",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "130956903496535967",
+          "expectedHai": "792391539772048759710",
+          "estimatedCollateralBought": "543365535141977922",
+          "estimatedCollateralWei": "543365535141977922"
+        },
+        {
+          "auctionId": "5",
+          "owner": "0x10000000000000000000000000000000000003Fe",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "130956903496535967",
+          "expectedHai": "792391539772048759710",
+          "estimatedCollateralBought": "543365535141977922",
+          "estimatedCollateralWei": "543365535141977922"
+        },
+        {
+          "auctionId": "6",
+          "owner": "0x10000000000000000000000000000000000003FF",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "130956903496535967",
+          "expectedHai": "792391539772048759710",
+          "estimatedCollateralBought": "543365535141977922",
+          "estimatedCollateralWei": "543365535141977922"
+        }
+      ]
+    },
+    {
+      "cTypeName": "YV-VELO-MSETH-WETH",
+      "cTypeBytes32": "0x59562d56454c4f2d4d534554482d574554480000000000000000000000000000",
+      "collateralJoinAddress": "0xBc2c13769453CD1F17523626a27A36d7849eb527",
+      "collateralAuctionHouseAddress": "0x430555C6345f4A26DD123F81BE1925968f341A14",
+      "stagedSafes": [
+        {
+          "owner": "0x1000000000000000000000000000000000000400",
+          "collateralToken": "0xd0d2Ac44Cc842079e978bB11b094764f7D0dec6A",
+          "multiplier": "0",
+          "collateralWei": "92157451258159052",
+          "collateralWad": "92157451258159052",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000002079"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000401",
+          "collateralToken": "0xd0d2Ac44Cc842079e978bB11b094764f7D0dec6A",
+          "multiplier": "0",
+          "collateralWei": "92157451258159052",
+          "collateralWad": "92157451258159052",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000002079"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000402",
+          "collateralToken": "0xd0d2Ac44Cc842079e978bB11b094764f7D0dec6A",
+          "multiplier": "0",
+          "collateralWei": "92157451258159052",
+          "collateralWad": "92157451258159052",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000002079"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x1000000000000000000000000000000000000400",
+          "auctionId": "7"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000401",
+          "auctionId": "8"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000402",
+          "auctionId": "9"
+        }
+      ],
+      "oracle": {
+        "original": "0xb780ebA83D6210B4f7fcc86B2996F2918Eb7B14b",
+        "staged": "0x81306ac116b8B08856DdC1a0EF4B7E3C727F5EFa",
+        "originalPrice": "6211002657339071371408",
+        "stagedPrice": "1242200531467814274",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "7",
+          "owner": "0x1000000000000000000000000000000000000400",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "69951827236704936",
+          "expectedHai": "424983354270084502305",
+          "estimatedCollateralBought": "92157451258159052",
+          "estimatedCollateralWei": "92157451258159052"
+        },
+        {
+          "auctionId": "8",
+          "owner": "0x1000000000000000000000000000000000000401",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "69951827236704936",
+          "expectedHai": "424983354270084502305",
+          "estimatedCollateralBought": "92157451258159052",
+          "estimatedCollateralWei": "92157451258159052"
+        },
+        {
+          "auctionId": "9",
+          "owner": "0x1000000000000000000000000000000000000402",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "69951827236704936",
+          "expectedHai": "424983354270084502305",
+          "estimatedCollateralBought": "92157451258159052",
+          "estimatedCollateralWei": "92157451258159052"
+        }
+      ]
+    },
+    {
+      "cTypeName": "HAIVELOV2",
+      "cTypeBytes32": "0x48414956454c4f56320000000000000000000000000000000000000000000000",
+      "collateralJoinAddress": "0x36Bf76b8d62c8943bC6E684245C42fbF0253840D",
+      "collateralAuctionHouseAddress": "0xD2873c157062abE35F619493e016E656A08B00C9",
+      "stagedSafes": [
+        {
+          "owner": "0x1000000000000000000000000000000000000403",
+          "collateralToken": "0x20A7EaF4a922DF50b312ef61AeA8B6E1deb5DdD6",
+          "multiplier": "0",
+          "collateralWei": "49592719690664692974897",
+          "collateralWad": "49592719690664692974897",
+          "debtWad": "250000000000000000000",
+          "maxDebtWad": "300000000000000000000"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000404",
+          "collateralToken": "0x20A7EaF4a922DF50b312ef61AeA8B6E1deb5DdD6",
+          "multiplier": "0",
+          "collateralWei": "49592719690664692974897",
+          "collateralWad": "49592719690664692974897",
+          "debtWad": "250000000000000000000",
+          "maxDebtWad": "300000000000000000000"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000405",
+          "collateralToken": "0x20A7EaF4a922DF50b312ef61AeA8B6E1deb5DdD6",
+          "multiplier": "0",
+          "collateralWei": "49592719690664692974897",
+          "collateralWad": "49592719690664692974897",
+          "debtWad": "250000000000000000000",
+          "maxDebtWad": "300000000000000000000"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x1000000000000000000000000000000000000403",
+          "auctionId": "13"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000404",
+          "auctionId": "14"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000405",
+          "auctionId": "15"
+        }
+      ],
+      "oracle": {
+        "original": "0x02BdE9Dd0DF3ABeb6bADe013d834E0D60D50B391",
+        "staged": "0xA672E243260Da5f8DbC0DAC76452C617DFB41627",
+        "originalPrice": "16227980000000000",
+        "stagedPrice": "3245596000000",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "13",
+          "owner": "0x1000000000000000000000000000000000000403",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "73765033862187395",
+          "expectedHai": "550773386688321643676",
+          "estimatedCollateralBought": "49592719690664692974897",
+          "estimatedCollateralWei": "49592719690664692974897"
+        },
+        {
+          "auctionId": "14",
+          "owner": "0x1000000000000000000000000000000000000404",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "73765033862187395",
+          "expectedHai": "550773386688321643676",
+          "estimatedCollateralBought": "49592719690664692974897",
+          "estimatedCollateralWei": "49592719690664692974897"
+        },
+        {
+          "auctionId": "15",
+          "owner": "0x1000000000000000000000000000000000000405",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "73765033862187395",
+          "expectedHai": "550773386688321643676",
+          "estimatedCollateralBought": "49592719690664692974897",
+          "estimatedCollateralWei": "49592719690664692974897"
+        }
+      ]
+    },
+    {
+      "cTypeName": "MOO-VELO-BOLD-LUSD",
+      "cTypeBytes32": "0x4d4f4f2d56454c4f2d424f4c442d4c5553440000000000000000000000000000",
+      "collateralJoinAddress": "0x807eBA431227e296ac38DfED5348e8a7D405d6dE",
+      "collateralAuctionHouseAddress": "0x05A58ad523854CE232130C49080050c84bE985F3",
+      "stagedSafes": [
+        {
+          "owner": "0x1000000000000000000000000000000000000406",
+          "collateralToken": "0xC06C0A19d0A3eD7B3BA9D7c3101B6BC9634b84a9",
+          "multiplier": "0",
+          "collateralWei": "223226631385866076576",
+          "collateralWad": "223226631385866076576",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000000"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000407",
+          "collateralToken": "0xC06C0A19d0A3eD7B3BA9D7c3101B6BC9634b84a9",
+          "multiplier": "0",
+          "collateralWei": "223226631385866076576",
+          "collateralWad": "223226631385866076576",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000000"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000408",
+          "collateralToken": "0xC06C0A19d0A3eD7B3BA9D7c3101B6BC9634b84a9",
+          "multiplier": "0",
+          "collateralWei": "223226631385866076576",
+          "collateralWad": "223226631385866076576",
+          "debtWad": "200000000000000000000",
+          "maxDebtWad": "240000000000000000000"
+        }
+      ],
+      "auctions": [
+        {
+          "owner": "0x1000000000000000000000000000000000000406",
+          "auctionId": "1"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000407",
+          "auctionId": "2"
+        },
+        {
+          "owner": "0x1000000000000000000000000000000000000408",
+          "auctionId": "3"
+        }
+      ],
+      "oracle": {
+        "original": "0x5297d401079B9Ad332eBaFdE622e632624B59BD0",
+        "staged": "0xE35fA3C3A015247E2B66234f3ce6f1D9Ab790640",
+        "originalPrice": "2121378353839223787",
+        "stagedPrice": "424275670767844",
+        "divisor": "5000"
+      },
+      "suggestedBids": [
+        {
+          "auctionId": "1",
+          "owner": "0x1000000000000000000000000000000000000406",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "57872338505320189",
+          "expectedHai": "354203168232466825126",
+          "estimatedCollateralBought": "223226631385866076576",
+          "estimatedCollateralWei": "223226631385866076576"
+        },
+        {
+          "auctionId": "2",
+          "owner": "0x1000000000000000000000000000000000000407",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "57872338505320189",
+          "expectedHai": "354203168232466825126",
+          "estimatedCollateralBought": "223226631385866076576",
+          "estimatedCollateralWei": "223226631385866076576"
+        },
+        {
+          "auctionId": "3",
+          "owner": "0x1000000000000000000000000000000000000408",
+          "bidAmount": "100000000000000000000",
+          "adjustedBid": "57872338505320189",
+          "expectedHai": "354203168232466825126",
+          "estimatedCollateralBought": "223226631385866076576",
+          "estimatedCollateralWei": "223226631385866076576"
+        }
+      ]
+    }
+  ]
+}
