@@ -119,6 +119,14 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Maximum normalized reserve size used before volatile geometric-mean scaling.
   uint256 internal constant VOLATILE_GEOMEAN_SCALE_LIMIT = 1e27;
 
+  /// @notice Maximum token price ratio allowed for stable-pool collateral pricing.
+  uint256 internal constant MAX_STABLE_PRICE_DEVIATION = 1.05e18;
+
+  /// @notice Maximum daily-low decrease allowed for volatile single-feed pools.
+  uint256 internal constant MAX_SINGLE_FEED_DAILY_LOW_DECREASE_BPS = 2000;
+
+  uint256 internal constant BPS = 10_000;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -159,6 +167,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
     if (_maxStablePriceDeviation < DECIMALS) {
       revert StablePriceDeviationTooLow();
+    }
+    if (_maxStablePriceDeviation > MAX_STABLE_PRICE_DEVIATION) {
+      revert StablePriceDeviationTooHigh();
     }
     maxStablePriceDeviation = _maxStablePriceDeviation;
 
@@ -230,6 +241,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error TwapObservationTooOld();
   error TwapObservationIntervalTooLong();
   error StablePriceDeviationTooLow();
+  error StablePriceDeviationTooHigh();
   error StablePriceDeviation();
   error NoPostSequencerRecoveryPriceUpdate();
   error PessimisticPriceAgeTooShort();
@@ -238,6 +250,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error InvalidLpPrice();
   error NoValidPriceUpdates();
   error PessimisticPriceWindowNotReady();
+  error SingleFeedDailyLowDecreaseTooLarge();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -440,6 +453,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // store price if it's today's low
     uint256 todaysLow = dailyLow[day];
     if (isFirstUpdate || currentPrice < todaysLow) {
+      _validateSingleFeedDailyLowDecrease(currentPrice, day, todaysLow);
       dailyLow[day] = currentPrice;
       emit RecordDailyLow(currentPrice);
     }
@@ -600,6 +614,29 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     _valid = dailyUpdates[_day] > 0 && dailyLow[_day] > 0;
   }
 
+  function _validateSingleFeedDailyLowDecrease(uint256 _currentPrice, uint256 _day, uint256 _todaysLow) internal view {
+    if (stable || !_isSingleFeed()) return;
+
+    uint256 referencePrice;
+    if (_todaysLow > 0) {
+      referencePrice = _todaysLow;
+    } else if (_day > 0 && _hasValidDailyLow(_day - 1)) {
+      referencePrice = dailyLow[_day - 1];
+    }
+
+    if (referencePrice == 0) return;
+
+    uint256 minimumPrice =
+      FixedPointMathLib.mulDivDownFullPrecision(referencePrice, BPS - MAX_SINGLE_FEED_DAILY_LOW_DECREASE_BPS, BPS);
+    if (_currentPrice < minimumPrice) {
+      revert SingleFeedDailyLowDecreaseTooLarge();
+    }
+  }
+
+  function _isSingleFeed() internal view returns (bool _singleFeed) {
+    _singleFeed = (token0Feed == address(0)) != (token1Feed == address(0));
+  }
+
   function _getMarginalAmountOut(
     address _token,
     uint256 _amountIn,
@@ -639,10 +676,16 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
       (uint256 knownReserve, uint256 derivedReserve) =
         _getNormalizedReservePair(knownTokenIsToken0, reserve0Average, reserve1Average);
+      if (knownReserve == 0 || derivedReserve == 0) {
+        revert InvalidDerivedPrice();
+      }
 
       if (stable) {
         (uint256 knownDerivative, uint256 derivedDerivative) =
           _getScaledStableDerivativePair(knownReserve, derivedReserve);
+        if (knownDerivative == 0 || derivedDerivative == 0) {
+          revert InvalidDerivedPrice();
+        }
         twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownDerivative, derivedDerivative);
       } else {
         twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownReserve, derivedReserve);

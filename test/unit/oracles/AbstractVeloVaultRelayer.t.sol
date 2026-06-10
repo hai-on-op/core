@@ -131,6 +131,23 @@ contract Unit_AbstractVeloVaultRelayer is HaiTest {
     relayer.read();
   }
 
+  function test_UpdatePricePerFullShare_RecoversFromAcceptedZeroPricePerFullShare() public {
+    relayer.setPricePerFullShare(0);
+    relayer.updatePricePerFullShare();
+
+    relayer.setPricePerFullShare(1e18);
+
+    bool updated = relayer.updatePricePerFullShare();
+
+    assertTrue(updated);
+    assertEq(relayer.acceptedPricePerFullShare(), 1e18);
+
+    (uint256 result, bool valid) = relayer.getResultWithValidity();
+
+    assertEq(result, 2e18);
+    assertTrue(valid);
+  }
+
   function test_UpdatePricePerFullShare_DoesNotAcceptIncreaseBeforeDelay() public {
     relayer.setPricePerFullShare(10e18);
 

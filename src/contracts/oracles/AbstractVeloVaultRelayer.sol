@@ -125,6 +125,15 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
       return true;
     }
 
+    if (_acceptedPricePerFullShare == 0) {
+      acceptedPricePerFullShare = _pricePerFullShare;
+      lastPricePerFullShareUpdateTime = block.timestamp;
+
+      emit UpdatePricePerFullShare(_pricePerFullShare);
+
+      return true;
+    }
+
     if (_pricePerFullShare > _acceptedPricePerFullShare) {
       if (block.timestamp < lastPricePerFullShareUpdateTime + PRICE_PER_FULL_SHARE_UPDATE_DELAY) {
         return false;

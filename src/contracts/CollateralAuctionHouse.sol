@@ -134,6 +134,8 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
 
   /**
    * @notice Get the collateral price from the oracle
+   * @dev Uses the collateral oracle configured in OracleRelayer for both SAFE accounting and auction execution.
+   *      For Velo LP collateral this intentionally means auctions use the same delayed/pessimistic price source.
    * @return _collateralPrice The collateral price if valid [wad]
    */
   function _getCollateralPrice() internal view returns (uint256 _collateralPrice) {

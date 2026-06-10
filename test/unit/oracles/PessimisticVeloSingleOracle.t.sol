@@ -439,6 +439,22 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     );
   }
 
+  function test_Constructor_RevertsWhenMaxStablePriceDeviationTooHigh() public {
+    vm.expectRevert(PessimisticVeloSingleOracle.StablePriceDeviationTooHigh.selector);
+    new PessimisticVeloSingleOracle(
+      address(0),
+      address(0),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION + 1,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+  }
+
   function test_Constructor_RevertsWhenMaxPessimisticPriceAgeTooShort() public {
     vm.expectRevert(PessimisticVeloSingleOracle.PessimisticPriceAgeTooShort.selector);
     new PessimisticVeloSingleOracle(
@@ -526,6 +542,14 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_GetTokenPrices_RevertsWhenDerivedTokenPriceRoundsToZero() public {
     _deployOracle(false, 1e18, 1_000_000_000e18);
+    _mockSequencerUp();
+
+    vm.expectRevert(PessimisticVeloSingleOracle.InvalidDerivedPrice.selector);
+    oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_RevertsWhenTwapDerivedReserveIsZero() public {
+    _deployOracle(false, 1e18, 0);
     _mockSequencerUp();
 
     vm.expectRevert(PessimisticVeloSingleOracle.InvalidDerivedPrice.selector);
@@ -778,6 +802,71 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(oracle.dailyUpdates(day), 1);
     assertEq(oracle.dailyLow(day), 200_000_000);
     assertEq(oracle.getCurrentPoolPrice(true), 200_000_000);
+  }
+
+  function test_UpdatePrice_RevertsWhenVolatileSingleFeedDailyLowDropsTooMuch() public {
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    assertEq(oracle.dailyLow(day), 400_000_000);
+
+    pool.setConstantObservations(0.79e18, 1e18, POINTS + 1);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.SingleFeedDailyLowDecreaseTooLarge.selector);
+    oracle.updatePrice();
+
+    assertEq(oracle.dailyUpdates(day), 1);
+    assertEq(oracle.dailyLow(day), 400_000_000);
+  }
+
+  function test_UpdatePrice_AllowsVolatileSingleFeedDailyLowDropWithinCap() public {
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    pool.setConstantObservations(0.81e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertGt(oracle.dailyLow(day), 320_000_000);
+    assertLt(oracle.dailyLow(day), 400_000_000);
+  }
+
+  function test_UpdatePrice_DoesNotApplySingleFeedDailyLowCapToDualFeedPool() public {
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    pool.setReserves(0.25e18, 1e18);
+    oracle.updatePrice();
+
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertLt(oracle.dailyLow(day), 200_000_000);
+  }
+
+  function test_UpdatePrice_DoesNotApplySingleFeedDailyLowCapToStablePool() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    pool.setReserves(0.25e18, 0.25e18);
+    oracle.updatePrice();
+
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertLt(oracle.dailyLow(day), 200_000_000);
   }
 
   function test_GetCurrentPoolPrice_PessimisticIgnoresLegacyZeroLow() public {
