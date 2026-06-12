@@ -652,15 +652,27 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   function _getVolatileGeometricMean(uint256 _reserve0, uint256 _reserve1) internal pure returns (uint256 _k) {
     if (_reserve0 == 0 || _reserve1 == 0) return 0;
 
+    // Compute the exact geometric mean whenever the raw product fits in uint256. This is the common case and a
+    // far wider domain than the 1e27 magnitude guard used previously, which truncated a small reserve to zero
+    // (returning k == 0 for a validly priceable pool) any time the other reserve crossed 1e27.
+    if (_reserve0 <= type(uint256).max / _reserve1) {
+      return FixedPointMathLib.sqrt(_reserve0 * _reserve1);
+    }
+
+    // Genuine overflow territory (both reserves enormous, physically unrealizable for a real pool): scale down
+    // before the sqrt. Floor division can zero a dust reserve here; returning 0 is the conservative fallback.
     uint256 maxReserve = _reserve0 > _reserve1 ? _reserve0 : _reserve1;
     uint256 scale = _ceilDiv(maxReserve, VOLATILE_GEOMEAN_SCALE_LIMIT);
-    if (scale <= 1) return FixedPointMathLib.sqrt(_reserve0 * _reserve1);
 
     uint256 scaledReserve0 = _reserve0 / scale;
     uint256 scaledReserve1 = _reserve1 / scale;
     if (scaledReserve0 == 0 || scaledReserve1 == 0) return 0;
 
-    _k = FixedPointMathLib.sqrt(scaledReserve0 * scaledReserve1) * scale;
+    // Bound the rescale so sqrt(...) * scale cannot itself overflow; fall back to 0 if it would.
+    uint256 root = FixedPointMathLib.sqrt(scaledReserve0 * scaledReserve1);
+    if (root > type(uint256).max / scale) return 0;
+
+    _k = root * scale;
   }
 
   function _requirePopulatedPessimisticWindow(uint256 _day) internal view {
@@ -769,15 +781,20 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
         revert InvalidDerivedPrice();
       }
 
+      // Accumulate each sample at 1e18-boosted precision and floor only once (below), instead of flooring every
+      // sample to 8 decimals before summing. Round-then-average could floor sub-unit-but-nonzero sample prices
+      // to zero and drag a valid average down to zero, reverting the update (L-19). The 1e18 boost is safe: a
+      // mulDivDownFullPrecision uses 512-bit intermediates and an 8-decimal Chainlink price leaves ample headroom.
       if (stable) {
         (uint256 knownDerivative, uint256 derivedDerivative) =
           _getScaledStableDerivativePair(knownReserve, derivedReserve);
         if (knownDerivative == 0 || derivedDerivative == 0) {
           revert InvalidDerivedPrice();
         }
-        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownDerivative, derivedDerivative);
+        twapPrice +=
+          FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice * 1e18, knownDerivative, derivedDerivative);
       } else {
-        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice, knownReserve, derivedReserve);
+        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice * 1e18, knownReserve, derivedReserve);
       }
 
       unchecked {
@@ -785,7 +802,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       }
     }
 
-    twapPrice /= points;
+    twapPrice /= (points * 1e18);
   }
 
   function _getNormalizedReservePair(

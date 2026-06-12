@@ -598,6 +598,60 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertLt(vulnerablePrice1 * 10, expectedPrice1);
   }
 
+  function test_GetVolatileGeometricMean_DoesNotTruncateAsymmetricReservesToZero() public {
+    // L-13: normalized reserves (1e36, 1) have a product that fits in uint256, so the geometric mean must be
+    // sqrt(product) = 1e18, not zeroed by the old 1e27 magnitude scaling (which floor-divided the small reserve
+    // to 0 and returned k = 0, bricking pricing with InvalidLpPrice).
+    _deployOracleWithFeeds(false, 1e36, 1, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    // k = sqrt(1e36 * 1) = 1e18; p = sqrt(1e8 * 1e16 * 1e8) = 1e16; price = 2*p*k/totalSupply/1e8 = 2e8
+    assertEq(oracle.getCurrentPoolPrice(false), 2e8);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 2e8);
+  }
+
+  function test_GetTokenPrices_AveragesDerivedPriceBeforeFlooring() public {
+    // L-19: per-sample derived prices that each floor to 0 at 8 decimals (0.9 units) but average to a nonzero
+    // value (1.0) must survive. Old code floored every sample first (0+0+0+1)/4 = 0 -> InvalidDerivedPrice;
+    // boosted accumulation keeps sub-unit precision so the average is 1.
+    token0Feed = new ChainlinkOracleForTest(8, 1, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, false, 1e18, 1e18);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    uint256[] memory reserve0 = new uint256[](POINTS);
+    uint256[] memory reserve1 = new uint256[](POINTS);
+    reserve0[0] = 0.9e18;
+    reserve0[1] = 0.9e18;
+    reserve0[2] = 0.9e18;
+    reserve0[3] = 1.3e18;
+    for (uint256 i = 0; i < POINTS;) {
+      reserve1[i] = 1e18;
+      unchecked {
+        i++;
+      }
+    }
+    pool.setObservationsWithReserves(reserve0, reserve1, 30 minutes);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+    assertEq(price0, 1);
+    assertEq(price1, 1); // (0.9 + 0.9 + 0.9 + 1.3) / 4 = 1.0, not floored to 0
+  }
+
   function test_GetCurrentPoolPrice_VolatileSingleFeedToken0CapUsesTwapReservesNotSpot() public {
     token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, false, 1e6, 1e18);
