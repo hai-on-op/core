@@ -535,39 +535,70 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // pull our prices
     (uint256 price0, uint256 price1) = getTokenPrices();
 
+    uint256 totalSupply = poolContract.totalSupply();
+
     if (stable) {
       _validateStablePriceDeviation(price0, price1);
-      fairReservesPricing =
-        _calculate_stable_lp_token_price(poolContract.totalSupply(), price0, price1, reserve0, reserve1, 8);
+      fairReservesPricing = _calculate_stable_lp_token_price(totalSupply, price0, price1, reserve0, reserve1, 8);
     } else {
       uint256 k = _getVolatileGeometricMean(reserve0, reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
       uint256 p = FixedPointMathLib.sqrt(price0 * 1e16 * price1); // boost this to 1e16 to give us more precision
 
       // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
-      uint256 totalSupply = poolContract.totalSupply();
       fairReservesPricing = FixedPointMathLib.mulDivDownFullPrecision(2 * p, k, totalSupply) / 1e8;
-      fairReservesPricing =
-        _capVolatileSingleFeedPrice(fairReservesPricing, totalSupply, reserve0, reserve1, price0, price1);
     }
+
+    // for single-feed pools (volatile or stable), bound the LP price by the value of the trusted (fed) side.
+    // no-op for dual-feed pools.
+    fairReservesPricing = _capSingleFeedPrice(fairReservesPricing, totalSupply, price0, price1);
   }
 
-  function _capVolatileSingleFeedPrice(
+  function _capSingleFeedPrice(
     uint256 _lpPrice,
     uint256 _totalSupply,
-    uint256 _reserve0,
-    uint256 _reserve1,
     uint256 _price0,
     uint256 _price1
   ) internal view returns (uint256 cappedPrice) {
     cappedPrice = _lpPrice;
+    if (!_isSingleFeed()) return cappedPrice;
 
-    if (token0Feed != address(0) && token1Feed == address(0)) {
-      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve0, _price0, _totalSupply);
-      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
-    } else if (token1Feed != address(0) && token0Feed == address(0)) {
-      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve1, _price1, _totalSupply);
-      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
+    // Bound the LP price by twice the value of the trusted (fed) side, using TWAP-averaged reserves so the
+    // bound cannot be moved by a single-block reserve manipulation (a spot drain/inflation no longer collapses
+    // or inflates the cached low). For stable pools the bound roughly equals fair value at balance, so it will
+    // bind -- and conservatively underprice by ~the imbalance fraction -- during a sustained imbalance toward
+    // the unfed side. That pessimistic-direction cost is the accepted price of resisting unfed-token depeg
+    // overvaluation, where the trusted reserve drains while the TWAP-derived unfed price still lags near peg.
+    (uint256 reserve0Average, uint256 reserve1Average) = _getTwapAverageReserves();
+
+    uint256 cap;
+    if (token0Feed != address(0)) {
+      cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve0Average, _price0, _totalSupply);
+    } else {
+      cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve1Average, _price1, _totalSupply);
     }
+
+    if (_lpPrice > cap) cappedPrice = cap;
+  }
+
+  // average of the per-interval TWAP reserves over the configured window, normalized to 18 decimals
+  function _getTwapAverageReserves() internal view returns (uint256 reserve0Average, uint256 reserve1Average) {
+    IVeloPool poolContract = IVeloPool(pool);
+    (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
+
+    uint256 reserve0Sum;
+    uint256 reserve1Sum;
+    for (; i < length;) {
+      (uint256 reserve0Interval, uint256 reserve1Interval) = _getAverageReserves(poolContract, i);
+      reserve0Sum += reserve0Interval;
+      reserve1Sum += reserve1Interval;
+
+      unchecked {
+        i++;
+      }
+    }
+
+    reserve0Average = _normalizeReserve(reserve0Sum / points, decimals0);
+    reserve1Average = _normalizeReserve(reserve1Sum / points, decimals1);
   }
 
   function _validateStablePriceDeviation(uint256 _price0, uint256 _price1) internal view {

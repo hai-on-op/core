@@ -598,7 +598,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertLt(vulnerablePrice1 * 10, expectedPrice1);
   }
 
-  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken0PricingByCurrentFedReserve() public {
+  function test_GetCurrentPoolPrice_VolatileSingleFeedToken0CapUsesTwapReservesNotSpot() public {
     token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, false, 1e6, 1e18);
     pool.setConstantObservations(1000e6, 1e18, POINTS + 1);
@@ -620,12 +620,18 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken1Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
+    // M-13: a single-block spot drain of the fed reserve must NOT collapse the price. The cap is derived from
+    // TWAP-averaged reserves, which are unchanged by a spot-only move (the old spot cap would report 20e8).
     pool.setReserves(10e6, 100e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
+    // M-11 preserved: a single-block spot inflation must NOT overvalue. The cap still bounds the LP price by
+    // the TWAP-averaged fed-side value (uncapped this would be ~63000e8).
+    pool.setReserves(1_000_000e6, 1e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
   }
 
-  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken1PricingByCurrentFedReserve() public {
+  function test_GetCurrentPoolPrice_VolatileSingleFeedToken1CapUsesTwapReservesNotSpot() public {
     token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, false, 1e18, 1e6);
     pool.setConstantObservations(1e18, 1000e6, POINTS + 1);
@@ -647,9 +653,58 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken0Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
+    // M-13: spot drain of the fed (token1) reserve must not collapse the price.
     pool.setReserves(100e18, 10e6);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
+    // M-11 preserved: spot inflation must not overvalue.
+    pool.setReserves(1e18, 1_000_000e6);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
+  }
+
+  function test_GetCurrentPoolPrice_StableSingleFeedCapBoundsLpByFedSide() public {
+    // single-feed stable pool: token0 (e.g. BOLD) has a $1 feed, token1 (e.g. LUSD) is TWAP-derived.
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, true, 1e18, 1e18);
+    pool.setConstantObservations(1000e18, 1000e18, POINTS + 1);
+    pool.setTotalSupply(2000e18);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    uint256 baseline = oracle.getCurrentPoolPrice(false);
+
+    // M-16: with the TWAP-averaged fed reserve unchanged, a spot inflation that the stable formula would price
+    // up is bounded by the fed-side cap, so the reported price stays anchored to the trusted side's value.
+    pool.setReserves(10_000e18, 10_000e18);
+    uint256 cappedSingleFeed = oracle.getCurrentPoolPrice(false);
+    assertApproxEqAbs(cappedSingleFeed, baseline, 1e6);
+
+    // Same pool/reserves as a dual-feed deployment (no cap) is NOT bounded, proving the cap is what limits it.
+    token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    PessimisticVeloSingleOracle dualFeedOracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(token1Feed),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    assertGt(dualFeedOracle.getCurrentPoolPrice(false), cappedSingleFeed);
   }
 
   function test_GetCurrentPoolPrice_DoesNotOverflowForHugeVolatileReserves() public {
