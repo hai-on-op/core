@@ -677,14 +677,16 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken1Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
-    // M-13: a single-block spot drain of the fed reserve must NOT collapse the price. The cap is derived from
-    // TWAP-averaged reserves, which are unchanged by a spot-only move (the old spot cap would report 20e8).
+    // M-13: a single-block spot drain of the fed reserve (a k-preserving swap) must NOT move the price. The
+    // fair-reserves value is k-based and the cap is TWAP-anchored (the old spot cap would have reported 20e8).
     pool.setReserves(10e6, 100e18);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    // M-11 preserved: a single-block spot inflation must NOT overvalue. The cap still bounds the LP price by
-    // the TWAP-averaged fed-side value (uncapped this would be ~63000e8).
-    pool.setReserves(1_000_000e6, 1e18);
+    // Codex P1: a single-block balanced flash mint (reserves AND totalSupply scaled together) must NOT move the
+    // price. The cap's trusted-side bound and the fair value it scales both divide by the same supply, so the
+    // supply cancels (the old cap divided a TWAP reserve by the inflated spot supply and underpriced ~halved).
+    pool.setReserves(2000e6, 2e18);
+    pool.setTotalSupply(2e18);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
   }
 
@@ -710,21 +712,21 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken0Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
-    // M-13: spot drain of the fed (token1) reserve must not collapse the price.
+    // M-13: spot drain (k-preserving swap) of the fed (token1) reserve must not move the price.
     pool.setReserves(100e18, 10e6);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    // M-11 preserved: spot inflation must not overvalue.
-    pool.setReserves(1e18, 1_000_000e6);
+    // Codex P1: a balanced flash mint must not move the price (supply cancels in the cap ratio).
+    pool.setReserves(2e18, 2000e6);
+    pool.setTotalSupply(2e18);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
   }
 
-  function test_GetCurrentPoolPrice_StableSingleFeedCapBoundsLpByFedSide() public {
-    // single-feed stable pool: token0 (e.g. BOLD) has a $1 feed, token1 (e.g. LUSD) is TWAP-derived.
+  function _deployStableSingleFeed(uint256 _reserve0, uint256 _reserve1, uint256 _totalSupply) internal {
     token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, true, 1e18, 1e18);
-    pool.setConstantObservations(1000e18, 1000e18, POINTS + 1);
-    pool.setTotalSupply(2000e18);
+    pool.setConstantObservations(_reserve0, _reserve1, POINTS + 1);
+    pool.setTotalSupply(_totalSupply);
     oracle = new PessimisticVeloSingleOracle(
       address(pool),
       address(token0Feed),
@@ -737,19 +739,35 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
       MAX_PESSIMISTIC_PRICE_AGE,
       address(this)
     );
+  }
+
+  function test_GetCurrentPoolPrice_StableSingleFeedCapResistsFlashMint() public {
+    // single-feed stable pool (e.g. BOLD fed / LUSD derived), balanced.
+    _deployStableSingleFeed(1000e18, 1000e18, 2000e18);
     _mockSequencerUp();
 
     uint256 baseline = oracle.getCurrentPoolPrice(false);
 
-    // M-16: with the TWAP-averaged fed reserve unchanged, a spot inflation that the stable formula would price
-    // up is bounded by the fed-side cap, so the reported price stays anchored to the trusted side's value.
-    pool.setReserves(10_000e18, 10_000e18);
-    uint256 cappedSingleFeed = oracle.getCurrentPoolPrice(false);
-    assertApproxEqAbs(cappedSingleFeed, baseline, 1e6);
+    // Codex P1 (underprice): a balanced flash mint doubles spot reserves AND totalSupply while the TWAP reserves
+    // lag. The price must stay at baseline. The OLD cap divided a TWAP reserve by the inflated spot supply and
+    // would have underpriced to ~half here; option 1 cancels the supply in the cap ratio.
+    pool.setReserves(2000e18, 2000e18);
+    pool.setTotalSupply(4000e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), baseline, baseline / 1000);
+  }
 
-    // Same pool/reserves as a dual-feed deployment (no cap) is NOT bounded, proving the cap is what limits it.
-    token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
-    PessimisticVeloSingleOracle dualFeedOracle = new PessimisticVeloSingleOracle(
+  function test_GetCurrentPoolPrice_StableSingleFeedCapBindsAndResistsFlashBurn() public {
+    // TWAP imbalanced toward the unfed (token1) side so the fed-side cap binds and marks the price down,
+    // while the derived price stays inside the 1.05 deviation band.
+    _deployStableSingleFeed(900e18, 1100e18, 2000e18);
+    _mockSequencerUp();
+
+    (, uint256 derivedPrice1) = oracle.getTokenPrices();
+    uint256 cappedPrice = oracle.getCurrentPoolPrice(false);
+
+    // confirm the cap is actually binding: an identical DUAL-feed pool (no cap, same derived price) is higher
+    token1Feed = new ChainlinkOracleForTest(8, int256(derivedPrice1), block.timestamp);
+    PessimisticVeloSingleOracle dualFeed = new PessimisticVeloSingleOracle(
       address(pool),
       address(token0Feed),
       address(token1Feed),
@@ -761,7 +779,14 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
       MAX_PESSIMISTIC_PRICE_AGE,
       address(this)
     );
-    assertGt(dualFeedOracle.getCurrentPoolPrice(false), cappedSingleFeed);
+    assertGt(dualFeed.getCurrentPoolPrice(false), cappedPrice);
+
+    // Codex P1 (overvalue bypass): a balanced flash burn halves spot reserves AND supply while the TWAP reserves
+    // lag. The markdown must persist. The OLD cap (TWAP reserve / deflated spot supply) would have RISEN and let
+    // the overvalued price through; option 1 cancels the supply in the cap ratio.
+    pool.setReserves(450e18, 550e18);
+    pool.setTotalSupply(1000e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), cappedPrice, cappedPrice / 1000);
   }
 
   function test_GetCurrentPoolPrice_DoesNotOverflowForHugeVolatileReserves() public {

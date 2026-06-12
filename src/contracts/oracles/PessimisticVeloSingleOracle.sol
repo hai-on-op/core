@@ -569,18 +569,32 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
     if (stable) {
       _validateStablePriceDeviation(price0, price1);
-      fairReservesPricing = _calculate_stable_lp_token_price(totalSupply, price0, price1, reserve0, reserve1, 8);
-    } else {
-      uint256 k = _getVolatileGeometricMean(reserve0, reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
-      uint256 p = FixedPointMathLib.sqrt(price0 * 1e16 * price1); // boost this to 1e16 to give us more precision
-
-      // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
-      fairReservesPricing = FixedPointMathLib.mulDivDownFullPrecision(2 * p, k, totalSupply) / 1e8;
     }
+    fairReservesPricing = _fairReservesValue(totalSupply, price0, price1, reserve0, reserve1);
 
     // for single-feed pools (volatile or stable), bound the LP price by the value of the trusted (fed) side.
     // no-op for dual-feed pools.
     fairReservesPricing = _capSingleFeedPrice(fairReservesPricing, totalSupply, price0, price1);
+  }
+
+  // fair-reserves LP value for the given reserves/prices/supply (manipulation-resistant: stable uses the
+  // x^3y+y^3x invariant, volatile uses the geometric mean k), in chainlink (8-decimal) units
+  function _fairReservesValue(
+    uint256 _totalSupply,
+    uint256 _price0,
+    uint256 _price1,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 _fairValue) {
+    if (stable) {
+      _fairValue = _calculate_stable_lp_token_price(_totalSupply, _price0, _price1, _reserve0, _reserve1, 8);
+    } else {
+      uint256 k = _getVolatileGeometricMean(_reserve0, _reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
+      uint256 p = FixedPointMathLib.sqrt(_price0 * 1e16 * _price1); // boost this to 1e16 to give us more precision
+
+      // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
+      _fairValue = FixedPointMathLib.mulDivDownFullPrecision(2 * p, k, _totalSupply) / 1e8;
+    }
   }
 
   function _capSingleFeedPrice(
@@ -592,22 +606,25 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     cappedPrice = _lpPrice;
     if (!_isSingleFeed()) return cappedPrice;
 
-    // Bound the LP price by twice the value of the trusted (fed) side, using TWAP-averaged reserves so the
-    // bound cannot be moved by a single-block reserve manipulation (a spot drain/inflation no longer collapses
-    // or inflates the cached low). For stable pools the bound roughly equals fair value at balance, so it will
-    // bind -- and conservatively underprice by ~the imbalance fraction -- during a sustained imbalance toward
-    // the unfed side. That pessimistic-direction cost is the accepted price of resisting unfed-token depeg
-    // overvaluation, where the trusted reserve drains while the TWAP-derived unfed price still lags near peg.
+    // Bound the LP price by twice the value of the trusted (fed) side. Both the trusted-side bound and the fair
+    // value it is compared against are computed from the same TWAP-averaged reserves and the same totalSupply,
+    // so a single-block reserve OR totalSupply change (e.g. a flash mint/burn that would otherwise mismatch
+    // TWAP reserves with spot supply) cannot move the bound -- the supply cancels in the ratio below. The spot
+    // fair price is then scaled by that supply-independent fraction, which still tracks a sustained drain of
+    // the trusted reserve (the unfed-token depeg case) while staying invariant to liquidity-supply manipulation.
     (uint256 reserve0Average, uint256 reserve1Average) = _getTwapAverageReserves();
 
-    uint256 cap;
+    uint256 trustedValue;
     if (token0Feed != address(0)) {
-      cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve0Average, _price0, _totalSupply);
+      trustedValue = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve0Average, _price0, _totalSupply);
     } else {
-      cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve1Average, _price1, _totalSupply);
+      trustedValue = 2 * FixedPointMathLib.mulDivDownFullPrecision(reserve1Average, _price1, _totalSupply);
     }
 
-    if (_lpPrice > cap) cappedPrice = cap;
+    uint256 fairValueTwap = _fairReservesValue(_totalSupply, _price0, _price1, reserve0Average, reserve1Average);
+    if (fairValueTwap == 0 || trustedValue >= fairValueTwap) return cappedPrice;
+
+    cappedPrice = FixedPointMathLib.mulDivDownFullPrecision(_lpPrice, trustedValue, fairValueTwap);
   }
 
   // average of the per-interval TWAP reserves over the configured window, normalized to 18 decimals
