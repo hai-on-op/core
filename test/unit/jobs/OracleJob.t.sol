@@ -59,6 +59,12 @@ abstract contract Base is HaiTest {
     vm.mockCall(address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.updateResult, ()), abi.encode(_success));
   }
 
+  function _mockLastUpdateTime(uint256 _lastUpdateTime) internal {
+    vm.mockCall(
+      address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.lastUpdateTime, ()), abi.encode(_lastUpdateTime)
+    );
+  }
+
   function _mockRewardAmount(uint256 _rewardAmount) internal {
     stdstore.target(address(oracleJob)).sig(IJob.rewardAmount.selector).checked_write(_rewardAmount);
   }
@@ -160,6 +166,8 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
     _mockShouldWorkUpdateCollateralPrice(_shouldWorkUpdateCollateralPrice);
     _mockOracleRelayerCollateralParams(_cType, address(mockDelayedOracle), 0, 0);
     _mockUpdateResult(_updateResult);
+    // constant lastUpdateTime so before == after: an invalid updateResult reads as a no-op unless overridden
+    _mockLastUpdateTime(0);
   }
 
   function test_Revert_NotWorkable(bytes32 _cType) public {
@@ -171,10 +179,28 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
   }
 
   function test_Revert_InvalidPrice(bytes32 _cType) public {
+    // no-op case: updateResult() returns false AND lastUpdateTime does not advance -> revert (no reward farming)
     _mockValues(_cType, true, false);
 
     vm.expectRevert(IOracleJob.OracleJob_InvalidPrice.selector);
 
+    oracleJob.workUpdateCollateralPrice(_cType);
+  }
+
+  function test_Call_OracleRelayer_UpdateCollateralPrice_OnInvalidationTransition(bytes32 _cType) public {
+    // L-15: an invalid result that DOES advance lastUpdateTime is a genuine invalidation transition. The job
+    // must not revert; it must still push the (now invalid) result to the relayer so it reaches the SAFE engine.
+    vm.startPrank(user);
+    _mockShouldWorkUpdateCollateralPrice(true);
+    _mockOracleRelayerCollateralParams(_cType, address(mockDelayedOracle), 0, 0);
+    _mockUpdateResult(false);
+
+    bytes[] memory _lastUpdateTimes = new bytes[](2);
+    _lastUpdateTimes[0] = abi.encode(uint256(1));
+    _lastUpdateTimes[1] = abi.encode(uint256(2));
+    vm.mockCalls(address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.lastUpdateTime, ()), _lastUpdateTimes);
+
+    vm.expectCall(address(mockOracleRelayer), abi.encodeCall(mockOracleRelayer.updateCollateralPrice, (_cType)), 1);
     oracleJob.workUpdateCollateralPrice(_cType);
   }
 
