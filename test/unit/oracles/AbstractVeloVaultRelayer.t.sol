@@ -2,9 +2,11 @@
 pragma solidity 0.8.20;
 
 import {AbstractVeloVaultRelayer} from '@contracts/oracles/AbstractVeloVaultRelayer.sol';
+import {DelayedOracle} from '@contracts/oracles/DelayedOracle.sol';
 import {IPessimisticVeloLpOracle} from '@interfaces/external/IPessimisticVeloLpOracle.sol';
 import {IVeloPool} from '@interfaces/external/IVeloPool.sol';
 import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 
 contract PessimisticVeloLpOracleForTest is IPessimisticVeloLpOracle {
@@ -265,5 +267,39 @@ contract Unit_AbstractVeloVaultRelayer is HaiTest {
 
     assertTrue(updated);
     assertEq(relayer.acceptedPricePerFullShare(), 1.005e18);
+  }
+
+  // --- H-04: end-to-end front-run through a real DelayedOracle ---
+
+  function test_FrontRun_VaultLossPropagatesThroughDelayedOracleRegardlessOfCaller() public {
+    // Wrap the live relayer in a real DelayedOracle. After a vault loss with NO updatePricePerFullShare() call,
+    // an attacker who drives both delayed-oracle steps cannot keep the stale-high price latched: the relayer
+    // reports the loss-adjusted value to every caller, so the corrected price propagates over the two-step delay.
+    // (Pre-fix the relayer would still report the cached 2e18 and this would settle at 2e18, not 1e18.)
+    uint256 _updateDelay = 1 hours;
+    DelayedOracle delayedOracle = new DelayedOracle(IBaseOracle(address(relayer)), _updateDelay);
+
+    // construction sampled the healthy price: accepted 1e18 * lpPrice 2e8 / 1e8 = 2e18
+    (uint256 _result, bool _valid) = delayedOracle.getResultWithValidity();
+    assertTrue(_valid);
+    assertEq(_result, 2e18);
+
+    // vault loses half its value; nobody calls updatePricePerFullShare()
+    relayer.setPricePerFullShare(0.5e18);
+    // the relayer already reflects the loss on read: min(cached 1e18, live 0.5e18) * 2e8 / 1e8 = 1e18
+    (uint256 _relayerResult,) = relayer.getResultWithValidity();
+    assertEq(_relayerResult, 1e18);
+
+    // an attacker drives both delayed-oracle steps, trying to keep 2e18 latched
+    vm.warp(block.timestamp + _updateDelay);
+    delayedOracle.updateResult();
+    vm.warp(block.timestamp + _updateDelay);
+    delayedOracle.updateResult();
+
+    // the loss has fully propagated to the delayed oracle's current feed
+    (_result, _valid) = delayedOracle.getResultWithValidity();
+    assertTrue(_valid);
+    assertEq(_result, 1e18);
+    assertEq(delayedOracle.read(), 1e18);
   }
 }

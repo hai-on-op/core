@@ -840,6 +840,31 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     oracle.getTwapPrice(token0, 1e18);
   }
 
+  function test_GetTokenPrices_AllowsWindowStartingExactlyAtRecovery() public {
+    // L-18 boundary: the gate uses strict `<`, so a window whose earliest observation timestamp EQUALS the
+    // recovery time must be allowed (that first interval accumulates only post-recovery; `<=` would over-reject).
+    _deployOracle(false, 1e18, 1e18);
+    // setConstantObservations(.., POINTS + 1) places the earliest observation at exactly block.timestamp - 2h
+    uint256 _earliestObservationTimestamp = block.timestamp - (POINTS * 30 minutes);
+    _mockSequencer(0, _earliestObservationTimestamp);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+
+    assertGt(price0, 0);
+    assertGt(price1, 0);
+  }
+
+  function test_UpdatePrice_RevertsWhenTwapWindowStraddlesSequencerRecovery() public {
+    // L-18: the recording path (updatePrice -> _getFairReservesPricing -> getTokenPrices) is gated too, so a
+    // contaminated straddling window can never be cached as a daily low.
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+    oracle.setOperator(address(this), true);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.updatePrice();
+  }
+
   function test_GetCurrentPoolPrice_PessimisticRevertsDuringSequencerGracePeriod() public {
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
     _mockSequencerUp();
@@ -1077,6 +1102,52 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
+  function test_UpdatePrice_SingleFeedDailyLowConvergesToTrueValueOverDeepCrash() public {
+    // L-20/L-22: a deep crash must converge: the cached low steps down 20%/day, never below the true (capped)
+    // value, the oracle stays live throughout, and once the floor reaches the true value it stops decreasing.
+    vm.warp(30 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 _prevLow = oracle.dailyLow(oracle.currentDay());
+    assertEq(_prevLow, 400_000_000);
+
+    // crash the fed reserve hard and hold it; the true (capped) LP value is what the live path now reports
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    uint256 _trueLow = oracle.getCurrentPoolPrice(false);
+    assertLt(_trueLow, _prevLow); // the real value is far below the pre-crash low
+
+    bool _converged;
+    for (uint256 _i = 0; _i < 15;) {
+      vm.warp(block.timestamp + 1 days);
+      _mockSequencerUp();
+      token0Feed.set(200_000_000, block.timestamp);
+      pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+      oracle.updatePrice();
+
+      uint256 _curLow = oracle.dailyLow(oracle.currentDay());
+      uint256 _floor = (_prevLow * (10_000 - 2000)) / 10_000; // prior-day low * 0.8
+      uint256 _expected = _floor > _trueLow ? _floor : _trueLow; // clamp floor, but never below true value
+      assertEq(_curLow, _expected);
+      assertLe(_curLow, _prevLow); // monotonic non-increasing
+      assertGe(_curLow, _trueLow); // never underprices below the true value
+      assertGt(oracle.getCurrentPoolPrice(true), 0); // oracle stays live every day
+
+      if (_curLow == _trueLow) _converged = true;
+      _prevLow = _curLow;
+
+      unchecked {
+        _i++;
+      }
+    }
+
+    // after enough days the cached low has converged to the true value and holds there
+    assertTrue(_converged);
+    assertEq(oracle.dailyLow(oracle.currentDay()), _trueLow);
+  }
+
   function test_UpdatePrice_SingleFeedDailyLowClampsAfterMissedDayWithCompoundedBound() public {
     vm.warp(10 days);
     _deployOracle(false, 1e18, 1e18);
@@ -1098,6 +1169,57 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(day2, day0 + 2);
     assertEq(oracle.dailyLow(day2), 256_000_000); // 400e6 * 0.8^2, NOT unbounded
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowDecayIsCappedAfterLongGap() public {
+    // L-16: a gap longer than MAX_SINGLE_FEED_LOW_DECAY_DAYS (3) caps the compounding at 0.8^3, so the floor
+    // cannot vanish after a long keeper outage (0.8^5 would be ~131e6; the cap keeps it at 0.8^3 = 204.8e6).
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 _day0 = oracle.currentDay();
+    assertEq(oracle.dailyLow(_day0), 400_000_000);
+
+    // skip 4 whole days, then crash on day 5
+    vm.warp(block.timestamp + 5 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+
+    assertEq(oracle.currentDay(), _day0 + 5);
+    assertEq(oracle.dailyLow(oracle.currentDay()), 204_800_000); // 400e6 * 0.8^3 (capped), not 0.8^5
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowFloorAnchorsToPriorDayNotFirstReading() public {
+    // L-12: the per-day floor is anchored to the PRIOR-day carry-in low, not the current day's first reading.
+    // Day 2's first reading (350e6) is lower than day 1's (400e6); a same-day crash must clamp to 400e6*0.8=320e6
+    // (prior-day anchor), not 350e6*0.8=280e6 (which a first-reading anchor would wrongly allow).
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 400_000_000);
+
+    // day 2 first update: a modest drop within bound, recorded as-is (350e6 >= 400e6*0.8 floor)
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(175_000_000, block.timestamp); // half-priced feed -> 350e6 LP price at 1e18/1e18 reserves
+    pool.setConstantObservations(1e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    uint256 _day2 = oracle.currentDay();
+    assertEq(oracle.dailyLow(_day2), 350_000_000);
+
+    // same-day crash: clamps to the prior-day-anchored floor (320e6), proving the floor did not re-anchor to 350e6
+    token0Feed.set(175_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(_day2), 320_000_000); // 400e6 * 0.8, NOT 350e6 * 0.8 = 280e6
   }
 
   function test_UpdatePrice_AllowsVolatileSingleFeedDailyLowDropWithinCap() public {

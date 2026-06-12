@@ -3,7 +3,9 @@ pragma solidity 0.8.20;
 
 import {OracleJobForTest, IOracleJob} from '@test/mocks/OracleJobForTest.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
+import {DelayedOracle} from '@contracts/oracles/DelayedOracle.sol';
 import {IDelayedOracle} from '@interfaces/oracles/IDelayedOracle.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IPIDRateSetter} from '@interfaces/IPIDRateSetter.sol';
 import {IStabilityFeeTreasury} from '@interfaces/IStabilityFeeTreasury.sol';
 import {IJob} from '@interfaces/jobs/IJob.sol';
@@ -12,6 +14,31 @@ import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 import {HaiTest, stdStorage, StdStorage} from '@test/utils/HaiTest.t.sol';
 
 import {Assertions} from '@libraries/Assertions.sol';
+
+contract PriceSourceForTest is IBaseOracle {
+  uint256 internal _value;
+  bool internal _valid;
+  string public symbol = 'PriceSource / USD';
+
+  constructor(uint256 __value, bool __valid) {
+    _value = __value;
+    _valid = __valid;
+  }
+
+  function setResult(uint256 __value, bool __valid) external {
+    _value = __value;
+    _valid = __valid;
+  }
+
+  function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
+    return (_value, _valid);
+  }
+
+  function read() external view returns (uint256 _result) {
+    require(_valid, 'invalid');
+    return _value;
+  }
+}
 
 abstract contract Base is HaiTest {
   using stdStorage for StdStorage;
@@ -215,6 +242,42 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
     emit Rewarded(user, REWARD_AMOUNT);
 
     oracleJob.workUpdateCollateralPrice(_cType);
+  }
+
+  function test_PropagatesInvalidationThroughRealDelayedOracleOverTwoCycles() public {
+    // L-15 end-to-end against a REAL DelayedOracle (not mocked updateResult/lastUpdateTime): a fail-closed price
+    // source must propagate to invalidity over the two-step delay via the rewarded keeper path, and neither
+    // rewarded call may revert. Pre-fix the first call reverts on updateResult()==false and invalidation never
+    // propagates.
+    vm.startPrank(user);
+    uint256 _updateDelay = 1 hours;
+    PriceSourceForTest _priceSource = new PriceSourceForTest(1e18, true);
+    DelayedOracle _delayedOracle = new DelayedOracle(IBaseOracle(address(_priceSource)), _updateDelay);
+
+    bytes32 _cType = bytes32('TEST');
+    _mockShouldWorkUpdateCollateralPrice(true);
+    _mockOracleRelayerCollateralParams(_cType, address(_delayedOracle), 0, 0);
+    // updateCollateralPrice lives on the etched mockOracleRelayer (returns void, never reverts)
+
+    (, bool _validStart) = _delayedOracle.getResultWithValidity();
+    assertTrue(_validStart);
+
+    // the price source goes fail-closed
+    _priceSource.setResult(0, false);
+
+    // cycle 1: invalidation staged into nextFeed; the rewarded call must reach updateCollateralPrice (no revert)
+    vm.warp(block.timestamp + _updateDelay);
+    vm.expectCall(address(mockOracleRelayer), abi.encodeCall(mockOracleRelayer.updateCollateralPrice, (_cType)));
+    oracleJob.workUpdateCollateralPrice(_cType);
+    (, bool _validAfterOne) = _delayedOracle.getResultWithValidity();
+    assertTrue(_validAfterOne); // currentFeed still the last valid value after one cycle
+
+    // cycle 2: invalidation reaches currentFeed and is now visible to the SAFE-engine-facing getter
+    vm.warp(block.timestamp + _updateDelay);
+    oracleJob.workUpdateCollateralPrice(_cType);
+    (uint256 _resultAfterTwo, bool _validAfterTwo) = _delayedOracle.getResultWithValidity();
+    assertFalse(_validAfterTwo);
+    assertEq(_resultAfterTwo, 0);
   }
 }
 
