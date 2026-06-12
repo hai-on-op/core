@@ -808,6 +808,67 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
+  function test_GetCurrentPoolPrice_PessimisticRechecksStableDepegForDualFeed() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    // in-band: the pessimistic read serves the cached low
+    uint256 cachedLow = oracle.getCurrentPoolPrice(true);
+    assertGt(cachedLow, 0);
+
+    // a within-band feed move still serves the same cached low (the recheck only gates on the band)
+    token0Feed.set(104_000_000, block.timestamp);
+    assertEq(oracle.getCurrentPoolPrice(true), cachedLow);
+
+    // M-14: once a feed depegs beyond the band, the cached low must no longer be served
+    token0Feed.set(106_000_000, block.timestamp);
+    vm.expectRevert(PessimisticVeloSingleOracle.StablePriceDeviation.selector);
+    oracle.getCurrentPoolPrice(true);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticDoesNotRecheckStableDepegForSingleFeed() public {
+    // single-feed stable: the depeg recheck is intentionally skipped (the unfed price is the lagging TWAP
+    // value, so the fed-side cap is the relevant defense). The pessimistic read still serves the cached low.
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, true, 1e18, 1e18);
+    pool.setConstantObservations(1000e18, 1000e18, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    uint256 cachedLow = oracle.getCurrentPoolPrice(true);
+    assertGt(cachedLow, 0);
+
+    // Skew the pool so the TWAP-derived unfed price would now be far off-band. A dual-feed pool would revert
+    // here; a single-feed pool still serves its cached low because the read path skips the deviation recheck.
+    pool.setConstantObservations(1000e18, 4000e18, POINTS + 1);
+    assertEq(oracle.getCurrentPoolPrice(true), cachedLow);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticDoesNotRecheckDepegForVolatileDualFeed() public {
+    // volatile pools have no peg band; the read path must be unaffected by the stable recheck
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 300_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
   function test_GetCurrentPoolPrice_ThreeDayLowRequiresFullWindow() public {
     vm.warp(10 days);
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);

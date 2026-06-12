@@ -473,6 +473,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert PessimisticPriceStale();
     }
 
+    // For dual-feed stable pools, refuse to serve a cached low while the trusted feeds currently show a depeg
+    // beyond the allowed band: the cached low was computed under in-band conditions the oracle would now reject.
+    // This makes the read path fail closed (the relayer turns the revert into invalidity) the moment a depeg
+    // appears, rather than vouching for a stale in-band price until maxPessimisticPriceAge elapses.
+    // Single-feed stable pools are intentionally not rechecked here: their unfed price is the lagging TWAP value,
+    // so the trusted-side cap (see _capSingleFeedPrice) is the relevant defense; volatile pools have no peg band.
+    if (stable && !_isSingleFeed()) {
+      (uint256 price0, uint256 price1) = getTokenPrices();
+      _validateStablePriceDeviation(price0, price1);
+    }
+
     // start off with our standard price
     uint256 day = currentDay();
 
