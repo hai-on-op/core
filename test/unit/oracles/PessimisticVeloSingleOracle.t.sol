@@ -464,6 +464,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Volatile_ReturnsNoSlippageMarginalPrice() public {
     _deployOracle(false, 100e18, 200e18);
+    _mockSequencerUp();
 
     assertEq(oracle.getTwapPrice(token0, 1e18), 2e18);
     assertEq(oracle.getTwapPrice(token0, 100e18), 200e18);
@@ -473,6 +474,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Stable_ReturnsNoSlippageMarginalPrice() public {
     _deployOracle(true, 100e18, 200e18);
+    _mockSequencerUp();
 
     uint256 expectedToken0ToToken1 = (1e18 * _stableDerivative(200e18, 100e18)) / _stableDerivative(100e18, 200e18);
     uint256 expectedToken1ToToken0 = (1e18 * _stableDerivative(100e18, 200e18)) / _stableDerivative(200e18, 100e18);
@@ -485,6 +487,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Stable_HandlesDifferentTokenDecimals() public {
     _deployOracle(true, 1e6, 1e18, 1000e6, 2000e18);
+    _mockSequencerUp();
 
     uint256 expectedToken0ToToken1 = (1e18 * _stableDerivative(2000e18, 1000e18)) / _stableDerivative(1000e18, 2000e18);
 
@@ -782,7 +785,8 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_GetTokenPrices_RevertsWhenTwapObservationIntervalIsTooLong() public {
     _deployOracle(false, 1_000_000e18, 1_000_000e18);
-    _mockSequencerUp();
+    // recovery far enough in the past that the whole window is post-recovery, isolating the interval check
+    _mockSequencer(0, block.timestamp - 3 hours);
 
     uint256[] memory reserve0 = new uint256[](POINTS);
     uint256[] memory reserve1 = new uint256[](POINTS);
@@ -804,6 +808,36 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooLong.selector);
     oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_RevertsWhenTwapWindowStraddlesSequencerRecovery() public {
+    // L-18: observations span the last 2h; the sequencer recovered only 1h ago, so the window's earliest
+    // sampled observation predates recovery and would average frozen pre-outage reserves into the derived price.
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_SucceedsWhenTwapWindowFullyPostRecovery() public {
+    // recovery 3h ago: the entire 2h TWAP window is post-recovery, so derivation proceeds
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 3 hours);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+
+    assertGt(price0, 0);
+    assertGt(price1, 0);
+  }
+
+  function test_GetTwapPrice_RevertsWhenWindowStraddlesSequencerRecovery() public {
+    // the public TWAP quote is gated on the same post-recovery requirement for consistency
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.getTwapPrice(token0, 1e18);
   }
 
   function test_GetCurrentPoolPrice_PessimisticRevertsDuringSequencerGracePeriod() public {

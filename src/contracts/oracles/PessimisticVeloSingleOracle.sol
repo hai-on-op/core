@@ -255,6 +255,7 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error TwapObservationIntervalTooShort();
   error TwapObservationTooOld();
   error TwapObservationIntervalTooLong();
+  error TwapObservationNotPostRecovery();
   error StablePriceDeviationTooLow();
   error StablePriceDeviationTooHigh();
   error StablePriceDeviation();
@@ -823,6 +824,16 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     IVeloPool.Observation memory latestObservation = _poolContract.observations(length);
     if (block.timestamp - latestObservation.timestamp > maxTwapObservationInterval) {
       revert TwapObservationTooOld();
+    }
+
+    // Reject any window whose earliest sampled observation predates the latest sequencer recovery. During an
+    // outage no observations are written, so the first interval after a restart would span the gap and average
+    // frozen pre-outage reserves into the derived price. Observation timestamps are monotonic, so a start
+    // observation at/after recovery guarantees no sampled interval straddles recovery (per-interval validation
+    // is redundant). Fail closed until enough post-recovery observations exist (~points * 30 min after restart).
+    uint256 sequencerStartedAt = _checkSequencerUpAndGracePeriodOver();
+    if (_poolContract.observations(startIndex).timestamp < sequencerStartedAt) {
+      revert TwapObservationNotPostRecovery();
     }
   }
 
