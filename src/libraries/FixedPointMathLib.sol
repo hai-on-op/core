@@ -56,6 +56,47 @@ library FixedPointMathLib {
     }
   }
 
+  /// @notice Calculates floor(x * y / denominator) with full precision.
+  /// @dev Adapted from Uniswap V3 FullMath.mulDiv.
+  function mulDivDownFullPrecision(uint256 x, uint256 y, uint256 denominator) internal pure returns (uint256 z) {
+    /// @solidity memory-safe-assembly
+    assembly {
+      let mm := mulmod(x, y, not(0))
+      let prod0 := mul(x, y)
+      let prod1 := sub(sub(mm, prod0), lt(mm, prod0))
+
+      switch prod1
+      case 0 {
+        if iszero(denominator) { revert(0, 0) }
+        z := div(prod0, denominator)
+      }
+      default {
+        if iszero(gt(denominator, prod1)) { revert(0, 0) }
+
+        let remainder := mulmod(x, y, denominator)
+        prod1 := sub(prod1, gt(remainder, prod0))
+        prod0 := sub(prod0, remainder)
+
+        let twos := and(denominator, sub(0, denominator))
+        denominator := div(denominator, twos)
+        prod0 := div(prod0, twos)
+
+        twos := add(div(sub(0, twos), twos), 1)
+        prod0 := or(prod0, mul(prod1, twos))
+
+        let inverse := xor(mul(3, denominator), 2)
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+        inverse := mul(inverse, sub(2, mul(denominator, inverse)))
+
+        z := mul(prod0, inverse)
+      }
+    }
+  }
+
   function rpow(uint256 x, uint256 n, uint256 scalar) internal pure returns (uint256 z) {
     /// @solidity memory-safe-assembly
     assembly {

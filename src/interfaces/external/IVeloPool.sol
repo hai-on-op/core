@@ -4,6 +4,12 @@ pragma solidity 0.8.20;
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 
 interface IVeloPool is IERC20 {
+  struct Observation {
+    uint256 timestamp;
+    uint256 reserve0Cumulative;
+    uint256 reserve1Cumulative;
+  }
+
   /**
    * @notice Returns the value of tokens in existence.
    */
@@ -20,6 +26,10 @@ interface IVeloPool is IERC20 {
   function symbol() external view returns (string memory _symbol);
 
   function quote(address tokenIn, uint256 amountIn, uint256 granularity) external view returns (uint256);
+
+  function observationLength() external view returns (uint256);
+
+  function observations(uint256 index) external view returns (Observation memory);
 
   function getReserves() external view returns (uint256 _reserve0, uint256 _reserve1, uint256 _blockTimestampLast);
 
