@@ -41,6 +41,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Last time the daily low state was updated from live pricing.
   uint256 public lastPriceUpdateTime;
 
+  /// @notice Day of the most recently recorded daily low. Source of the single-feed clamp carry-in anchor.
+  uint256 public lastValidLowDay;
+
+  /// @notice Day for which the single-feed daily-low floor is currently frozen.
+  /// @dev Internal bookkeeping for the volatile single-feed fail-soft clamp.
+  uint256 internal clampFloorDay;
+
+  /// @notice Frozen minimum daily low for the current day on volatile single-feed pools.
+  /// @dev All of a day's recorded lows are clamped to this floor, so the bound cannot ratchet intra-day.
+  uint256 internal clampFloor;
+
   /// @notice Whether we use a three-day low instead of a two-day low.
   /// @dev May only be updated by owner. Realistically most useful when price updating is public, as this
   ///  guarantees any price observations used must be at least 24 hours apart.
@@ -124,6 +135,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
   /// @notice Maximum daily-low decrease allowed for volatile single-feed pools.
   uint256 internal constant MAX_SINGLE_FEED_DAILY_LOW_DECREASE_BPS = 2000;
+
+  /// @notice Maximum number of elapsed days the single-feed daily-low floor decays over after a keeper gap.
+  /// @dev Caps the compounding so a long outage cannot erase the floor entirely on the first update back.
+  uint256 internal constant MAX_SINGLE_FEED_LOW_DECAY_DAYS = 3;
 
   uint256 internal constant BPS = 10_000;
 
@@ -250,7 +265,6 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error InvalidLpPrice();
   error NoValidPriceUpdates();
   error PessimisticPriceWindowNotReady();
-  error SingleFeedDailyLowDecreaseTooLarge();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -453,9 +467,13 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     // store price if it's today's low
     uint256 todaysLow = dailyLow[day];
     if (isFirstUpdate || currentPrice < todaysLow) {
-      _validateSingleFeedDailyLowDecrease(currentPrice, day, todaysLow);
-      dailyLow[day] = currentPrice;
-      emit RecordDailyLow(currentPrice);
+      // for volatile single-feed pools, fail soft: clamp the recorded low to this day's floor instead of
+      // reverting, so a legitimate sharp drop keeps the oracle live and steps the cached low down at the
+      // bounded per-day rate. no-op for stable / dual-feed pools.
+      uint256 lowToStore = _clampSingleFeedDailyLow(currentPrice, day);
+      dailyLow[day] = lowToStore;
+      lastValidLowDay = day;
+      emit RecordDailyLow(lowToStore);
     }
   }
 
@@ -656,22 +674,51 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     _valid = dailyUpdates[_day] > 0 && dailyLow[_day] > 0;
   }
 
-  function _validateSingleFeedDailyLowDecrease(uint256 _currentPrice, uint256 _day, uint256 _todaysLow) internal view {
-    if (stable || !_isSingleFeed()) return;
+  /// @notice Fail-soft daily-low floor for volatile single-feed pools.
+  /// @dev Returns the value that should actually be stored as the day's low: the live price, or the day's floor
+  ///  if the live price is below it. The floor is frozen on the first recorded low of each day and anchored to
+  ///  the carry-in low from a prior day (never the evolving intra-day low), so the bound is a fixed per-day
+  ///  reference rather than a value that ratchets down with each same-day update (L-12). After a keeper gap the
+  ///  floor decays 20% per elapsed day, capped, so a missed day still enforces a bound instead of no-oping
+  ///  (L-16). Because we clamp rather than revert, a legitimate sharp drop is recorded at the floor and the
+  ///  oracle stays live, stepping the cached low down on subsequent days instead of freezing (L-20/L-22).
+  function _clampSingleFeedDailyLow(uint256 _currentPrice, uint256 _day) internal returns (uint256 _lowToStore) {
+    _lowToStore = _currentPrice;
+    if (stable || !_isSingleFeed()) return _lowToStore;
 
-    uint256 referencePrice;
-    if (_todaysLow > 0) {
-      referencePrice = _todaysLow;
-    } else if (_day > 0 && _hasValidDailyLow(_day - 1)) {
-      referencePrice = dailyLow[_day - 1];
+    // freeze this day's floor on its first recorded low
+    if (clampFloorDay != _day) {
+      clampFloorDay = _day;
+
+      uint256 elapsedDays;
+      uint256 anchorLow;
+      if (lastValidLowDay == 0) {
+        // no prior day to anchor against: anchor to this first reading of the day. The floor is frozen here, so
+        // later same-day updates are still bounded without ratcheting, while the first reading is unconstrained.
+        anchorLow = _currentPrice;
+        elapsedDays = 1;
+      } else {
+        // anchor to the carry-in low from the last day that recorded one, decayed per elapsed day
+        anchorLow = dailyLow[lastValidLowDay];
+        elapsedDays = _day - lastValidLowDay;
+      }
+
+      if (elapsedDays > MAX_SINGLE_FEED_LOW_DECAY_DAYS) {
+        elapsedDays = MAX_SINGLE_FEED_LOW_DECAY_DAYS;
+      }
+
+      uint256 floor = anchorLow;
+      for (uint256 i = 0; i < elapsedDays;) {
+        floor = FixedPointMathLib.mulDivDownFullPrecision(floor, BPS - MAX_SINGLE_FEED_DAILY_LOW_DECREASE_BPS, BPS);
+        unchecked {
+          i++;
+        }
+      }
+      clampFloor = floor;
     }
 
-    if (referencePrice == 0) return;
-
-    uint256 minimumPrice =
-      FixedPointMathLib.mulDivDownFullPrecision(referencePrice, BPS - MAX_SINGLE_FEED_DAILY_LOW_DECREASE_BPS, BPS);
-    if (_currentPrice < minimumPrice) {
-      revert SingleFeedDailyLowDecreaseTooLarge();
+    if (clampFloor != 0 && _currentPrice < clampFloor) {
+      _lowToStore = clampFloor;
     }
   }
 

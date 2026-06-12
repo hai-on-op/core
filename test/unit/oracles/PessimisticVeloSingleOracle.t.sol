@@ -920,7 +920,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(oracle.getCurrentPoolPrice(true), 200_000_000);
   }
 
-  function test_UpdatePrice_RevertsWhenVolatileSingleFeedDailyLowDropsTooMuch() public {
+  function test_UpdatePrice_ClampsVolatileSingleFeedDailyLowToFloorInsteadOfReverting() public {
     _deployOracle(false, 1e18, 1e18);
     _mockSequencerUp();
     oracle.setOperator(address(this), true);
@@ -930,13 +930,86 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(oracle.dailyLow(day), 400_000_000);
 
-    pool.setConstantObservations(0.79e18, 1e18, POINTS + 1);
-
-    vm.expectRevert(PessimisticVeloSingleOracle.SingleFeedDailyLowDecreaseTooLarge.selector);
+    // L-20/L-22: a drop beyond the per-day bound is clamped to the floor (0.8 * 400e6) and recorded, instead of
+    // reverting and freezing the oracle. The update succeeds and lastPriceUpdateTime advances.
+    pool.setConstantObservations(0.5e18, 1e18, POINTS + 1);
     oracle.updatePrice();
 
-    assertEq(oracle.dailyUpdates(day), 1);
-    assertEq(oracle.dailyLow(day), 400_000_000);
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertEq(oracle.dailyLow(day), 320_000_000);
+    assertEq(oracle.lastPriceUpdateTime(), block.timestamp);
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowDoesNotRatchetWithinDay() public {
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    // L-12: repeated same-day crashes all clamp to the SAME frozen floor (320e6), never 0.8^k of the anchor.
+    for (uint256 i = 0; i < 3;) {
+      pool.setConstantObservations(0.1e18, 1e18, POINTS + 1);
+      oracle.updatePrice();
+      assertEq(oracle.dailyLow(day), 320_000_000);
+
+      unchecked {
+        i++;
+      }
+    }
+    assertEq(oracle.dailyUpdates(day), 4);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowStepsDownAcrossDaysOnSustainedCrash() public {
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 400_000_000);
+
+    // L-20/L-22: a sustained deep crash steps the cached low down 20%/day while the oracle stays live.
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 320_000_000); // 0.8 * 400e6
+
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 256_000_000); // 0.8 * 320e6
+
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowClampsAfterMissedDayWithCompoundedBound() public {
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day0 = oracle.currentDay();
+    assertEq(oracle.dailyLow(day0), 400_000_000);
+
+    // L-16: skip a whole day, then crash. The clamp still applies (compounded 0.8^2), not a no-op against a
+    // zero reference, so the low cannot drop unbounded after a keeper gap.
+    vm.warp(block.timestamp + 2 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    uint256 day2 = oracle.currentDay();
+
+    assertEq(day2, day0 + 2);
+    assertEq(oracle.dailyLow(day2), 256_000_000); // 400e6 * 0.8^2, NOT unbounded
   }
 
   function test_UpdatePrice_AllowsVolatileSingleFeedDailyLowDropWithinCap() public {
