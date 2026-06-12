@@ -71,7 +71,15 @@ contract OracleJob is Authorizable, Modifiable, Job, IOracleJob {
       address _priceSource = abi.decode(_returnData, (address));
       address(_priceSource).call(abi.encodeCall(IAbstractVeloVaultRelayer.updatePricePerFullShare, ()));
     }
-    if (!_delayedOracle.updateResult()) revert OracleJob_InvalidPrice();
+    // Propagate the delayed oracle's result on every genuine state transition, including an invalidation, so a
+    // fail-closed price reaches the SAFE engine via the rewarded keeper path instead of lingering as a stale
+    // value (DelayedOracle has no staleness expiry). Only a true no-op -- updateResult() returning false WITHOUT
+    // advancing lastUpdateTime -- is rejected, so keepers cannot farm rewards on repeated invalid reads.
+    // (Escalation option, if transient outages prove disruptive: gate propagation on N consecutive invalid cycles.)
+    uint256 _lastUpdateTimeBefore = _delayedOracle.lastUpdateTime();
+    if (!_delayedOracle.updateResult() && _delayedOracle.lastUpdateTime() == _lastUpdateTimeBefore) {
+      revert OracleJob_InvalidPrice();
+    }
 
     oracleRelayer.updateCollateralPrice(_cType);
   }

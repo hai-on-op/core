@@ -464,6 +464,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Volatile_ReturnsNoSlippageMarginalPrice() public {
     _deployOracle(false, 100e18, 200e18);
+    _mockSequencerUp();
 
     assertEq(oracle.getTwapPrice(token0, 1e18), 2e18);
     assertEq(oracle.getTwapPrice(token0, 100e18), 200e18);
@@ -473,6 +474,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Stable_ReturnsNoSlippageMarginalPrice() public {
     _deployOracle(true, 100e18, 200e18);
+    _mockSequencerUp();
 
     uint256 expectedToken0ToToken1 = (1e18 * _stableDerivative(200e18, 100e18)) / _stableDerivative(100e18, 200e18);
     uint256 expectedToken1ToToken0 = (1e18 * _stableDerivative(100e18, 200e18)) / _stableDerivative(200e18, 100e18);
@@ -485,6 +487,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_Stable_HandlesDifferentTokenDecimals() public {
     _deployOracle(true, 1e6, 1e18, 1000e6, 2000e18);
+    _mockSequencerUp();
 
     uint256 expectedToken0ToToken1 = (1e18 * _stableDerivative(2000e18, 1000e18)) / _stableDerivative(1000e18, 2000e18);
 
@@ -598,7 +601,61 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertLt(vulnerablePrice1 * 10, expectedPrice1);
   }
 
-  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken0PricingByCurrentFedReserve() public {
+  function test_GetVolatileGeometricMean_DoesNotTruncateAsymmetricReservesToZero() public {
+    // L-13: normalized reserves (1e36, 1) have a product that fits in uint256, so the geometric mean must be
+    // sqrt(product) = 1e18, not zeroed by the old 1e27 magnitude scaling (which floor-divided the small reserve
+    // to 0 and returned k = 0, bricking pricing with InvalidLpPrice).
+    _deployOracleWithFeeds(false, 1e36, 1, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    // k = sqrt(1e36 * 1) = 1e18; p = sqrt(1e8 * 1e16 * 1e8) = 1e16; price = 2*p*k/totalSupply/1e8 = 2e8
+    assertEq(oracle.getCurrentPoolPrice(false), 2e8);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 2e8);
+  }
+
+  function test_GetTokenPrices_AveragesDerivedPriceBeforeFlooring() public {
+    // L-19: per-sample derived prices that each floor to 0 at 8 decimals (0.9 units) but average to a nonzero
+    // value (1.0) must survive. Old code floored every sample first (0+0+0+1)/4 = 0 -> InvalidDerivedPrice;
+    // boosted accumulation keeps sub-unit precision so the average is 1.
+    token0Feed = new ChainlinkOracleForTest(8, 1, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, false, 1e18, 1e18);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    uint256[] memory reserve0 = new uint256[](POINTS);
+    uint256[] memory reserve1 = new uint256[](POINTS);
+    reserve0[0] = 0.9e18;
+    reserve0[1] = 0.9e18;
+    reserve0[2] = 0.9e18;
+    reserve0[3] = 1.3e18;
+    for (uint256 i = 0; i < POINTS;) {
+      reserve1[i] = 1e18;
+      unchecked {
+        i++;
+      }
+    }
+    pool.setObservationsWithReserves(reserve0, reserve1, 30 minutes);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+    assertEq(price0, 1);
+    assertEq(price1, 1); // (0.9 + 0.9 + 0.9 + 1.3) / 4 = 1.0, not floored to 0
+  }
+
+  function test_GetCurrentPoolPrice_VolatileSingleFeedToken0CapUsesTwapReservesNotSpot() public {
     token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, false, 1e6, 1e18);
     pool.setConstantObservations(1000e6, 1e18, POINTS + 1);
@@ -620,12 +677,18 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken1Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
+    // M-13: a single-block spot drain of the fed reserve must NOT collapse the price. The cap is derived from
+    // TWAP-averaged reserves, which are unchanged by a spot-only move (the old spot cap would report 20e8).
     pool.setReserves(10e6, 100e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
+    // M-11 preserved: a single-block spot inflation must NOT overvalue. The cap still bounds the LP price by
+    // the TWAP-averaged fed-side value (uncapped this would be ~63000e8).
+    pool.setReserves(1_000_000e6, 1e18);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
   }
 
-  function test_GetCurrentPoolPrice_CapsVolatileSingleFeedToken1PricingByCurrentFedReserve() public {
+  function test_GetCurrentPoolPrice_VolatileSingleFeedToken1CapUsesTwapReservesNotSpot() public {
     token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
     pool = new VeloPoolForTest(token0, token1, false, 1e18, 1e6);
     pool.setConstantObservations(1e18, 1000e6, POINTS + 1);
@@ -647,9 +710,58 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(derivedToken0Price, 1000e8);
     assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1);
 
+    // M-13: spot drain of the fed (token1) reserve must not collapse the price.
     pool.setReserves(100e18, 10e6);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
 
-    assertEq(oracle.getCurrentPoolPrice(false), 20e8);
+    // M-11 preserved: spot inflation must not overvalue.
+    pool.setReserves(1e18, 1_000_000e6);
+    assertApproxEqAbs(oracle.getCurrentPoolPrice(false), 2000e8, 1e8);
+  }
+
+  function test_GetCurrentPoolPrice_StableSingleFeedCapBoundsLpByFedSide() public {
+    // single-feed stable pool: token0 (e.g. BOLD) has a $1 feed, token1 (e.g. LUSD) is TWAP-derived.
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, true, 1e18, 1e18);
+    pool.setConstantObservations(1000e18, 1000e18, POINTS + 1);
+    pool.setTotalSupply(2000e18);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+
+    uint256 baseline = oracle.getCurrentPoolPrice(false);
+
+    // M-16: with the TWAP-averaged fed reserve unchanged, a spot inflation that the stable formula would price
+    // up is bounded by the fed-side cap, so the reported price stays anchored to the trusted side's value.
+    pool.setReserves(10_000e18, 10_000e18);
+    uint256 cappedSingleFeed = oracle.getCurrentPoolPrice(false);
+    assertApproxEqAbs(cappedSingleFeed, baseline, 1e6);
+
+    // Same pool/reserves as a dual-feed deployment (no cap) is NOT bounded, proving the cap is what limits it.
+    token1Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    PessimisticVeloSingleOracle dualFeedOracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(token1Feed),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    assertGt(dualFeedOracle.getCurrentPoolPrice(false), cappedSingleFeed);
   }
 
   function test_GetCurrentPoolPrice_DoesNotOverflowForHugeVolatileReserves() public {
@@ -673,7 +785,8 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
   function test_GetTokenPrices_RevertsWhenTwapObservationIntervalIsTooLong() public {
     _deployOracle(false, 1_000_000e18, 1_000_000e18);
-    _mockSequencerUp();
+    // recovery far enough in the past that the whole window is post-recovery, isolating the interval check
+    _mockSequencer(0, block.timestamp - 3 hours);
 
     uint256[] memory reserve0 = new uint256[](POINTS);
     uint256[] memory reserve1 = new uint256[](POINTS);
@@ -695,6 +808,61 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationIntervalTooLong.selector);
     oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_RevertsWhenTwapWindowStraddlesSequencerRecovery() public {
+    // L-18: observations span the last 2h; the sequencer recovered only 1h ago, so the window's earliest
+    // sampled observation predates recovery and would average frozen pre-outage reserves into the derived price.
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.getTokenPrices();
+  }
+
+  function test_GetTokenPrices_SucceedsWhenTwapWindowFullyPostRecovery() public {
+    // recovery 3h ago: the entire 2h TWAP window is post-recovery, so derivation proceeds
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 3 hours);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+
+    assertGt(price0, 0);
+    assertGt(price1, 0);
+  }
+
+  function test_GetTwapPrice_RevertsWhenWindowStraddlesSequencerRecovery() public {
+    // the public TWAP quote is gated on the same post-recovery requirement for consistency
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.getTwapPrice(token0, 1e18);
+  }
+
+  function test_GetTokenPrices_AllowsWindowStartingExactlyAtRecovery() public {
+    // L-18 boundary: the gate uses strict `<`, so a window whose earliest observation timestamp EQUALS the
+    // recovery time must be allowed (that first interval accumulates only post-recovery; `<=` would over-reject).
+    _deployOracle(false, 1e18, 1e18);
+    // setConstantObservations(.., POINTS + 1) places the earliest observation at exactly block.timestamp - 2h
+    uint256 _earliestObservationTimestamp = block.timestamp - (POINTS * 30 minutes);
+    _mockSequencer(0, _earliestObservationTimestamp);
+
+    (uint256 price0, uint256 price1) = oracle.getTokenPrices();
+
+    assertGt(price0, 0);
+    assertGt(price1, 0);
+  }
+
+  function test_UpdatePrice_RevertsWhenTwapWindowStraddlesSequencerRecovery() public {
+    // L-18: the recording path (updatePrice -> _getFairReservesPricing -> getTokenPrices) is gated too, so a
+    // contaminated straddling window can never be cached as a daily low.
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencer(0, block.timestamp - 1 hours);
+    oracle.setOperator(address(this), true);
+
+    vm.expectRevert(PessimisticVeloSingleOracle.TwapObservationNotPostRecovery.selector);
+    oracle.updatePrice();
   }
 
   function test_GetCurrentPoolPrice_PessimisticRevertsDuringSequencerGracePeriod() public {
@@ -753,6 +921,67 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertGt(oracle.getCurrentPoolPrice(true), 0);
   }
 
+  function test_GetCurrentPoolPrice_PessimisticRechecksStableDepegForDualFeed() public {
+    _deployOracleWithFeeds(true, 1e18, 1e18, 100_000_000, 100_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    // in-band: the pessimistic read serves the cached low
+    uint256 cachedLow = oracle.getCurrentPoolPrice(true);
+    assertGt(cachedLow, 0);
+
+    // a within-band feed move still serves the same cached low (the recheck only gates on the band)
+    token0Feed.set(104_000_000, block.timestamp);
+    assertEq(oracle.getCurrentPoolPrice(true), cachedLow);
+
+    // M-14: once a feed depegs beyond the band, the cached low must no longer be served
+    token0Feed.set(106_000_000, block.timestamp);
+    vm.expectRevert(PessimisticVeloSingleOracle.StablePriceDeviation.selector);
+    oracle.getCurrentPoolPrice(true);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticDoesNotRecheckStableDepegForSingleFeed() public {
+    // single-feed stable: the depeg recheck is intentionally skipped (the unfed price is the lagging TWAP
+    // value, so the fed-side cap is the relevant defense). The pessimistic read still serves the cached low.
+    token0Feed = new ChainlinkOracleForTest(8, 100_000_000, block.timestamp);
+    pool = new VeloPoolForTest(token0, token1, true, 1e18, 1e18);
+    pool.setConstantObservations(1000e18, 1000e18, POINTS + 1);
+    oracle = new PessimisticVeloSingleOracle(
+      address(pool),
+      address(token0Feed),
+      address(0),
+      3600,
+      3600,
+      POINTS,
+      MAX_TWAP_OBSERVATION_INTERVAL,
+      MAX_STABLE_PRICE_DEVIATION,
+      MAX_PESSIMISTIC_PRICE_AGE,
+      address(this)
+    );
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    uint256 cachedLow = oracle.getCurrentPoolPrice(true);
+    assertGt(cachedLow, 0);
+
+    // Skew the pool so the TWAP-derived unfed price would now be far off-band. A dual-feed pool would revert
+    // here; a single-feed pool still serves its cached low because the read path skips the deviation recheck.
+    pool.setConstantObservations(1000e18, 4000e18, POINTS + 1);
+    assertEq(oracle.getCurrentPoolPrice(true), cachedLow);
+  }
+
+  function test_GetCurrentPoolPrice_PessimisticDoesNotRecheckDepegForVolatileDualFeed() public {
+    // volatile pools have no peg band; the read path must be unaffected by the stable recheck
+    _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 300_000_000);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+    oracle.updatePrice();
+
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
   function test_GetCurrentPoolPrice_ThreeDayLowRequiresFullWindow() public {
     vm.warp(10 days);
     _deployOracleWithFeeds(false, 1e18, 1e18, 100_000_000, 100_000_000);
@@ -804,7 +1033,7 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
     assertEq(oracle.getCurrentPoolPrice(true), 200_000_000);
   }
 
-  function test_UpdatePrice_RevertsWhenVolatileSingleFeedDailyLowDropsTooMuch() public {
+  function test_UpdatePrice_ClampsVolatileSingleFeedDailyLowToFloorInsteadOfReverting() public {
     _deployOracle(false, 1e18, 1e18);
     _mockSequencerUp();
     oracle.setOperator(address(this), true);
@@ -814,13 +1043,183 @@ contract Unit_PessimisticVeloSingleOracle_GetTwapPrice is PessimisticVeloSingleO
 
     assertEq(oracle.dailyLow(day), 400_000_000);
 
-    pool.setConstantObservations(0.79e18, 1e18, POINTS + 1);
-
-    vm.expectRevert(PessimisticVeloSingleOracle.SingleFeedDailyLowDecreaseTooLarge.selector);
+    // L-20/L-22: a drop beyond the per-day bound is clamped to the floor (0.8 * 400e6) and recorded, instead of
+    // reverting and freezing the oracle. The update succeeds and lastPriceUpdateTime advances.
+    pool.setConstantObservations(0.5e18, 1e18, POINTS + 1);
     oracle.updatePrice();
 
-    assertEq(oracle.dailyUpdates(day), 1);
-    assertEq(oracle.dailyLow(day), 400_000_000);
+    assertEq(oracle.dailyUpdates(day), 2);
+    assertEq(oracle.dailyLow(day), 320_000_000);
+    assertEq(oracle.lastPriceUpdateTime(), block.timestamp);
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowDoesNotRatchetWithinDay() public {
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day = oracle.currentDay();
+
+    // L-12: repeated same-day crashes all clamp to the SAME frozen floor (320e6), never 0.8^k of the anchor.
+    for (uint256 i = 0; i < 3;) {
+      pool.setConstantObservations(0.1e18, 1e18, POINTS + 1);
+      oracle.updatePrice();
+      assertEq(oracle.dailyLow(day), 320_000_000);
+
+      unchecked {
+        i++;
+      }
+    }
+    assertEq(oracle.dailyUpdates(day), 4);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowStepsDownAcrossDaysOnSustainedCrash() public {
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 400_000_000);
+
+    // L-20/L-22: a sustained deep crash steps the cached low down 20%/day while the oracle stays live.
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 320_000_000); // 0.8 * 400e6
+
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 256_000_000); // 0.8 * 320e6
+
+    assertGt(oracle.getCurrentPoolPrice(true), 0);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowConvergesToTrueValueOverDeepCrash() public {
+    // L-20/L-22: a deep crash must converge: the cached low steps down 20%/day, never below the true (capped)
+    // value, the oracle stays live throughout, and once the floor reaches the true value it stops decreasing.
+    vm.warp(30 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 _prevLow = oracle.dailyLow(oracle.currentDay());
+    assertEq(_prevLow, 400_000_000);
+
+    // crash the fed reserve hard and hold it; the true (capped) LP value is what the live path now reports
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    uint256 _trueLow = oracle.getCurrentPoolPrice(false);
+    assertLt(_trueLow, _prevLow); // the real value is far below the pre-crash low
+
+    bool _converged;
+    for (uint256 _i = 0; _i < 15;) {
+      vm.warp(block.timestamp + 1 days);
+      _mockSequencerUp();
+      token0Feed.set(200_000_000, block.timestamp);
+      pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+      oracle.updatePrice();
+
+      uint256 _curLow = oracle.dailyLow(oracle.currentDay());
+      uint256 _floor = (_prevLow * (10_000 - 2000)) / 10_000; // prior-day low * 0.8
+      uint256 _expected = _floor > _trueLow ? _floor : _trueLow; // clamp floor, but never below true value
+      assertEq(_curLow, _expected);
+      assertLe(_curLow, _prevLow); // monotonic non-increasing
+      assertGe(_curLow, _trueLow); // never underprices below the true value
+      assertGt(oracle.getCurrentPoolPrice(true), 0); // oracle stays live every day
+
+      if (_curLow == _trueLow) _converged = true;
+      _prevLow = _curLow;
+
+      unchecked {
+        _i++;
+      }
+    }
+
+    // after enough days the cached low has converged to the true value and holds there
+    assertTrue(_converged);
+    assertEq(oracle.dailyLow(oracle.currentDay()), _trueLow);
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowClampsAfterMissedDayWithCompoundedBound() public {
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 day0 = oracle.currentDay();
+    assertEq(oracle.dailyLow(day0), 400_000_000);
+
+    // L-16: skip a whole day, then crash. The clamp still applies (compounded 0.8^2), not a no-op against a
+    // zero reference, so the low cannot drop unbounded after a keeper gap.
+    vm.warp(block.timestamp + 2 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    uint256 day2 = oracle.currentDay();
+
+    assertEq(day2, day0 + 2);
+    assertEq(oracle.dailyLow(day2), 256_000_000); // 400e6 * 0.8^2, NOT unbounded
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowDecayIsCappedAfterLongGap() public {
+    // L-16: a gap longer than MAX_SINGLE_FEED_LOW_DECAY_DAYS (3) caps the compounding at 0.8^3, so the floor
+    // cannot vanish after a long keeper outage (0.8^5 would be ~131e6; the cap keeps it at 0.8^3 = 204.8e6).
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    uint256 _day0 = oracle.currentDay();
+    assertEq(oracle.dailyLow(_day0), 400_000_000);
+
+    // skip 4 whole days, then crash on day 5
+    vm.warp(block.timestamp + 5 days);
+    _mockSequencerUp();
+    token0Feed.set(200_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+
+    assertEq(oracle.currentDay(), _day0 + 5);
+    assertEq(oracle.dailyLow(oracle.currentDay()), 204_800_000); // 400e6 * 0.8^3 (capped), not 0.8^5
+  }
+
+  function test_UpdatePrice_SingleFeedDailyLowFloorAnchorsToPriorDayNotFirstReading() public {
+    // L-12: the per-day floor is anchored to the PRIOR-day carry-in low, not the current day's first reading.
+    // Day 2's first reading (350e6) is lower than day 1's (400e6); a same-day crash must clamp to 400e6*0.8=320e6
+    // (prior-day anchor), not 350e6*0.8=280e6 (which a first-reading anchor would wrongly allow).
+    vm.warp(10 days);
+    _deployOracle(false, 1e18, 1e18);
+    _mockSequencerUp();
+    oracle.setOperator(address(this), true);
+
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(oracle.currentDay()), 400_000_000);
+
+    // day 2 first update: a modest drop within bound, recorded as-is (350e6 >= 400e6*0.8 floor)
+    vm.warp(block.timestamp + 1 days);
+    _mockSequencerUp();
+    token0Feed.set(175_000_000, block.timestamp); // half-priced feed -> 350e6 LP price at 1e18/1e18 reserves
+    pool.setConstantObservations(1e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    uint256 _day2 = oracle.currentDay();
+    assertEq(oracle.dailyLow(_day2), 350_000_000);
+
+    // same-day crash: clamps to the prior-day-anchored floor (320e6), proving the floor did not re-anchor to 350e6
+    token0Feed.set(175_000_000, block.timestamp);
+    pool.setConstantObservations(0.05e18, 1e18, POINTS + 1);
+    oracle.updatePrice();
+    assertEq(oracle.dailyLow(_day2), 320_000_000); // 400e6 * 0.8, NOT 350e6 * 0.8 = 280e6
   }
 
   function test_UpdatePrice_AllowsVolatileSingleFeedDailyLowDropWithinCap() public {
