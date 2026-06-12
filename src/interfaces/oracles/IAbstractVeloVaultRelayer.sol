@@ -48,4 +48,8 @@ interface IAbstractVeloVaultRelayer is IBaseOracle {
 
   /// @notice Updates the accepted vault price per full share, capping upward movement
   function updatePricePerFullShare() external returns (bool _updated);
+
+  /// @notice Returns the live (uncached) vault price per full share [wad]
+  /// @dev    External so the view pricing path can wrap it in try/catch; reverts if the underlying vault reverts
+  function livePricePerFullShare() external view returns (uint256 _pricePerFullShare);
 }

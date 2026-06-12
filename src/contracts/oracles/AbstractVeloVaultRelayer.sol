@@ -80,6 +80,11 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
     return _updatePricePerFullShare();
   }
 
+  /// @inheritdoc IAbstractVeloVaultRelayer
+  function livePricePerFullShare() external view returns (uint256 _pricePerFullShare) {
+    return _getPricePerFullShare();
+  }
+
   function _getPriceValue(uint256 _veloLpPrice) internal view returns (uint256 _combinedPriceValue) {
     uint256 _price = _calculatePriceValue(_veloLpPrice);
 
@@ -91,8 +96,19 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
   }
 
   function _calculatePriceValue(uint256 _veloLpPrice) internal view returns (uint256 _price) {
-    // # of velo LP tokens in 1 yvToken
+    // # of velo LP tokens in 1 yvToken. Use the lower of the cached and live price-per-full-share so vault
+    // losses are reflected immediately, without waiting for an updatePricePerFullShare() call. The live read
+    // is an external vault call wrapped in try/catch; on failure we fail closed (return 0) instead of falling
+    // back to the cached value, which could otherwise re-enable a stale-high price.
     uint256 _veloLpBalance = acceptedPricePerFullShare;
+    try this.livePricePerFullShare() returns (uint256 _livePricePerFullShare) {
+      if (_livePricePerFullShare < _veloLpBalance) {
+        _veloLpBalance = _livePricePerFullShare;
+      }
+    } catch {
+      return 0;
+    }
+
     if (_veloLpPrice != 0 && _veloLpBalance > type(uint256).max / _veloLpPrice) {
       return 0;
     }
@@ -132,6 +148,13 @@ abstract contract AbstractVeloVaultRelayer is IAbstractVeloVaultRelayer {
       emit UpdatePricePerFullShare(_pricePerFullShare);
 
       return true;
+    }
+
+    // No-op when the live price equals the accepted price: do not touch the update timestamp, otherwise a
+    // permissionless no-op call during a flat-price window would defer the next allowed upward move by up to
+    // PRICE_PER_FULL_SHARE_UPDATE_DELAY. Placed after the zero branches so their invalidation semantics hold.
+    if (_pricePerFullShare == _acceptedPricePerFullShare) {
+      return false;
     }
 
     if (_pricePerFullShare > _acceptedPricePerFullShare) {
