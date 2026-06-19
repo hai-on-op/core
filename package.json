@@ -16,7 +16,9 @@
     "0xRaccoon (https://github.com/0xRaccoon)"
   ],
   "scripts": {
+    "bootstrap:tenderly:stability-pool": "yarn build:optimized:stability-pool && node script/tenderly/bootstrap-stability-pool.mjs",
     "build": "forge build",
+    "build:optimized:stability-pool": "FOUNDRY_PROFILE=optimized forge build src/contracts/stability-pool/StabilityPool.sol",
     "coverage": "forge coverage",
     "deploy:mainnet": "bash -c 'source .env && forge script DeployMainnet -vvvvv --rpc-url $OP_MAINNET_RPC --broadcast --private-key $OP_MAINNET_DEPLOYER_PK --verify --etherscan-api-key $OP_ETHERSCAN_API_KEY'",
     "deploy:testnet": "bash -c 'source .env && forge script DeployTestnet -vvvvv --rpc-url $OP_SEPOLIA_RPC --broadcast --private-key $OP_SEPOLIA_DEPLOYER_PK --verify --etherscan-api-key $OP_ETHERSCAN_API_KEY'",
@@ -27,13 +29,15 @@
     "lint:sol": "cross-env solhint 'src/**/*.sol' 'test/**/*.sol'",
     "prepare": "husky install",
     "script:mainnet": "bash -c 'source .env && forge script MainnetScript -vvvvv --rpc-url $OP_MAINNET_RPC --broadcast --private-key $OP_MAINNET_DEPLOYER_PK --verify --etherscan-api-key $OP_ETHERSCAN_API_KEY'",
+    "script:mainnet-eth": "bash -c 'source .env && forge script MainnetScript -vvvvv --rpc-url $ETH_MAINNET_RPC --broadcast --private-key $ETH_MAINNET_DEPLOYER_PK --verify --etherscan-api-key $ETH_ETHERSCAN_API_KEY'",
     "script:testnet": "bash -c 'source .env && forge script TestnetScript -vvvvv --rpc-url $OP_SEPOLIA_RPC --broadcast --private-key $OP_SEPOLIA_DEPLOYER_PK --verify --etherscan-api-key $OP_ETHERSCAN_API_KEY'",
     "test": "FOUNDRY_FUZZ_RUNS=128 FOUNDRY_FUZZ_MAX_TEST_REJECTS=10000000 FOUNDRY_FUZZ_SEED=69 forge test -vvv",
     "test:e2e": "forge test --match-contract E2E -vvv",
     "test:local": "FOUNDRY_FUZZ_RUNS=32 FOUNDRY_FUZZ_MAX_TEST_REJECTS=1000000 forge test -vvv",
     "test:simulation": "forge test --match-contract Simulation --ffi",
     "test:unit": "FOUNDRY_FUZZ_RUNS=128 FOUNDRY_FUZZ_MAX_TEST_REJECTS=1000000 forge test --match-contract Unit -vvv",
-    "test:unit:deep": "FOUNDRY_FUZZ_RUNS=1024 FOUNDRY_FUZZ_MAX_TEST_REJECTS=10000000 forge test --match-contract Unit -vvvvv"
+    "test:unit:deep": "FOUNDRY_FUZZ_RUNS=1024 FOUNDRY_FUZZ_MAX_TEST_REJECTS=10000000 forge test --match-contract Unit -vvvvv",
+    "verify:tenderly:stability-pool": "yarn build:optimized:stability-pool && node script/tenderly/verify-stability-pool-manifest.mjs"
   },
   "lint-staged": {
     "*.{js,css,md,ts,sol}": "forge fmt",
@@ -46,6 +50,7 @@
     "@pythnetwork/pyth-sdk-solidity": "^4.2.0",
     "@uniswap/v3-periphery": "https://github.com/Uniswap/v3-periphery.git#0.8",
     "ds-test": "https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "ethers": "^6.13.5",
     "forge-std": "https://github.com/foundry-rs/forge-std.git#v1.9.7"
   },
   "devDependencies": {
