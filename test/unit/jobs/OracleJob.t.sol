@@ -3,7 +3,9 @@ pragma solidity 0.8.20;
 
 import {OracleJobForTest, IOracleJob} from '@test/mocks/OracleJobForTest.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
+import {DelayedOracle} from '@contracts/oracles/DelayedOracle.sol';
 import {IDelayedOracle} from '@interfaces/oracles/IDelayedOracle.sol';
+import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {IPIDRateSetter} from '@interfaces/IPIDRateSetter.sol';
 import {IStabilityFeeTreasury} from '@interfaces/IStabilityFeeTreasury.sol';
 import {IJob} from '@interfaces/jobs/IJob.sol';
@@ -12,6 +14,31 @@ import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 import {HaiTest, stdStorage, StdStorage} from '@test/utils/HaiTest.t.sol';
 
 import {Assertions} from '@libraries/Assertions.sol';
+
+contract PriceSourceForTest is IBaseOracle {
+  uint256 internal _value;
+  bool internal _valid;
+  string public symbol = 'PriceSource / USD';
+
+  constructor(uint256 __value, bool __valid) {
+    _value = __value;
+    _valid = __valid;
+  }
+
+  function setResult(uint256 __value, bool __valid) external {
+    _value = __value;
+    _valid = __valid;
+  }
+
+  function getResultWithValidity() external view returns (uint256 _result, bool _validity) {
+    return (_value, _valid);
+  }
+
+  function read() external view returns (uint256 _result) {
+    require(_valid, 'invalid');
+    return _value;
+  }
+}
 
 abstract contract Base is HaiTest {
   using stdStorage for StdStorage;
@@ -59,6 +86,12 @@ abstract contract Base is HaiTest {
     vm.mockCall(address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.updateResult, ()), abi.encode(_success));
   }
 
+  function _mockLastUpdateTime(uint256 _lastUpdateTime) internal {
+    vm.mockCall(
+      address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.lastUpdateTime, ()), abi.encode(_lastUpdateTime)
+    );
+  }
+
   function _mockRewardAmount(uint256 _rewardAmount) internal {
     stdstore.target(address(oracleJob)).sig(IJob.rewardAmount.selector).checked_write(_rewardAmount);
   }
@@ -100,15 +133,17 @@ contract Unit_OracleJob_Constructor is Base {
   }
 
   function test_Set_OracleRelayer(address _oracleRelayer) public happyPath mockAsContract(_oracleRelayer) {
-    oracleJob =
-      new OracleJobForTest(_oracleRelayer, address(mockPIDRateSetter), address(mockStabilityFeeTreasury), REWARD_AMOUNT);
+    oracleJob = new OracleJobForTest(
+      _oracleRelayer, address(mockPIDRateSetter), address(mockStabilityFeeTreasury), REWARD_AMOUNT
+    );
 
     assertEq(address(oracleJob.oracleRelayer()), _oracleRelayer);
   }
 
   function test_Set_PIDRateSetter(address _pidRateSetter) public happyPath mockAsContract(_pidRateSetter) {
-    oracleJob =
-      new OracleJobForTest(address(mockOracleRelayer), _pidRateSetter, address(mockStabilityFeeTreasury), REWARD_AMOUNT);
+    oracleJob = new OracleJobForTest(
+      address(mockOracleRelayer), _pidRateSetter, address(mockStabilityFeeTreasury), REWARD_AMOUNT
+    );
 
     assertEq(address(oracleJob.pidRateSetter()), _pidRateSetter);
   }
@@ -160,6 +195,8 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
     _mockShouldWorkUpdateCollateralPrice(_shouldWorkUpdateCollateralPrice);
     _mockOracleRelayerCollateralParams(_cType, address(mockDelayedOracle), 0, 0);
     _mockUpdateResult(_updateResult);
+    // constant lastUpdateTime so before == after: an invalid updateResult reads as a no-op unless overridden
+    _mockLastUpdateTime(0);
   }
 
   function test_Revert_NotWorkable(bytes32 _cType) public {
@@ -171,10 +208,28 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
   }
 
   function test_Revert_InvalidPrice(bytes32 _cType) public {
+    // no-op case: updateResult() returns false AND lastUpdateTime does not advance -> revert (no reward farming)
     _mockValues(_cType, true, false);
 
     vm.expectRevert(IOracleJob.OracleJob_InvalidPrice.selector);
 
+    oracleJob.workUpdateCollateralPrice(_cType);
+  }
+
+  function test_Call_OracleRelayer_UpdateCollateralPrice_OnInvalidationTransition(bytes32 _cType) public {
+    // L-15: an invalid result that DOES advance lastUpdateTime is a genuine invalidation transition. The job
+    // must not revert; it must still push the (now invalid) result to the relayer so it reaches the SAFE engine.
+    vm.startPrank(user);
+    _mockShouldWorkUpdateCollateralPrice(true);
+    _mockOracleRelayerCollateralParams(_cType, address(mockDelayedOracle), 0, 0);
+    _mockUpdateResult(false);
+
+    bytes[] memory _lastUpdateTimes = new bytes[](2);
+    _lastUpdateTimes[0] = abi.encode(uint256(1));
+    _lastUpdateTimes[1] = abi.encode(uint256(2));
+    vm.mockCalls(address(mockDelayedOracle), abi.encodeCall(mockDelayedOracle.lastUpdateTime, ()), _lastUpdateTimes);
+
+    vm.expectCall(address(mockOracleRelayer), abi.encodeCall(mockOracleRelayer.updateCollateralPrice, (_cType)), 1);
     oracleJob.workUpdateCollateralPrice(_cType);
   }
 
@@ -189,6 +244,42 @@ contract Unit_OracleJob_WorkUpdateCollateralPrice is Base {
     emit Rewarded(user, REWARD_AMOUNT);
 
     oracleJob.workUpdateCollateralPrice(_cType);
+  }
+
+  function test_PropagatesInvalidationThroughRealDelayedOracleOverTwoCycles() public {
+    // L-15 end-to-end against a REAL DelayedOracle (not mocked updateResult/lastUpdateTime): a fail-closed price
+    // source must propagate to invalidity over the two-step delay via the rewarded keeper path, and neither
+    // rewarded call may revert. Pre-fix the first call reverts on updateResult()==false and invalidation never
+    // propagates.
+    vm.startPrank(user);
+    uint256 _updateDelay = 1 hours;
+    PriceSourceForTest _priceSource = new PriceSourceForTest(1e18, true);
+    DelayedOracle _delayedOracle = new DelayedOracle(IBaseOracle(address(_priceSource)), _updateDelay);
+
+    bytes32 _cType = bytes32('TEST');
+    _mockShouldWorkUpdateCollateralPrice(true);
+    _mockOracleRelayerCollateralParams(_cType, address(_delayedOracle), 0, 0);
+    // updateCollateralPrice lives on the etched mockOracleRelayer (returns void, never reverts)
+
+    (, bool _validStart) = _delayedOracle.getResultWithValidity();
+    assertTrue(_validStart);
+
+    // the price source goes fail-closed
+    _priceSource.setResult(0, false);
+
+    // cycle 1: invalidation staged into nextFeed; the rewarded call must reach updateCollateralPrice (no revert)
+    vm.warp(block.timestamp + _updateDelay);
+    vm.expectCall(address(mockOracleRelayer), abi.encodeCall(mockOracleRelayer.updateCollateralPrice, (_cType)));
+    oracleJob.workUpdateCollateralPrice(_cType);
+    (, bool _validAfterOne) = _delayedOracle.getResultWithValidity();
+    assertTrue(_validAfterOne); // currentFeed still the last valid value after one cycle
+
+    // cycle 2: invalidation reaches currentFeed and is now visible to the SAFE-engine-facing getter
+    vm.warp(block.timestamp + _updateDelay);
+    oracleJob.workUpdateCollateralPrice(_cType);
+    (uint256 _resultAfterTwo, bool _validAfterTwo) = _delayedOracle.getResultWithValidity();
+    assertFalse(_validAfterTwo);
+    assertEq(_resultAfterTwo, 0);
   }
 }
 

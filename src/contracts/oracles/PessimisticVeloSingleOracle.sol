@@ -38,6 +38,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Number of times our token's price was checked on a given day.
   mapping(uint256 => uint256) public dailyUpdates; // day => number of updates
 
+  /// @notice Last time the daily low state was updated from live pricing.
+  uint256 public lastPriceUpdateTime;
+
   /// @notice Whether we use a three-day low instead of a two-day low.
   /// @dev May only be updated by owner. Realistically most useful when price updating is public, as this
   ///  guarantees any price observations used must be at least 24 hours apart.
@@ -46,6 +49,17 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   /// @notice Custom number of periods our TWAP price should cover.
   /// @dev Set on deployment, minimum is 4 (2 hours).
   uint256 public immutable points;
+
+  /// @notice Maximum age/gap allowed for Velodrome TWAP observations.
+  /// @dev Set on deployment to allow pool-specific liveness/security tradeoffs.
+  uint256 public immutable maxTwapObservationInterval;
+
+  /// @notice Maximum token price ratio allowed for stable Velodrome pool pricing.
+  /// @dev 18-decimal ratio where 1e18 means 1:1.
+  uint256 public immutable maxStablePriceDeviation;
+
+  /// @notice Maximum age allowed for the latest successful pessimistic price update.
+  uint256 public immutable maxPessimisticPriceAge;
 
   /// @notice Chainlink feed to check that Optimism's sequencer is online.
   /// @dev This prevents transactions sent while the sequencer is down from being executed when it comes back online.
@@ -93,6 +107,24 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   // our pool/LP token decimals, just in case velodrome has weird pools in the future with different decimals
   uint256 internal constant DECIMALS = 10 ** 18;
 
+  /// @notice Velodrome observations are normally recorded after this period elapses.
+  uint256 internal constant VELO_OBSERVATION_PERIOD = 30 minutes;
+
+  /// @notice Maximum scaled reserve or reserve-value root used in stable LP fourth-power math.
+  uint256 internal constant STABLE_LP_PRICING_SCALE_LIMIT = 1e27;
+
+  /// @notice Maximum normalized reserve size used when computing stable TWAP derivative ratios.
+  uint256 internal constant STABLE_DERIVATIVE_SCALE_LIMIT = 1e27;
+
+  /// @notice Maximum normalized reserve size used before volatile geometric-mean scaling.
+  uint256 internal constant VOLATILE_GEOMEAN_SCALE_LIMIT = 1e27;
+
+  /// @notice Maximum token price ratio allowed for stable-pool collateral pricing.
+  uint256 internal constant MAX_STABLE_PRICE_DEVIATION = 1.05e18;
+
+  /// @notice Maximum current-vs-TWAP reserve-ratio deviation allowed for volatile single-feed live caps.
+  uint256 internal constant MAX_VOLATILE_RESERVE_RATIO_DEVIATION = 1.3e18;
+
   /* ========== CONSTRUCTOR ========== */
   /**
    * @dev Check Chainlink's documentation for heartbeat length of their various feeds.
@@ -102,6 +134,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    * @param _token0Heartbeat The heartbeat for our token0 feed (maximum time allowed before refresh).
    * @param _token1Heartbeat The heartbeat for our token1 feed (maximum time allowed before refresh).
    * @param _twapPoints Number of samples for TWAP pricing. Minimum is 4 (2 hours).
+   * @param _maxTwapObservationInterval Maximum allowed age/gap for sampled Velodrome TWAP observations.
+   * @param _maxStablePriceDeviation Maximum token price ratio allowed when pricing stable pools.
+   * @param _maxPessimisticPriceAge Maximum age allowed for cached pessimistic pricing.
    * @param _owner Owner role. Can set operators and adjust 2 vs 3 day pessimistic pricing.
    */
   constructor(
@@ -111,6 +146,9 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint96 _token0Heartbeat,
     uint96 _token1Heartbeat,
     uint256 _twapPoints,
+    uint256 _maxTwapObservationInterval,
+    uint256 _maxStablePriceDeviation,
+    uint256 _maxPessimisticPriceAge,
     address _owner
   ) Ownable(_owner) {
     // The default number of periods (points) we look back in time for TWAP pricing.
@@ -119,6 +157,24 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert TooFewTwapPoints();
     }
     points = _twapPoints;
+
+    if (_maxTwapObservationInterval < VELO_OBSERVATION_PERIOD) {
+      revert TwapObservationIntervalTooShort();
+    }
+    maxTwapObservationInterval = _maxTwapObservationInterval;
+
+    if (_maxStablePriceDeviation < DECIMALS) {
+      revert StablePriceDeviationTooLow();
+    }
+    if (_maxStablePriceDeviation > MAX_STABLE_PRICE_DEVIATION) {
+      revert StablePriceDeviationTooHigh();
+    }
+    maxStablePriceDeviation = _maxStablePriceDeviation;
+
+    if (_maxPessimisticPriceAge == 0) {
+      revert PessimisticPriceAgeTooShort();
+    }
+    maxPessimisticPriceAge = _maxPessimisticPriceAge;
 
     // A heartbeat is the amount of time after which we consider a chainlink feed's price to be stale. For major
     // assets like BTC and ETH, this value is 3600 (1 hour). For less actively traded assets, this can be as high as
@@ -179,6 +235,22 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   error GracePeriodNotOver();
   error NotOperator();
   error NoRecentPriceUpdates();
+  error TwapObservationIntervalTooShort();
+  error TwapObservationTooOld();
+  error TwapObservationIntervalTooLong();
+  error TwapObservationNotPostRecovery();
+  error StablePriceDeviationTooLow();
+  error StablePriceDeviationTooHigh();
+  error StablePriceDeviation();
+  error NoPostSequencerRecoveryPriceUpdate();
+  error PessimisticPriceAgeTooShort();
+  error PessimisticPriceStale();
+  error InvalidDerivedPrice();
+  error InvalidLpPrice();
+  error NoValidPriceUpdates();
+  error PessimisticPriceWindowNotReady();
+  error DualFeedTimestampSkew();
+  error SingleFeedReserveRatioDeviation();
 
   /* ========== VIEW FUNCTIONS ========== */
 
@@ -221,10 +293,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert WrongVaultForPool();
     }
 
+    uint256 assetsPerShare = vault.previewRedeem(10 ** vault.decimals());
+
     if (_usePessimisticPricing) {
-      return (_getAdjustedPrice(_pool) * vault.convertToAssets(DECIMALS)) / DECIMALS;
+      return (_getAdjustedPrice(_pool) * assetsPerShare) / DECIMALS;
     } else {
-      return (_getFairReservesPricing(_pool) * vault.convertToAssets(DECIMALS)) / DECIMALS;
+      return (_getFairReservesPricing(_pool) * assetsPerShare) / DECIMALS;
     }
   }
 
@@ -242,10 +316,12 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert WrongVaultForPool();
     }
 
+    uint256 assetsPerShare = ShareValueHelper.sharesToAmount(_vault, 10 ** vault.decimals());
+
     if (_usePessimisticPricing) {
-      return (_getAdjustedPrice(_pool) * ShareValueHelper.sharesToAmount(_vault, DECIMALS)) / DECIMALS;
+      return (_getAdjustedPrice(_pool) * assetsPerShare) / DECIMALS;
     } else {
-      return (_getFairReservesPricing(_pool) * ShareValueHelper.sharesToAmount(_vault, DECIMALS)) / DECIMALS;
+      return (_getFairReservesPricing(_pool) * assetsPerShare) / DECIMALS;
     }
   }
 
@@ -270,6 +346,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
    * @return currentPrice The current price of the underlying token.
    */
   function getChainlinkPrice(uint256 _tokenIndex) public view returns (uint256 currentPrice) {
+    (currentPrice,) = _getChainlinkPrice(_tokenIndex);
+  }
+
+  function _getChainlinkPrice(uint256 _tokenIndex) internal view returns (uint256 currentPrice, uint256 updatedAt) {
     address feedAddress;
     uint256 heartbeat;
     if (_tokenIndex == 0) {
@@ -281,7 +361,10 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     }
 
     // pull latest data
-    (, int256 price,, uint256 updatedAt,) = IChainlinkOracle(feedAddress).latestRoundData();
+    int256 price;
+    uint256 roundUpdatedAt;
+    (, price,, roundUpdatedAt,) = IChainlinkOracle(feedAddress).latestRoundData();
+    updatedAt = roundUpdatedAt;
 
     // if a price is older than our preset heartbeat, we're in trouble
     if (block.timestamp - updatedAt > heartbeat) {
@@ -293,55 +376,62 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
       revert PriceInvalid();
     }
 
-    // make sure the sequencer is up
-    // uint80 roundID int256 sequencerAnswer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
-    (, int256 sequencerAnswer, uint256 startedAt,,) = sequencerUptimeFeed.latestRoundData();
-
-    // Answer == 0: L2 Sequencer is up
-    // Answer == 1: L2 Sequencer is down
-    if (sequencerAnswer == 1) {
-      revert SequencerDown();
-    }
-
-    // Make sure a grace period of one hour has passed after the sequencer is back up.
-    uint256 timeSinceUp = block.timestamp - startedAt;
-    if (timeSinceUp < 3600) {
-      revert GracePeriodNotOver();
-    }
+    _checkSequencerUpAndGracePeriodOver();
 
     currentPrice = uint256(price);
   }
 
   /**
-   * @notice Returns the TWAP price for a token relative to the other token in its pool.
-   * @dev Note that we can customize the length of points but we default to 4 points (2 hours). Additionally, if a
-   *  pool is very small, it may not be priced as accurately if we attempt to use 1 full token to price.
-   * @param _token The address of the token to get the price of, and that we are swapping in.
-   * @param _tokenAmount Amount of the token we are swapping in.
-   * @return twapPrice Amount of other token we get when swapping in _tokenAmount looking back over our TWAP period.
+   * @notice Returns the no-slippage TWAP quote for a token relative to the other token in its pool.
+   * @dev Samples Velodrome's stored observations like pool.quote(), but computes a marginal price from the sampled
+   *  reserves instead of simulating a finite swap through the pool curve.
+   * @param _token The address of the token to price, and that we are notionally inputting.
+   * @param _tokenAmount Amount of the token we are pricing.
+   * @return twapPrice Amount of other token implied by _tokenAmount over our TWAP period.
    */
   function getTwapPrice(address _token, uint256 _tokenAmount) public view returns (uint256 twapPrice) {
     IVeloPool poolContract = IVeloPool(pool);
 
-    // swapping one of our token gets us this many otherToken, returned in decimals of the other token
-    twapPrice = poolContract.quote(_token, _tokenAmount, points);
+    (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
+
+    for (; i < length;) {
+      (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
+      twapPrice += _getMarginalAmountOut(_token, _tokenAmount, reserve0Average, reserve1Average);
+
+      unchecked {
+        i++;
+      }
+    }
+
+    twapPrice /= points;
   }
 
-  // by default we use 0.01 tokens in this function to more accurately price small pools
+  // derive missing token prices directly from TWAP reserve ratios to avoid precision loss from tiny raw quotes
   function getTokenPrices() public view returns (uint256 price0, uint256 price1) {
     // check if we have chainlink feeds or TWAP for each token
     if (token0Feed != address(0)) {
-      price0 = getChainlinkPrice(0); // returned with 8 decimals
+      uint256 updatedAt0;
+      uint256 updatedAt1;
+      (price0, updatedAt0) = _getChainlinkPrice(0); // returned with 8 decimals
       if (token1Feed != address(0)) {
-        price1 = getChainlinkPrice(1); // returned with 8 decimals
+        (price1, updatedAt1) = _getChainlinkPrice(1); // returned with 8 decimals
+        if (stable) {
+          _validateDualFeedTimestampSkew(updatedAt0, updatedAt1);
+        }
       } else {
-        // get twap price for token1. this is the amount of token1 we would get from 0.01 token0
-        price1 = (price0 * decimals1) / (getTwapPrice(token0, decimals0 / 100) * 100);
+        // derive token1's price by averaging each sampled token1/token0 price
+        price1 = _getTwapDerivedTokenPrice(token0, price0);
+        if (price1 == 0) {
+          revert InvalidDerivedPrice();
+        }
       }
     } else if (token1Feed != address(0)) {
-      price1 = getChainlinkPrice(1); // returned with 8 decimals
-      // get twap price for token0. this is the amount of token0 we would get from 0.01 token1
-      price0 = (price1 * decimals0) / (getTwapPrice(token1, decimals1 / 100) * 100);
+      (price1,) = _getChainlinkPrice(1); // returned with 8 decimals
+      // derive token0's price by averaging each sampled token0/token1 price
+      price0 = _getTwapDerivedTokenPrice(token1, price1);
+      if (price0 == 0) {
+        revert InvalidDerivedPrice();
+      }
     }
   }
 
@@ -362,14 +452,19 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
   function _updatePrice() internal {
     // get current fair reserves pricing
     uint256 currentPrice = _getFairReservesPricing(pool);
+    if (currentPrice == 0) {
+      revert InvalidLpPrice();
+    }
 
     // increment our counter whether we store the price or not
     uint256 day = currentDay();
+    bool isFirstUpdate = dailyUpdates[day] == 0;
     dailyUpdates[day] += 1;
+    lastPriceUpdateTime = block.timestamp;
 
     // store price if it's today's low
     uint256 todaysLow = dailyLow[day];
-    if (todaysLow == 0 || currentPrice < todaysLow) {
+    if (isFirstUpdate || currentPrice < todaysLow) {
       dailyLow[day] = currentPrice;
       emit RecordDailyLow(currentPrice);
     }
@@ -381,31 +476,84 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
 
   // adjust our reported pool price as needed for 48-hour lows and hard upper/lower limits
   function _getAdjustedPrice(address _pool) internal view returns (uint256 adjustedPrice) {
+    uint256 sequencerStartedAt = _checkSequencerUpAndGracePeriodOver();
+    if (lastPriceUpdateTime <= sequencerStartedAt) {
+      revert NoPostSequencerRecoveryPriceUpdate();
+    }
+    if (block.timestamp - lastPriceUpdateTime > maxPessimisticPriceAge) {
+      revert PessimisticPriceStale();
+    }
+
+    // For dual-feed stable pools, refuse to serve a cached low while the trusted feeds currently show a depeg
+    // beyond the allowed band: the cached low was computed under in-band conditions the oracle would now reject.
+    // This makes the read path fail closed (the relayer turns the revert into invalidity) the moment a depeg
+    // appears, rather than vouching for a stale in-band price until maxPessimisticPriceAge elapses.
+    // Single-feed stable pools are not early-rechecked here, but the live cap below recomputes the full fair price
+    // and fails closed if current derived prices are invalid or out-of-band. Volatile pools have no peg band.
+    if (stable && !_isSingleFeed()) {
+      (uint256 price0, uint256 price1) = getTokenPrices();
+      _validateStablePriceDeviation(price0, price1);
+    }
+
     // start off with our standard price
     uint256 day = currentDay();
 
     // if we haven't updated yet today, pretend it's yesterday instead
     if (dailyUpdates[day] == 0) {
+      if (day == 0) {
+        revert NoRecentPriceUpdates();
+      }
       day -= 1;
       if (dailyUpdates[day] == 0) {
         revert NoRecentPriceUpdates();
       }
     }
 
-    // get today's low
-    uint256 todaysLow = dailyLow[day];
+    _requirePopulatedPessimisticWindow(day);
 
-    // get yesterday's low
-    uint256 yesterdaysLow = dailyLow[day - 1];
+    adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day]);
 
-    // calculate price based on two-day low
-    adjustedPrice = todaysLow > yesterdaysLow && yesterdaysLow > 0 ? yesterdaysLow : todaysLow;
+    if (day > 0 && dailyUpdates[day - 1] > 0) {
+      adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day - 1]);
+    }
 
-    // if using three-day low, compare again
-    if (useThreeDayLow) {
-      uint256 dayBeforeYesterdaysLow = dailyLow[day - 2];
-      adjustedPrice =
-        adjustedPrice > dayBeforeYesterdaysLow && dayBeforeYesterdaysLow > 0 ? dayBeforeYesterdaysLow : adjustedPrice;
+    if (useThreeDayLow && day > 1 && dailyUpdates[day - 2] > 0) {
+      adjustedPrice = _minNonZeroPrice(adjustedPrice, dailyLow[day - 2]);
+    }
+
+    if (adjustedPrice == 0) {
+      revert NoValidPriceUpdates();
+    }
+
+    if (_shouldSkipVolatileSingleFeedLiveCap(_pool)) {
+      getTokenPrices();
+      return adjustedPrice;
+    }
+
+    uint256 livePrice = _getFairReservesPricing(_pool);
+    if (livePrice == 0) {
+      revert InvalidLpPrice();
+    }
+    if (livePrice < adjustedPrice) {
+      adjustedPrice = livePrice;
+    }
+  }
+
+  function _checkSequencerUpAndGracePeriodOver() internal view returns (uint256 startedAt) {
+    // uint80 roundID int256 sequencerAnswer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound
+    int256 sequencerAnswer;
+    (, sequencerAnswer, startedAt,,) = sequencerUptimeFeed.latestRoundData();
+
+    // Answer == 0: L2 Sequencer is up
+    // Answer == 1: L2 Sequencer is down
+    if (sequencerAnswer == 1) {
+      revert SequencerDown();
+    }
+
+    // Make sure a grace period of one hour has passed after the sequencer is back up.
+    uint256 timeSinceUp = block.timestamp - startedAt;
+    if (timeSinceUp < 3600) {
+      revert GracePeriodNotOver();
     }
   }
 
@@ -416,22 +564,326 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     (uint256 reserve0, uint256 reserve1,) = poolContract.getReserves();
 
     // make sure our reserves are normalized to 18 decimals (looking at you, USDC)
-    reserve0 = (reserve0 * DECIMALS) / decimals0;
-    reserve1 = (reserve1 * DECIMALS) / decimals1;
+    reserve0 = _normalizeReserve(reserve0, decimals0);
+    reserve1 = _normalizeReserve(reserve1, decimals1);
 
     // pull our prices
     (uint256 price0, uint256 price1) = getTokenPrices();
 
+    uint256 totalSupply = poolContract.totalSupply();
+
     if (stable) {
-      fairReservesPricing =
-        _calculate_stable_lp_token_price(poolContract.totalSupply(), price0, price1, reserve0, reserve1, 8);
+      _validateStablePriceDeviation(price0, price1);
+    }
+    fairReservesPricing = _fairReservesValue(totalSupply, price0, price1, reserve0, reserve1);
+
+    // for single-feed pools (volatile or stable), bound the LP price by the value of the trusted (fed) side.
+    // no-op for dual-feed pools.
+    fairReservesPricing =
+      _capSingleFeedPrice(poolContract, fairReservesPricing, totalSupply, reserve0, reserve1, price0, price1);
+  }
+
+  // fair-reserves LP value for the given reserves/prices/supply (manipulation-resistant: stable uses the
+  // x^3y+y^3x invariant, volatile uses the geometric mean k), in chainlink (8-decimal) units
+  function _fairReservesValue(
+    uint256 _totalSupply,
+    uint256 _price0,
+    uint256 _price1,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 _fairValue) {
+    if (stable) {
+      _fairValue = _calculate_stable_lp_token_price(_totalSupply, _price0, _price1, _reserve0, _reserve1, 8);
     } else {
-      uint256 k = FixedPointMathLib.sqrt(reserve0 * reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
-      uint256 p = FixedPointMathLib.sqrt(price0 * 1e16 * price1); // boost this to 1e16 to give us more precision
+      uint256 k = _getVolatileGeometricMean(_reserve0, _reserve1); // xy = k, p0r0' = p1r1', this is in 1e18
+      uint256 p = FixedPointMathLib.sqrt(_price0 * 1e16 * _price1); // boost this to 1e16 to give us more precision
 
       // we want k and total supply to have same number of decimals so price has decimals of chainlink oracle
-      fairReservesPricing = (2 * p * k) / (1e8 * poolContract.totalSupply());
+      _fairValue = FixedPointMathLib.mulDivDownFullPrecision(2 * p, k, _totalSupply) / 1e8;
     }
+  }
+
+  function _capSingleFeedPrice(
+    IVeloPool _poolContract,
+    uint256 _lpPrice,
+    uint256 _totalSupply,
+    uint256 _reserve0,
+    uint256 _reserve1,
+    uint256 _price0,
+    uint256 _price1
+  ) internal view returns (uint256 cappedPrice) {
+    cappedPrice = _lpPrice;
+    if (!_isSingleFeed()) return cappedPrice;
+
+    _validateSingleFeedCurrentReserves(_poolContract, _reserve0, _reserve1);
+
+    // Bound the LP price by the current value of the trusted side actually present in the pool.
+    if (token0Feed != address(0)) {
+      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve0, _price0, _totalSupply);
+      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
+    } else {
+      uint256 cap = 2 * FixedPointMathLib.mulDivDownFullPrecision(_reserve1, _price1, _totalSupply);
+      cappedPrice = _lpPrice > cap ? cap : _lpPrice;
+    }
+  }
+
+  function _validateSingleFeedCurrentReserves(
+    IVeloPool _poolContract,
+    uint256 _currentReserve0,
+    uint256 _currentReserve1
+  ) internal view {
+    uint256 maxRatioDeviation = stable ? maxStablePriceDeviation : MAX_VOLATILE_RESERVE_RATIO_DEVIATION;
+    if (
+      _getSingleFeedReserveRatioDeviation(_poolContract, _currentReserve0, _currentReserve1, false) > maxRatioDeviation
+    ) {
+      revert SingleFeedReserveRatioDeviation();
+    }
+  }
+
+  function _shouldSkipVolatileSingleFeedLiveCap(address _pool) internal view returns (bool skipLiveCap) {
+    if (stable || !_isSingleFeed()) return false;
+
+    IVeloPool poolContract = IVeloPool(_pool);
+    (uint256 reserve0, uint256 reserve1,) = poolContract.getReserves();
+    reserve0 = _normalizeReserve(reserve0, decimals0);
+    reserve1 = _normalizeReserve(reserve1, decimals1);
+
+    skipLiveCap = _getSingleFeedReserveRatioDeviation(poolContract, reserve0, reserve1, true)
+      > MAX_VOLATILE_RESERVE_RATIO_DEVIATION;
+  }
+
+  function _getSingleFeedReserveRatioDeviation(
+    IVeloPool _poolContract,
+    uint256 _currentReserve0,
+    uint256 _currentReserve1,
+    bool _zeroCurrentReserveIsMaxDeviation
+  ) internal view returns (uint256 ratioDeviation) {
+    (uint256 twapReserve0, uint256 twapReserve1) = _getAverageNormalizedTwapReserves(_poolContract);
+
+    (uint256 currentKnownReserve, uint256 currentDerivedReserve) =
+      token0Feed != address(0) ? (_currentReserve0, _currentReserve1) : (_currentReserve1, _currentReserve0);
+    (uint256 twapKnownReserve, uint256 twapDerivedReserve) =
+      token0Feed != address(0) ? (twapReserve0, twapReserve1) : (twapReserve1, twapReserve0);
+
+    if (twapKnownReserve == 0 || twapDerivedReserve == 0) {
+      revert InvalidDerivedPrice();
+    }
+    if (currentKnownReserve == 0 || currentDerivedReserve == 0) {
+      if (_zeroCurrentReserveIsMaxDeviation) return type(uint256).max;
+      revert InvalidDerivedPrice();
+    }
+
+    uint256 currentReserveRatio =
+      FixedPointMathLib.mulDivDownFullPrecision(currentKnownReserve, DECIMALS, currentDerivedReserve);
+    uint256 twapReserveRatio = FixedPointMathLib.mulDivDownFullPrecision(twapKnownReserve, DECIMALS, twapDerivedReserve);
+
+    (uint256 higherRatio, uint256 lowerRatio) = currentReserveRatio > twapReserveRatio
+      ? (currentReserveRatio, twapReserveRatio)
+      : (twapReserveRatio, currentReserveRatio);
+    ratioDeviation = FixedPointMathLib.mulDivDownFullPrecision(higherRatio, DECIMALS, lowerRatio);
+  }
+
+  function _getAverageNormalizedTwapReserves(IVeloPool _poolContract)
+    internal
+    view
+    returns (uint256 reserve0Average, uint256 reserve1Average)
+  {
+    (uint256 i, uint256 length) = _getTwapStartIndex(_poolContract);
+
+    for (; i < length;) {
+      (uint256 rawReserve0Average, uint256 rawReserve1Average) = _getAverageReserves(_poolContract, i);
+      reserve0Average += _normalizeReserve(rawReserve0Average, decimals0);
+      reserve1Average += _normalizeReserve(rawReserve1Average, decimals1);
+
+      unchecked {
+        i++;
+      }
+    }
+
+    reserve0Average /= points;
+    reserve1Average /= points;
+  }
+
+  function _validateStablePriceDeviation(uint256 _price0, uint256 _price1) internal view {
+    (uint256 higherPrice, uint256 lowerPrice) = _price0 > _price1 ? (_price0, _price1) : (_price1, _price0);
+    uint256 priceDeviation = FixedPointMathLib.mulDivDownFullPrecision(higherPrice, DECIMALS, lowerPrice);
+
+    if (priceDeviation > maxStablePriceDeviation) {
+      revert StablePriceDeviation();
+    }
+  }
+
+  function _validateDualFeedTimestampSkew(uint256 _updatedAt0, uint256 _updatedAt1) internal view {
+    uint256 skew = _updatedAt0 > _updatedAt1 ? _updatedAt0 - _updatedAt1 : _updatedAt1 - _updatedAt0;
+    uint256 maxSkew = token0Heartbeat < token1Heartbeat ? token0Heartbeat : token1Heartbeat;
+    if (skew > maxSkew) {
+      revert DualFeedTimestampSkew();
+    }
+  }
+
+  function _minNonZeroPrice(uint256 _currentPrice, uint256 _candidatePrice) internal pure returns (uint256 _price) {
+    if (_candidatePrice == 0) return _currentPrice;
+    if (_currentPrice == 0 || _candidatePrice < _currentPrice) return _candidatePrice;
+    return _currentPrice;
+  }
+
+  function _normalizeReserve(uint256 _reserve, uint256 _decimals) internal pure returns (uint256 _normalizedReserve) {
+    _normalizedReserve = FixedPointMathLib.mulDivDownFullPrecision(_reserve, DECIMALS, _decimals);
+  }
+
+  function _getVolatileGeometricMean(uint256 _reserve0, uint256 _reserve1) internal pure returns (uint256 _k) {
+    if (_reserve0 == 0 || _reserve1 == 0) return 0;
+
+    // Compute the exact geometric mean whenever the raw product fits in uint256. This is the common case and a
+    // far wider domain than the 1e27 magnitude guard used previously, which truncated a small reserve to zero
+    // (returning k == 0 for a validly priceable pool) any time the other reserve crossed 1e27.
+    if (_reserve0 <= type(uint256).max / _reserve1) {
+      return FixedPointMathLib.sqrt(_reserve0 * _reserve1);
+    }
+
+    // Genuine overflow territory (both reserves enormous, physically unrealizable for a real pool): scale down
+    // before the sqrt. Floor division can zero a dust reserve here; returning 0 is the conservative fallback.
+    uint256 maxReserve = _reserve0 > _reserve1 ? _reserve0 : _reserve1;
+    uint256 scale = _ceilDiv(maxReserve, VOLATILE_GEOMEAN_SCALE_LIMIT);
+
+    uint256 scaledReserve0 = _reserve0 / scale;
+    uint256 scaledReserve1 = _reserve1 / scale;
+    if (scaledReserve0 == 0 || scaledReserve1 == 0) return 0;
+
+    // Bound the rescale so sqrt(...) * scale cannot itself overflow; fall back to 0 if it would.
+    uint256 root = FixedPointMathLib.sqrt(scaledReserve0 * scaledReserve1);
+    if (root > type(uint256).max / scale) return 0;
+
+    _k = root * scale;
+  }
+
+  function _requirePopulatedPessimisticWindow(uint256 _day) internal view {
+    if (!useThreeDayLow) return;
+    if (_day < 2 || !_hasValidDailyLow(_day) || !_hasValidDailyLow(_day - 1) || !_hasValidDailyLow(_day - 2)) {
+      revert PessimisticPriceWindowNotReady();
+    }
+  }
+
+  function _hasValidDailyLow(uint256 _day) internal view returns (bool _valid) {
+    _valid = dailyUpdates[_day] > 0 && dailyLow[_day] > 0;
+  }
+
+  function _isSingleFeed() internal view returns (bool _singleFeed) {
+    _singleFeed = (token0Feed == address(0)) != (token1Feed == address(0));
+  }
+
+  function _getMarginalAmountOut(
+    address _token,
+    uint256 _amountIn,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 amountOut) {
+    bool tokenInIsToken0 = _token == token0;
+
+    if (stable) {
+      uint256 normalizedReserve0 = _normalizeReserve(_reserve0, decimals0);
+      uint256 normalizedReserve1 = _normalizeReserve(_reserve1, decimals1);
+      (uint256 reserveA, uint256 reserveB) =
+        tokenInIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
+      uint256 normalizedAmountIn = _normalizeReserve(_amountIn, tokenInIsToken0 ? decimals0 : decimals1);
+      (uint256 derivativeA, uint256 derivativeB) = _getScaledStableDerivativePair(reserveA, reserveB);
+      uint256 normalizedAmountOut = FixedPointMathLib.mulDivDown(normalizedAmountIn, derivativeB, derivativeA);
+
+      amountOut = FixedPointMathLib.mulDivDownFullPrecision(
+        normalizedAmountOut, tokenInIsToken0 ? decimals1 : decimals0, DECIMALS
+      );
+    } else {
+      (uint256 reserveA, uint256 reserveB) = tokenInIsToken0 ? (_reserve0, _reserve1) : (_reserve1, _reserve0);
+      amountOut = FixedPointMathLib.mulDivDown(_amountIn, reserveB, reserveA);
+    }
+  }
+
+  function _getTwapDerivedTokenPrice(
+    address _knownToken,
+    uint256 _knownTokenPrice
+  ) internal view returns (uint256 twapPrice) {
+    IVeloPool poolContract = IVeloPool(pool);
+    bool knownTokenIsToken0 = _knownToken == token0;
+
+    (uint256 i, uint256 length) = _getTwapStartIndex(poolContract);
+
+    for (; i < length;) {
+      (uint256 reserve0Average, uint256 reserve1Average) = _getAverageReserves(poolContract, i);
+      (uint256 knownReserve, uint256 derivedReserve) =
+        _getNormalizedReservePair(knownTokenIsToken0, reserve0Average, reserve1Average);
+      if (knownReserve == 0 || derivedReserve == 0) {
+        revert InvalidDerivedPrice();
+      }
+
+      // Accumulate each sample at 1e18-boosted precision and floor only once (below), instead of flooring every
+      // sample to 8 decimals before summing. Round-then-average could floor sub-unit-but-nonzero sample prices
+      // to zero and drag a valid average down to zero, reverting the update (L-19). The 1e18 boost is safe: a
+      // mulDivDownFullPrecision uses 512-bit intermediates and an 8-decimal Chainlink price leaves ample headroom.
+      if (stable) {
+        (uint256 knownDerivative, uint256 derivedDerivative) =
+          _getScaledStableDerivativePair(knownReserve, derivedReserve);
+        if (knownDerivative == 0 || derivedDerivative == 0) {
+          revert InvalidDerivedPrice();
+        }
+        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(
+          _knownTokenPrice * 1e18, knownDerivative, derivedDerivative
+        );
+      } else {
+        twapPrice += FixedPointMathLib.mulDivDownFullPrecision(_knownTokenPrice * 1e18, knownReserve, derivedReserve);
+      }
+
+      unchecked {
+        i++;
+      }
+    }
+
+    twapPrice /= (points * 1e18);
+  }
+
+  function _getNormalizedReservePair(
+    bool _knownTokenIsToken0,
+    uint256 _reserve0,
+    uint256 _reserve1
+  ) internal view returns (uint256 knownReserve, uint256 derivedReserve) {
+    uint256 normalizedReserve0 = _normalizeReserve(_reserve0, decimals0);
+    uint256 normalizedReserve1 = _normalizeReserve(_reserve1, decimals1);
+    (knownReserve, derivedReserve) =
+      _knownTokenIsToken0 ? (normalizedReserve0, normalizedReserve1) : (normalizedReserve1, normalizedReserve0);
+  }
+
+  function _getTwapStartIndex(IVeloPool _poolContract) internal view returns (uint256 startIndex, uint256 length) {
+    length = _poolContract.observationLength() - 1;
+    startIndex = length - points;
+
+    IVeloPool.Observation memory latestObservation = _poolContract.observations(length);
+    if (block.timestamp - latestObservation.timestamp > maxTwapObservationInterval) {
+      revert TwapObservationTooOld();
+    }
+
+    // Reject any window whose earliest sampled observation predates the latest sequencer recovery. During an
+    // outage no observations are written, so the first interval after a restart would span the gap and average
+    // frozen pre-outage reserves into the derived price. Observation timestamps are monotonic, so a start
+    // observation at/after recovery guarantees no sampled interval straddles recovery (per-interval validation
+    // is redundant). Fail closed until enough post-recovery observations exist (~points * 30 min after restart).
+    uint256 sequencerStartedAt = _checkSequencerUpAndGracePeriodOver();
+    if (_poolContract.observations(startIndex).timestamp < sequencerStartedAt) {
+      revert TwapObservationNotPostRecovery();
+    }
+  }
+
+  function _getAverageReserves(
+    IVeloPool _poolContract,
+    uint256 _index
+  ) internal view returns (uint256 reserve0Average, uint256 reserve1Average) {
+    IVeloPool.Observation memory nextObservation = _poolContract.observations(_index + 1);
+    IVeloPool.Observation memory currentObservation = _poolContract.observations(_index);
+    uint256 timeElapsed = nextObservation.timestamp - currentObservation.timestamp;
+    if (timeElapsed > maxTwapObservationInterval) {
+      revert TwapObservationIntervalTooLong();
+    }
+
+    reserve0Average = (nextObservation.reserve0Cumulative - currentObservation.reserve0Cumulative) / timeElapsed;
+    reserve1Average = (nextObservation.reserve1Cumulative - currentObservation.reserve1Cumulative) / timeElapsed;
   }
 
   // solves for cases where curve is x^3 * y + y^3 * x = k
@@ -444,23 +896,106 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 reserve1,
     uint256 priceDecimals
   ) internal pure returns (uint256) {
-    uint256 k = _getK(reserve0, reserve1);
     // fair_reserves = ( (k * (price0 ** 3) * (price1 ** 3)) )^(1/4) / ((price0 ** 2) + (price1 ** 2));
     price0 *= 1e18 / (10 ** priceDecimals); // convert to 18 dec
     price1 *= 1e18 / (10 ** priceDecimals);
-    uint256 a = FixedPointMathLib.rpow(price0, 3, 1e18); // keep same decimals as chainlink
-    uint256 b = FixedPointMathLib.rpow(price1, 3, 1e18);
-    uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
-    uint256 d = FixedPointMathLib.rpow(price1, 2, 1e18);
+    uint256 stablePriceScale = _getStablePriceScale(price0, price1);
+    price0 *= stablePriceScale;
+    price1 *= stablePriceScale;
 
-    uint256 p0 = k * FixedPointMathLib.mulWadDown(a, b); // 2*18 decimals
+    uint256 stablePricingScale = _getStablePricingScale(reserve0, reserve1, price0, price1);
+    reserve0 /= stablePricingScale;
+    reserve1 /= stablePricingScale;
 
-    uint256 fair = p0 / (c + d); // number of decimals is 18
+    uint256 frth_fair;
+    {
+      uint256 k = _getK(reserve0, reserve1);
+      uint256 a = FixedPointMathLib.rpow(price0, 3, 1e18); // keep same decimals as chainlink
+      uint256 b = FixedPointMathLib.rpow(price1, 3, 1e18);
+      uint256 c = FixedPointMathLib.rpow(price0, 2, 1e18);
+      uint256 d = FixedPointMathLib.rpow(price1, 2, 1e18);
 
-    // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
-    uint256 frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18
+      uint256 fair = _getStableFair(k, a, b, c + d);
 
-    return 2 * ((frth_fair * (10 ** priceDecimals)) / total_supply); // converts to chainlink decimals
+      // each sqrt divides the num decimals by 2. So need to replenish the decimals midway through with another 1e18
+      frth_fair = FixedPointMathLib.sqrt(FixedPointMathLib.sqrt(fair * 1e18) * 1e18); // number of decimals is 18
+    }
+
+    return _scaleStableLpTokenPrice(total_supply, frth_fair, stablePricingScale, stablePriceScale, priceDecimals);
+  }
+
+  function _scaleStableLpTokenPrice(
+    uint256 _totalSupply,
+    uint256 _frthFair,
+    uint256 _stablePricingScale,
+    uint256 _stablePriceScale,
+    uint256 _priceDecimals
+  ) internal pure returns (uint256 _price) {
+    uint256 fairReserve = FixedPointMathLib.mulDivDownFullPrecision(
+      2 * _frthFair, _stablePricingScale, _stablePriceScale
+    );
+
+    _price = FixedPointMathLib.mulDivDownFullPrecision(fairReserve, 10 ** _priceDecimals, _totalSupply);
+  }
+
+  function _getStableFair(
+    uint256 _k,
+    uint256 _a,
+    uint256 _b,
+    uint256 _denominator
+  ) internal pure returns (uint256 _fair) {
+    uint256 kTimesA = FixedPointMathLib.mulDivDownFullPrecision(_k, _a, _denominator);
+    _fair = FixedPointMathLib.mulDivDownFullPrecision(kTimesA, _b, DECIMALS);
+  }
+
+  function _getStablePriceScale(uint256 _price0, uint256 _price1) internal pure returns (uint256 _stablePriceScale) {
+    uint256 maxPrice = _price0 > _price1 ? _price0 : _price1;
+    if (maxPrice >= DECIMALS) return 1;
+
+    _stablePriceScale = _ceilDiv(DECIMALS, maxPrice);
+  }
+
+  function _getStablePricingScale(
+    uint256 _reserve0,
+    uint256 _reserve1,
+    uint256 _price0,
+    uint256 _price1
+  ) internal pure returns (uint256 stablePricingScale) {
+    uint256 maxReserve = _reserve0 > _reserve1 ? _reserve0 : _reserve1;
+    uint256 maxPrice = _price0 > _price1 ? _price0 : _price1;
+    uint256 maxReserveValue = FixedPointMathLib.mulDivDownFullPrecision(maxReserve, maxPrice, DECIMALS);
+
+    stablePricingScale = _ceilDiv(maxReserve, STABLE_LP_PRICING_SCALE_LIMIT);
+    uint256 valueScale = _ceilDiv(maxReserveValue, STABLE_LP_PRICING_SCALE_LIMIT);
+    if (valueScale > stablePricingScale) stablePricingScale = valueScale;
+    if (stablePricingScale == 0) stablePricingScale = 1;
+  }
+
+  function _ceilDiv(uint256 _x, uint256 _y) internal pure returns (uint256 _z) {
+    if (_x == 0) return 0;
+    return ((_x - 1) / _y) + 1;
+  }
+
+  function _getScaledStableDerivativePair(
+    uint256 _reserveA,
+    uint256 _reserveB
+  ) internal pure returns (uint256 derivativeA, uint256 derivativeB) {
+    (uint256 scaledReserveA, uint256 scaledReserveB) = _scaleStableDerivativeReserves(_reserveA, _reserveB);
+
+    derivativeA = _stableDerivative(scaledReserveA, scaledReserveB);
+    derivativeB = _stableDerivative(scaledReserveB, scaledReserveA);
+  }
+
+  function _scaleStableDerivativeReserves(
+    uint256 _reserveA,
+    uint256 _reserveB
+  ) internal pure returns (uint256 scaledReserveA, uint256 scaledReserveB) {
+    uint256 maxReserve = _reserveA > _reserveB ? _reserveA : _reserveB;
+    uint256 scale = _ceilDiv(maxReserve, STABLE_DERIVATIVE_SCALE_LIMIT);
+    if (scale <= 1) return (_reserveA, _reserveB);
+
+    scaledReserveA = _ceilDiv(_reserveA, scale);
+    scaledReserveB = _ceilDiv(_reserveB, scale);
   }
 
   function _getK(uint256 x, uint256 y) internal pure returns (uint256) {
@@ -471,6 +1006,11 @@ contract PessimisticVeloSingleOracle is Ownable2Step {
     uint256 newY = FixedPointMathLib.mulWadDown(y_cubed, x);
 
     return newX + newY; // 18 decimals
+  }
+
+  function _stableDerivative(uint256 x0, uint256 y) internal pure returns (uint256 derivative) {
+    derivative = 3 * FixedPointMathLib.mulWadDown(x0, FixedPointMathLib.mulWadDown(y, y))
+      + FixedPointMathLib.mulWadDown(FixedPointMathLib.mulWadDown(x0, x0), x0);
   }
 
   /* ========== SETTERS ========== */
