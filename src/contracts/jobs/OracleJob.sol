@@ -3,6 +3,7 @@ pragma solidity 0.8.20;
 
 import {IOracleJob} from '@interfaces/jobs/IOracleJob.sol';
 import {IOracleRelayer} from '@interfaces/IOracleRelayer.sol';
+import {IAbstractVeloVaultRelayer} from '@interfaces/oracles/IAbstractVeloVaultRelayer.sol';
 import {IDelayedOracle} from '@interfaces/oracles/IDelayedOracle.sol';
 import {IPIDRateSetter} from '@interfaces/IPIDRateSetter.sol';
 
@@ -64,7 +65,21 @@ contract OracleJob is Authorizable, Modifiable, Job, IOracleJob {
     if (!shouldWorkUpdateCollateralPrice) revert NotWorkable();
 
     IDelayedOracle _delayedOracle = IDelayedOracle(address(oracleRelayer.cParams(_cType).oracle));
-    if (!_delayedOracle.updateResult()) revert OracleJob_InvalidPrice();
+    (bool _success, bytes memory _returnData) =
+      address(_delayedOracle).staticcall(abi.encodeCall(IDelayedOracle.priceSource, ()));
+    if (_success && _returnData.length >= 32) {
+      address _priceSource = abi.decode(_returnData, (address));
+      address(_priceSource).call(abi.encodeCall(IAbstractVeloVaultRelayer.updatePricePerFullShare, ()));
+    }
+    // Propagate the delayed oracle's result on every genuine state transition, including an invalidation, so a
+    // fail-closed price reaches the SAFE engine via the rewarded keeper path instead of lingering as a stale
+    // value (DelayedOracle has no staleness expiry). Only a true no-op -- updateResult() returning false WITHOUT
+    // advancing lastUpdateTime -- is rejected, so keepers cannot farm rewards on repeated invalid reads.
+    // (Escalation option, if transient outages prove disruptive: gate propagation on N consecutive invalid cycles.)
+    uint256 _lastUpdateTimeBefore = _delayedOracle.lastUpdateTime();
+    if (!_delayedOracle.updateResult() && _delayedOracle.lastUpdateTime() == _lastUpdateTimeBefore) {
+      revert OracleJob_InvalidPrice();
+    }
 
     oracleRelayer.updateCollateralPrice(_cType);
   }

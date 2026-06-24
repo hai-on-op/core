@@ -134,6 +134,8 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
 
   /**
    * @notice Get the collateral price from the oracle
+   * @dev Uses the collateral oracle configured in OracleRelayer for both SAFE accounting and auction execution.
+   *      For Velo LP collateral this intentionally means auctions use the same delayed/pessimistic price source.
    * @return _collateralPrice The collateral price if valid [wad]
    */
   function _getCollateralPrice() internal view returns (uint256 _collateralPrice) {
@@ -201,10 +203,7 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
     });
 
     safeEngine.transferCollateral({
-      _cType: collateralType,
-      _source: msg.sender,
-      _destination: address(this),
-      _wad: _amountToSell
+      _cType: collateralType, _source: msg.sender, _destination: address(this), _wad: _amountToSell
     });
 
     emit StartAuction({
@@ -270,9 +269,7 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
 
     // Transfer the bid to the income recipient
     safeEngine.transferInternalCoins({
-      _source: msg.sender,
-      _destination: _auction.auctionIncomeRecipient,
-      _rad: _adjustedBid * RAY
+      _source: msg.sender, _destination: _auction.auctionIncomeRecipient, _rad: _adjustedBid * RAY
     });
 
     if (_adjustedBid * RAY < _auction.amountToRaise && _auction.amountToSell > _boughtCollateral) {
@@ -323,10 +320,7 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
 
     // Transfer the collateral to the bidder
     safeEngine.transferCollateral({
-      _cType: collateralType,
-      _source: address(this),
-      _destination: msg.sender,
-      _wad: _boughtCollateral
+      _cType: collateralType, _source: address(this), _destination: msg.sender, _wad: _boughtCollateral
     });
 
     // Emit the buy event
@@ -348,10 +342,7 @@ contract CollateralAuctionHouse is Authorizable, Modifiable, Disableable, IColla
     liquidationEngine().removeCoinsFromAuction(_auction.amountToRaise);
 
     safeEngine.transferCollateral({
-      _cType: collateralType,
-      _source: address(this),
-      _destination: msg.sender,
-      _wad: _auction.amountToSell
+      _cType: collateralType, _source: address(this), _destination: msg.sender, _wad: _auction.amountToSell
     });
 
     emit TerminateAuctionPrematurely({
