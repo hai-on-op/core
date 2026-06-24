@@ -55,8 +55,8 @@ abstract contract ModifiablePerCollateral is Authorizable, IModifiablePerCollate
   function _modifyParameters(bytes32 _cType, bytes32 _param, bytes memory _data) internal virtual;
 
   /**
-   * @notice Register a new collateral type in the SAFEEngine
-   * @param _cType Collateral type to register
+   * @notice Initialize a new collateral type in the inheriting contract
+   * @param _cType Collateral type to initialize
    * @param _collateralParams Collateral parameters
    */
   function _initializeCollateralType(bytes32 _cType, bytes memory _collateralParams) internal virtual;
