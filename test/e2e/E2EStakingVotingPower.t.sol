@@ -5,6 +5,7 @@ import {Test} from 'forge-std/Test.sol';
 import {ProtocolToken} from '@contracts/tokens/ProtocolToken.sol';
 import {StakingToken} from '@contracts/tokens/StakingToken.sol';
 import {StakingManager} from '@contracts/tokens/StakingManager.sol';
+import {StakingEscrow} from '@contracts/tokens/StakingEscrow.sol';
 
 contract E2EStakingVotingPower is Test {
   function test_StakingPreservesVotingPower() public {
@@ -31,16 +32,20 @@ contract E2EStakingVotingPower is Test {
     assertEq(_kite.balanceOf(address(_manager)), 0);
 
     _manager.initiateWithdrawal(20 ether);
-    assertEq(_kite.delegates(address(_manager)), address(0));
-    assertEq(_kite.getVotes(address(this)), 80 ether);
+    assertEq(_kite.delegates(_escrow), address(0));
+    vm.expectRevert();
+    StakingEscrow(_escrow).delegate(address(this));
+    assertEq(_kite.balanceOf(_escrow), 100 ether);
+    assertEq(_kite.balanceOf(address(_manager)), 0);
+    assertEq(_kite.getVotes(address(this)), 0);
     _manager.cancelWithdrawal();
     assertEq(_kite.getVotes(address(this)), 100 ether);
-    _manager.initiateWithdrawal(100 ether);
-    assertEq(_kite.getVotes(address(this)), 0);
+    _manager.initiateWithdrawal(20 ether);
     vm.warp(block.timestamp + 7 days);
-    _stKite.approve(address(_manager), 100 ether);
+    _stKite.approve(address(_manager), 20 ether);
     _manager.withdraw();
-    assertEq(_kite.balanceOf(address(this)), 100 ether);
+    assertEq(_kite.balanceOf(address(this)), 20 ether);
+    assertEq(_kite.balanceOf(_escrow), 80 ether);
     assertEq(_kite.getVotes(address(this)), 100 ether);
   }
 }

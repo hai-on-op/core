@@ -179,8 +179,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       _pendingWithdrawals[msg.sender] = PendingWithdrawal({amount: _wad, timestamp: block.timestamp});
     }
 
-    // The manager has no delegate: pending withdrawals carry no voting power.
-    protocolToken.safeTransferFrom(stakingEscrows[msg.sender], address(this), _wad);
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(address(0));
 
     // Call decreaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
@@ -212,7 +211,7 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     totalStaked += _withdrawalAmount;
 
-    protocolToken.safeTransfer(stakingEscrows[msg.sender], _withdrawalAmount);
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(msg.sender);
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
@@ -246,7 +245,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     stakingToken.burnFrom(msg.sender, _withdrawalAmount);
 
-    protocolToken.safeTransfer(msg.sender, _withdrawalAmount);
+    protocolToken.safeTransferFrom(stakingEscrows[msg.sender], msg.sender, _withdrawalAmount);
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(msg.sender);
 
     emit StakingManagerWithdrawn(msg.sender, _withdrawalAmount);
   }

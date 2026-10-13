@@ -853,7 +853,10 @@ contract Unit_StakingManager_Withdraw is Base {
     vm.expectCall(
       address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT)
     );
-    vm.expectCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT));
+    vm.expectCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, stakingManager.stakingEscrows(user), user, WITHDRAW_AMOUNT)
+    );
 
     vm.prank(user);
     stakingManager.withdraw();
@@ -870,14 +873,17 @@ contract Unit_StakingManager_Withdraw is Base {
     );
     vm.mockCall(
       address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, stakingManager.stakingEscrows(user), user, WITHDRAW_AMOUNT),
       abi.encode(true)
     );
 
     vm.expectCall(
       address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT)
     );
-    vm.expectCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT));
+    vm.expectCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, stakingManager.stakingEscrows(user), user, WITHDRAW_AMOUNT)
+    );
 
     vm.prank(user);
     stakingManager.withdraw();
@@ -898,7 +904,7 @@ contract Unit_StakingManager_Withdraw is Base {
     );
     vm.mockCall(
       address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, stakingManager.stakingEscrows(user), user, WITHDRAW_AMOUNT),
       abi.encode(true)
     );
 
@@ -917,7 +923,10 @@ contract Unit_StakingManager_Withdraw is Base {
     vm.expectCall(
       address(mockStakingToken), abi.encodeWithSelector(IStakingToken.burnFrom.selector, user, WITHDRAW_AMOUNT)
     );
-    vm.expectCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transfer.selector, user, WITHDRAW_AMOUNT));
+    vm.expectCall(
+      address(mockProtocolToken),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, stakingManager.stakingEscrows(user), user, WITHDRAW_AMOUNT)
+    );
 
     // Execute withdrawal
     vm.prank(user);
@@ -1339,9 +1348,7 @@ contract Unit_StakingManager_Checkpoint is Base {
     vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(mockProtocolToken.delegate.selector), abi.encode());
     vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true));
     vm.mockCall(
-      address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transferFrom.selector, secondUser),
-      abi.encode(true)
+      address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector, secondUser), abi.encode(true)
     );
     vm.mockCall(
       address(mockStakingToken),
