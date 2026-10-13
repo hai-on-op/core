@@ -42,6 +42,8 @@ abstract contract Base is HaiTest {
   uint256 constant COOLDOWN_PERIOD = 7 days;
 
   function setUp() public virtual {
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(mockProtocolToken.delegate.selector), abi.encode());
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true));
     vm.startPrank(deployer);
 
     stakingManager = new StakingManagerForTest(address(mockProtocolToken), address(mockStakingToken), COOLDOWN_PERIOD);
@@ -326,11 +328,12 @@ contract Unit_StakingManager_Stake is Base {
 
   function test_Stake(uint256 _amount) public {
     vm.assume(_amount > 0 && _amount <= type(uint256).max);
+    address _escrow = computeCreateAddress(address(stakingManager), vm.getNonce(address(stakingManager)));
 
     // Mock token transfer
     vm.mockCall(
       address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transferFrom.selector, user, address(stakingManager), _amount),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, user, _escrow, _amount),
       abi.encode(true)
     );
 
@@ -356,6 +359,7 @@ contract Unit_StakingManager_Stake is Base {
 
   function test_Stake_WithRewardPool(uint256 _amount) public {
     vm.assume(_amount > 0 && _amount <= type(uint256).max);
+    address _escrow = computeCreateAddress(address(stakingManager), vm.getNonce(address(stakingManager)));
 
     // Setup reward pool
     vm.startPrank(authorizedAccount);
@@ -365,7 +369,7 @@ contract Unit_StakingManager_Stake is Base {
     // Mock token transfer
     vm.mockCall(
       address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transferFrom.selector, user, address(stakingManager), _amount),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, user, _escrow, _amount),
       abi.encode(true)
     );
 
@@ -377,9 +381,7 @@ contract Unit_StakingManager_Stake is Base {
     // Mock token balances (for later assertions)
     vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, user), abi.encode(_amount));
     vm.mockCall(
-      address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.balanceOf.selector, address(stakingManager)),
-      abi.encode(_amount)
+      address(mockProtocolToken), abi.encodeWithSelector(IERC20.balanceOf.selector, _escrow), abi.encode(_amount)
     );
 
     // --- Mocks for _checkpoint call ---
@@ -424,7 +426,7 @@ contract Unit_StakingManager_Stake is Base {
       abi.encode(_amount)
     );
 
-    assertEq(mockProtocolToken.balanceOf(address(stakingManager)), _amount);
+    assertEq(mockProtocolToken.balanceOf(_escrow), _amount);
     assertEq(mockStakingToken.balanceOf(user), _amount);
 
     assertEq(stakingManager.stakedBalances(user), _amount);
@@ -1334,9 +1336,11 @@ contract Unit_StakingManager_Checkpoint is Base {
     vm.mockCall( // Mock secondUser's balance before stake
     address(mockStakingToken), abi.encodeWithSelector(IERC20.balanceOf.selector, secondUser), abi.encode(0));
     // Mocks for secondUser stake operation
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(mockProtocolToken.delegate.selector), abi.encode());
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true));
     vm.mockCall(
       address(mockProtocolToken),
-      abi.encodeWithSelector(IERC20.transferFrom.selector, secondUser, address(stakingManager), secondUserStakeAmount),
+      abi.encodeWithSelector(IERC20.transferFrom.selector, secondUser),
       abi.encode(true)
     );
     vm.mockCall(
@@ -2996,6 +3000,8 @@ contract Unit_StakingManager_PendingWithdrawals is Base {
   }
 
   function test_PendingWithdrawals_MultipleUsers() public {
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(mockProtocolToken.delegate.selector), abi.encode());
+    vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.approve.selector), abi.encode(true));
     // Setup second user's stake
     vm.mockCall(address(mockProtocolToken), abi.encodeWithSelector(IERC20.transferFrom.selector), abi.encode(true));
     vm.mockCall(address(mockStakingToken), abi.encodeWithSelector(IStakingToken.mint.selector), abi.encode());
