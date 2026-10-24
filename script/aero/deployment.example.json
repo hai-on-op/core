@@ -8,12 +8,17 @@
     "rpcUrl": "https://mainnet.base.org",
     "wrapper": null,
     "migrator": null,
-    "bridge": null
+    "bridge": null,
+    "sourceCaps": null
   },
   "optimism": {
     "chainId": 10,
     "rpcUrl": "https://mainnet.optimism.io",
     "output": null,
-    "migrator": null
-  }
+    "migrator": null,
+    "sourceCaps": null
+  },
+  "deployer": "0xbd8EC4cb226EBaE228F8829E2ec23070b09165d3",
+  "owner": "0x7F4735237c41F7F8578A9C7d10A11e3BCFa3D4A3",
+  "treasury": "0x7F4735237c41F7F8578A9C7d10A11e3BCFa3D4A3"
 }

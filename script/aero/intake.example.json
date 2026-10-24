@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "chainId": 8453,
+  "positionsReviewed": false,
+  "recipient": "treasury",
+  "positions": [],
+  "positionSchema": {
+    "origin": "aerodrome or velodrome",
+    "oldTokenId": "actual Base legacy NFT ID for aerodrome",
+    "nonce": "actual settled OP migration nonce for velodrome",
+    "tokenId": "actual new sAERO NFT ID from canonical settlement receipt",
+    "principal": "exact new AERO principal in raw units",
+    "transactionHash": "actual Base migration or settlement transaction",
+    "blockNumber": "actual finalized receipt block number (JSON integer)",
+    "blockHash": "canonical receipt block hash"
+  }
+}

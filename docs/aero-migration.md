@@ -119,4 +119,37 @@ The OP fork rehearsal uses a disposable test token and mirrors current legacy HA
 
 The source-only validation record is `script/aero/evidence/validation.json`. Both this change and clean baseline `de5a2d0` pass the exact CI build and lint commands. The exact CI test command gives 1,917 passes / 57 failures / 1 opt-in fork skip here, versus 1,884 passes / 57 failures on baseline. Both runs have the same failing suite/category multiset: 30 legacy `testFail` incompatibilities, 10 existing expected-error mismatches, 15 public RPC availability failures and 2 missing CI signing fixtures. This is not a green full suite; the change adds 33 passing contract tests with no new failing suite. The canonical Base binding fork passes separately.
 
-Twelve script tests and the recorded Base/OP local fork rehearsals pass. The Base reward claim has no accrued payout, and OP smoke finality is locally simulated. These records are test evidence only; they are not production receipts, treasury signatures, deployed collateral or proof of end-to-end reward funding.
+Twenty-two script tests and the recorded Base/OP local fork rehearsals pass. The Base reward claim has no accrued payout, and OP smoke finality is locally simulated. These records are test evidence only; they are not production receipts, treasury signatures, deployed collateral or proof of end-to-end reward funding.
+
+## Manual deployment and final treasury intake
+
+The user will deploy these contracts themselves. `script/aero/manual/base-issuer.unsigned.json` contains the exact Base issuer creation payload and constructor encoding for confirmed deployer `0xbd8EC4cb226EBaE228F8829E2ec23070b09165d3`, with both owner and immutable treasury set to Safe `0x7F4735237c41F7F8578A9C7d10A11e3BCFa3D4A3`. It records the reviewed contract source commit, initcode hash, compiler settings, every source hash, canonical upstream runtime/bindings and observed Safe controls. It is unsigned and records no deployed address. Nonce and transaction fee settings remain with the user's wallet.
+
+`prepare-deployment.mjs` checks constructor ABI, tested creation-bytecode hash and metadata against `artifacts-reviewed.json`; it rejects stale source files and linked libraries. Optional read-only gas estimation and deployer balance checks report whether observed balance covers estimated execution cost, separately from L1 data/operator fees. Lack of funding or an unavailable gas estimate does not prevent preparing the package. Gas and balance observations must be refreshed before the user's later execution.
+
+```sh
+sh script/aero/manual/prepare.sh
+node script/aero/prepare-deployment.mjs --manifest /path/to/actual-deployments.json --kind migrator --chain-id 8453 --output /tmp/base-migrator.unsigned.json
+node script/aero/prepare-deployment.mjs --manifest /path/to/actual-deployments.json --kind migrator --chain-id 10 --output /tmp/op-migrator.unsigned.json
+```
+
+Migrator preparation requires actual finalized output-token receipts/runtime and explicit source caps. Base output must prove the exact reviewed issuer creation payload from the confirmed deployer. OP output additionally requires recorded route review and full proxy identity evidence. A predicted token address cannot satisfy either path. Preparation emits no transaction-sending command; `manual/prepare.sh` only builds and generates unsigned data.
+
+After official migration has actually settled, `prepare-intake.mjs` consumes the deployed issuer manifest and an explicit selection shaped like `intake.example.json`. Each position must have the actual new sAERO ID, exact principal and finalized canonical Base transaction/block evidence. Base positions bind to `VeNFTMigrated` and their old token ID; OP positions bind to the destination `Migrated` nonce, used-nonce state, and minted-and-transferred NFT in that event's log segment. The tool verifies actual Safe ownership, unchanged principal and an unused issuer `principalOf` entry. It never substitutes a predicted NFT ID.
+
+```sh
+node script/aero/prepare-intake.mjs --manifest /path/to/actual-deployments.json --positions /path/to/actual-migrated-nfts.json --output /tmp/safe-intake.unsigned.json
+node script/aero/intake-fork-smoke.mjs
+```
+
+The generated Safe Transaction Builder batch calls the verified `upgradeToPermanentStake(id)` for each finite new sAERO position. This preserves principal and internally re-anchors the Voter; conversion itself needs no reset/deallocation. An expired funded position first uses verified `increaseStakingPeriod(id, 1)` to renew it to the next week boundary, then converts permanently. Previously existing leaf allocations may need their normal voting refresh separately. Legacy veNFT reset/claim requirements before the official migration still apply.
+
+The final call is `depositNFTs(recipient, actualIds)`, authenticated by Safe ownership, with receipts sent to the Safe or an explicitly verified Base migrator. No NFT approval or same-owner transfer is needed. If the issuer is paused, the batch temporarily unpauses and restores pause around intake. Execute the entire ordered Safe batch atomically and refresh evidence before signing. This creates receipts against the selected actual principal; it does not activate migrators, bridge inventory or enable borrowing.
+
+The supplemental fork test migrates actual finite legacy Base NFT `8814` on a disposable pinned fork, derives its new ID from the genuine settlement, converts it permanently, registers exact principal to the Safe, restores pause and rejects duplicate intake. Production assets and signatures are never used by the test.
+
+Remote CI for PR160 at `fbbfa5c` remains **failing**: [run 40123603899](https://github.com/hai-on-op/core/actions/runs/40123603899) reports 1,952 passes and 113 failures. All 33 new issuer/migrator tests pass. Failures comprise 79 legacy `testFail` methods (nightly lists these individually), 10 existing expected-error mismatches and 24 fork initializations blocked by the configured OP RPC hostname failing DNS. All failing tests belong to 39 files unchanged from baseline; all legacy failure names were checked against baseline. This remote result is separate from the local 57-failure comparison.
+
+Before OP-origin intake, run the app's [source-to-destination settlement verifier](https://github.com/hai-on-op/app/blob/c2c0bd2eff1b5ba924526ea8b964da1fbcacc0b8/scripts/aero-migration/verify-settlement.cjs). It binds old OP NFT migration, dispatch nonce and Base destination settlement. The core intake generator verifies the actual Base nonce settlement, Safe recipient, principal and new NFT, while `positionsReviewed` records the separately reconciled product provenance; it does not replace that OP source-chain check.
+
+The optional `intake-fork-smoke.mjs --expired` rehearsal remains unverified: after advancing years beyond the actual migrated stake expiry, Anvil advanced the sending account nonce but returned no transaction receipt. Active finite intake passed its six checks. The expired-renewal call encoding has unit coverage and matches the verified upstream implementation, but its full fork lifecycle still needs a successful rehearsal before using that path. No production transaction was attempted.

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "sourceOnly": true,
+  "scriptTests": {
+    "passed": 22,
+    "failed": 0
+  },
+  "issuerUnsignedPackage": "script/aero/manual/base-issuer.unsigned.json",
+  "issuerInitcodeHash": "0x5fc9354056dc44b139d98cd0de633064594015feb71b82fa16ee80337b9b66d3",
+  "actualFiniteIntakeFork": {
+    "passedChecks": 6,
+    "evidence": "script/aero/evidence/intake-fork-smoke.json"
+  },
+  "expiredIntakeFork": {
+    "verified": false,
+    "limitation": "After time-advancing beyond the migrated stake expiry, local Anvil advanced the account nonce but returned no receipt. No expired lifecycle success is claimed. Unit-verified call encoding and upstream source inspection do not replace a successful fork rehearsal."
+  },
+  "readOnlyNegativeChecks": [
+    "Existing unsigned output paths are rejected before RPC and final writes use wx",
+    "Missing output deployment prevents migrator payload generation",
+    "Missing reviewed actual NFT selection prevents intake generation"
+  ],
+  "independentReview": {
+    "reviewer": "app_inventory agent",
+    "scope": "New prepare-deployment/prepare-intake source and all 22 Node tests; actual artifact verification: issuer27 source files and migrator12 source files",
+    "result": "No blocking bug identified",
+    "limits": [
+      "OP old-NFT source provenance must be separately reconciled with app verify-settlement.cjs",
+      "Fork intake calls execute sequentially; actual atomic Safe MultiSend remains untested"
+    ]
+  },
+  "productionTransactions": 0,
+  "soliditySourceChanged": false
+}

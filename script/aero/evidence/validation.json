@@ -40,7 +40,7 @@
     "issuer": 16,
     "migrator": 17,
     "canonicalBaseBindingFork": 1,
-    "scripts": 12,
+    "scripts": 22,
     "baseActualUpstreamSmokeChecks": 10,
     "optimismActualCoreSmokeChecks": 7
   },
@@ -292,5 +292,25 @@
       "suite": "test/unit/jobs/OracleJob.t.sol:Unit_OracleJob_ModifyParameters",
       "category": "legacy expected-error mismatch"
     }
-  ]
+  ],
+  "remoteCi": {
+    "runUrl": "https://github.com/hai-on-op/core/actions/runs/40123603899",
+    "commit": "fbbfa5c",
+    "overallTests": "failed",
+    "passed": 1952,
+    "failed": 113,
+    "newIssuerAndMigratorTests": {
+      "passed": 33,
+      "failed": 0
+    },
+    "canonicalForkTest": "opt-in skipped",
+    "failureCategories": {
+      "legacyTestFailNaming": 79,
+      "legacyExpectedErrorMismatch": 10,
+      "configuredOpRpcDnsResolution": 24
+    },
+    "baselineEvidence": "Every one of 113 failures belongs to one of 39 existing test files byte-for-byte unchanged from de5a2d0. All 79 testFail names exist in baseline; the ten expected-error cases match the local baseline failures. CI nightly enumerates unsupported testFail methods individually rather than the local Foundry grouping.",
+    "limitations": "Remote overall CI remains failing. Configured RPC DNS failure differs from the public-RPC rate limiting in local comparison; this is not an exact remote baseline rerun."
+  },
+  "manualPreparationEvidence": "script/aero/evidence/manual-preparation-validation.json"
 }
