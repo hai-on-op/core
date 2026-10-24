@@ -1,0 +1,17 @@
+name: AERO migration preparation
+on:
+  push:
+    paths: ['script/aero/**', '.github/workflows/aero-migration.yml', 'package.json', 'yarn.lock']
+  pull_request:
+    paths: ['script/aero/**', '.github/workflows/aero-migration.yml', 'package.json', 'yarn.lock']
+jobs:
+  read-only-scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+      - run: yarn install --frozen-lockfile --ignore-scripts
+      - run: yarn test:aero:scripts

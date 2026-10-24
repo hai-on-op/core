@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "upstreamCommit": "8b506b450aaa9d4a9f1a77e264f2d9dd508e9ddf",
+  "treasuryCustodyReviewed": false,
+  "bridgeRouteReviewed": false,
+  "base": {
+    "chainId": 8453,
+    "rpcUrl": "https://mainnet.base.org",
+    "wrapper": null,
+    "migrator": null,
+    "bridge": null
+  },
+  "optimism": {
+    "chainId": 10,
+    "rpcUrl": "https://mainnet.optimism.io",
+    "output": null,
+    "migrator": null
+  }
+}

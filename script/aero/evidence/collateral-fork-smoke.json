@@ -1,0 +1,21 @@
+{
+  "localForkOnly": true,
+  "chainId": 10,
+  "pinnedBlock": 158633871,
+  "pinnedBlockHash": "0x42f03c13c2f2466df336f64395f5e91aaf554815dfa6fcb01c959f3b46ae849b",
+  "runtime": "prague",
+  "checks": [
+    "Pinned real HAI runtimes and live execution authorization",
+    "Canonical factory calls create actual join and auction",
+    "Finalized local receipts, canonical blocks and exact factory events validate children",
+    "Existing HAIAERO Pyth oracle reused unchanged",
+    "Ordered initialization succeeds with debtCeiling zero",
+    "Legacy collateral core parameters unchanged",
+    "Duplicate initialization rejected"
+  ],
+  "limits": [
+    "New token is a local test fixture. Existing collateral risk values are integration fixtures, not new collateral recommendations.",
+    "Local finality is simulated because Anvil does not finalize its mined blocks. Production preflight requires actual finalized RPC blocks.",
+    "Authority is impersonated only on the disposable local fork; this is not a governance proposal, deployment receipt or production approval."
+  ]
+}

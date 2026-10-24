@@ -1,0 +1,25 @@
+{
+  "localForkOnly": true,
+  "chainId": 8453,
+  "pinnedBlock": 53038227,
+  "pinnedBlockHash": "0x0de4c95c70ae87344f9a395accc17c7866c65ffbe8c698d005e04cefdea7ba69",
+  "runtime": "prague",
+  "artifact": "out/HaiAero.sol/HaiAero.json",
+  "creationBytecodeHash": "0xc95e5884f1dd1325164d6c208d6aae9bdb5e6be7433d6aeeb9a07d69852876cd",
+  "deployedRuntimeHash": "0x5a3f6a70f573320ef24e37cc45a45c5b4f4955798671ea88813fd5d72c3d6559",
+  "checks": [
+    "canonical runtime hashes at pinned Base block",
+    "actual new AERO deposit creates exact permanent sAERO principal with cleared allowance",
+    "actual sAERO NFT intake mints principal and transfers custody to the treasury Safe",
+    "same NFT cannot mint twice",
+    "unapproved depositor cannot transfer treasury backing NFT",
+    "treasury Safe directly allocates to an actual Base gauge and claims via registered fee manager",
+    "treasury intake cannot recognize same NFT twice",
+    "treasury-owned existing permanent NFT is recognized once without NFT approval",
+    "treasury-transferred NFT cannot mint duplicate bearer claims",
+    "treasury retains transfer/migration control, with honest live custody status after transfer"
+  ],
+  "limits": [
+    "Safe authorization is impersonated only on the local fork; production requires its real signatures. The new NFT has no accrued rewards; positive reward payout and remote-chain delivery require separate rehearsal."
+  ]
+}
