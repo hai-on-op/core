@@ -28,6 +28,14 @@ Treasury custody is an explicit trust assumption. `totalIssuedPrincipal` and `pr
 
 The issuer owner can pause and unpause deposits. Voting, allocation, reward recipients, approvals and backing migration remain under the Safe's normal multisig controls, with no issuer operator role. Users cannot redeem haiAERO through this one-way issuer. Unsolicited safe transfers to the issuer revert; unsafe direct transfers to it mint nothing and are not recoverable through this contract.
 
+## Selected legacy reward policy
+
+The user has explicitly chosen to skip legacy historical fee, bribe and rebase cleanup for this migration. The app's operational selection uses `rewardPolicy: "skip"`: historical reward discovery, reward reads, claims and reconciliation are not prerequisites for this selected plan. Other plans retain the default `claim-reviewed` policy. Existing historical evidence remains valid evidence of what was observed; skipping does not mark any balance as zero, claimed, recovered or reconciled.
+
+The official Base and Optimism [`depositVeNFT` implementation](https://github.com/dromos-labs/metadex-public/blob/8b506b450aaa9d4a9f1a77e264f2d9dd508e9ddf/V3/src/migration/Migration.sol#L102-L143) has no legacy reward-claim prerequisite and does not automatically claim fees, bribes or rebases. It converts the current locked principal, unlocks a permanent position if necessary and merges the source NFT before settlement. The verified legacy escrow implementations likewise perform no automatic reward claim in their unlock, merge or burn paths; merging burns the old NFT. Unclaimed rebases are not added to migrated principal, and skipped claims may become inaccessible after the burn. Migration ownership, current principal, eligibility, vote reset, approval, native transport-fee and source-to-destination settlement checks still apply.
+
+This decision applies to legacy cleanup only. Reward collection, accounting, funding and distribution for holders of the new product remain separate implementation and activation work; prior zero-accrual fork claims do not establish that future reward flow.
+
 ## Bearer migration and the unpausable legacy deposit tail
 
 `HaiAeroMigrator` permanently holds surrendered legacy ERC20s and transfers already-issued new haiAERO. It never mints. There is no holder snapshot, wallet allowlist or claim expiry. The bearer of an eligible token can migrate, including a proxy holding withdrawn SAFE collateral. This does not itself implement debt-safe migration.
@@ -95,7 +103,7 @@ Deployment scripts take public configuration via environment variables. They do 
 - Migrator: `AERO_OUTPUT_TOKEN`, `AERO_OUTPUT_RUNTIME_HASH`, `AERO_OWNER`, `AERO_TREASURY`, `AERO_SOURCE_CAPS` (comma-separated raw token amounts, route order above).
 - OP migrator additionally: `AERO_OUTPUT_IMPLEMENTATION`, `AERO_OUTPUT_IMPLEMENTATION_HASH`, `AERO_BRIDGE_ROUTE_REVIEWED`.
 
-Remaining production work: review through the existing release/governance process; treasury Safe role verification; new Hyperlane route deployment and configuration review; actual backing migration through the treasury Safe; receipts/runtime reconciliation; full reserve funding; reward operations and a nonempty cross-chain reward rehearsal; new collateral join/auction/governance parameters using the selected existing AERO oracle; a documented borrower repayment/withdrawal/redeposit path; production monitoring. The existing Pyth AERO price reuse is selected; no additional feed transition approval is required. A flash-funded vault migration helper is not a prerequisite of this implementation and is not provided here.
+Remaining production work: review through the existing release/governance process; treasury Safe role verification; new Hyperlane route deployment and configuration review; actual backing migration through the treasury Safe; receipts/runtime reconciliation; full reserve funding; new-product holder reward operations and a nonempty cross-chain reward rehearsal; new collateral join/auction/governance parameters using the selected existing AERO oracle; a documented borrower repayment/withdrawal/redeposit path; production monitoring. Legacy historical reward cleanup is intentionally skipped under the selected policy above and is not a migration prerequisite. The existing Pyth AERO price reuse is selected; no additional feed transition approval is required. A flash-funded vault migration helper is not a prerequisite of this implementation and is not provided here.
 
 ## Unsigned collateral onboarding
 
@@ -142,7 +150,7 @@ node script/aero/prepare-intake.mjs --manifest /path/to/actual-deployments.json 
 node script/aero/intake-fork-smoke.mjs
 ```
 
-The generated Safe Transaction Builder batch calls the verified `upgradeToPermanentStake(id)` for each finite new sAERO position. This preserves principal and internally re-anchors the Voter; conversion itself needs no reset/deallocation. An expired funded position first uses verified `increaseStakingPeriod(id, 1)` to renew it to the next week boundary, then converts permanently. Previously existing leaf allocations may need their normal voting refresh separately. Legacy veNFT reset/claim requirements before the official migration still apply.
+The generated Safe Transaction Builder batch calls the verified `upgradeToPermanentStake(id)` for each finite new sAERO position. This preserves principal and internally re-anchors the Voter; conversion itself needs no reset/deallocation. An expired funded position first uses verified `increaseStakingPeriod(id, 1)` to renew it to the next week boundary, then converts permanently. Previously existing leaf allocations may need their normal voting refresh separately. Legacy veNFT vote reset and all principal/ownership/settlement checks before official migration still apply; historical reward claims are intentionally skipped under the selected policy.
 
 The final call is `depositNFTs(recipient, actualIds)`, authenticated by Safe ownership, with receipts sent to the Safe or an explicitly verified Base migrator. No NFT approval or same-owner transfer is needed. If the issuer is paused, the batch temporarily unpauses and restores pause around intake. Execute the entire ordered Safe batch atomically and refresh evidence before signing. This creates receipts against the selected actual principal; it does not activate migrators, bridge inventory or enable borrowing.
 
