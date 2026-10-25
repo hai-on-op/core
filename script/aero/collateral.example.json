@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "chainId": 10,
+  "rpcUrl": "https://mainnet.optimism.io",
+  "reviewed": false,
+  "cType": null,
+  "executionAuthority": null,
+  "token": null,
+  "oracle": {
+    "address": "0x7DA9D12c5b6Fd2548B0E535Ec12F2406D69aBb75",
+    "runtimeCodeHash": "0x37adb8e31ee85fd46689284e4a606cad06e4ae3f1d69ea564e60a628a386bc60"
+  },
+  "children": {
+    "join": null,
+    "auction": null
+  },
+  "risk": {
+    "debtCeiling": "0",
+    "debtFloor": null,
+    "safetyCRatio": null,
+    "liquidationCRatio": null,
+    "liquidationPenalty": null,
+    "liquidationQuantity": null,
+    "stabilityFee": null,
+    "secondaryTaxPolicy": "primary-only",
+    "auction": {
+      "minimumBid": null,
+      "minDiscount": null,
+      "maxDiscount": null,
+      "perSecondDiscountUpdateRate": null
+    }
+  },
+  "oraclePolicy": "reuse-existing-haiaero-pyth"
+}

@@ -37,7 +37,8 @@
     "test:simulation": "forge test --match-contract Simulation --ffi",
     "test:unit": "FOUNDRY_FUZZ_RUNS=128 FOUNDRY_FUZZ_MAX_TEST_REJECTS=1000000 forge test --match-contract Unit -vvv",
     "test:unit:deep": "FOUNDRY_FUZZ_RUNS=1024 FOUNDRY_FUZZ_MAX_TEST_REJECTS=10000000 forge test --match-contract Unit -vvvvv",
-    "verify:tenderly:stability-pool": "yarn build:optimized:stability-pool && node script/tenderly/verify-stability-pool-manifest.mjs"
+    "verify:tenderly:stability-pool": "yarn build:optimized:stability-pool && node script/tenderly/verify-stability-pool-manifest.mjs",
+    "test:aero:scripts": "node --test script/aero/test/*.test.mjs"
   },
   "lint-staged": {
     "*.{js,css,md,ts,sol}": "forge fmt",

@@ -1,0 +1,316 @@
+{
+  "schemaVersion": 1,
+  "sourceOnly": true,
+  "baselineCommit": "de5a2d0fc17b9419a80751b8d22e3dd92e19e7f7",
+  "targetDevCommit": "b069712ebf53df77e4abeb7845df553c0ac2e3f1",
+  "targetDevTreeMatchesBaseline": true,
+  "build": {
+    "command": "yarn build",
+    "feature": "passed",
+    "baseline": "passed",
+    "compiler": "0.8.20",
+    "effectiveEvmVersion": "shanghai"
+  },
+  "fullTests": {
+    "command": "OP_MAINNET_RPC=https://mainnet.optimism.io OP_SEPOLIA_RPC=https://sepolia.optimism.io yarn test --nmc OnchainConfig",
+    "feature": {
+      "passed": 1917,
+      "failed": 57,
+      "skipped": 1
+    },
+    "baseline": {
+      "passed": 1884,
+      "failed": 57,
+      "skipped": 0
+    },
+    "sameFailingSuiteCategoryMultiset": true,
+    "failureCategories": {
+      "legacy expected-error mismatch": 10,
+      "legacy testFail naming": 30,
+      "missing CI signing fixture": 2,
+      "public RPC availability": 15
+    },
+    "limits": [
+      "No CI deployment keys were supplied. Public RPC requests were rate-limited; failing fork initialization stages can vary.",
+      "This comparison does not establish a green upstream test suite. New contract tests account for all 33 added passes.",
+      "The optional canonical Base fork test was skipped in the full command and passed separately with AERO_FORK_RPC set."
+    ]
+  },
+  "focusedTests": {
+    "issuer": 16,
+    "migrator": 17,
+    "canonicalBaseBindingFork": 1,
+    "scripts": 22,
+    "baseActualUpstreamSmokeChecks": 10,
+    "optimismActualCoreSmokeChecks": 7
+  },
+  "lint": {
+    "command": "yarn lint:check",
+    "feature": "passed (0 errors; 370 warnings)",
+    "baseline": "passed (0 errors; 328 warnings)",
+    "sourceOnlySolhintErrors": 0,
+    "formatCheckExistingFiles": [
+      "src/contracts/oracles/PessimisticVeloSingleOracle.sol",
+      "src/contracts/CollateralAuctionHouse.sol",
+      "test/unit/oracles/PessimisticVeloSingleOracle.t.sol",
+      "test/unit/jobs/OracleJob.t.sol"
+    ],
+    "note": "All new Solidity files pass forge fmt --check. Baseline formatter changes and generated simulation CSVs are excluded from this change."
+  },
+  "independentReview": {
+    "contracts": "Two agents reviewed; no additional permissionless mint or reserve bypass identified. Trusted treasury replacement-ID issuance remains documented.",
+    "preparation": "Two agents independently reviewed and reran script tests and OP fork; reported oracle/proxy/factory-evidence issues were fixed."
+  },
+  "productionTransactions": 0,
+  "unreviewedProductionDeploymentAddresses": 0,
+  "failingSuiteCategories": [
+    {
+      "suite": "test/e2e/Deploy.t.sol:E2EDeploymentMainnetTest",
+      "category": "missing CI signing fixture"
+    },
+    {
+      "suite": "test/e2e/Deploy.t.sol:E2EDeploymentTestnetTest",
+      "category": "missing CI signing fixture"
+    },
+    {
+      "suite": "test/e2e/E2EGlobalSettlement.t.sol:E2EGlobalSettlementTestDirectUser",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EGlobalSettlement.t.sol:E2EGlobalSettlementTestProxyUser",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EGovernor.t.sol:E2EGovernorMainnetTest",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EJobs.t.sol:E2EJobsTestDirectUser",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EJobs.t.sol:E2EJobsTestProxyUser",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EOracles.t.sol:E2EOracleSetup",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2EStabilityFeeTreasury.t.sol:E2EStabilityFeeTreasuryTestDirectUser",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2ETest.t.sol:E2ETestDirectUserTKN",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2ETest.t.sol:E2ETestDirectUserTKN8D",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2ETest.t.sol:E2ETestProxyUserTKN",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/E2ETest.t.sol:E2ETestProxyUserTKN8D",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/stability-pool/E2EStabilityPoolCoverAndRepayDebt.t.sol:E2EStabilityPoolCoverAndRepayDebtForkTest",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/stability-pool/E2EStabilityPoolEmissions.t.sol:E2EStabilityPoolEmissionsForkTest",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/stability-pool/E2EStabilityPoolStrategyPipelines.t.sol:E2EStabilityPoolStrategyPipelinesForkTest",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/e2e/stability-pool/E2EStabilityPoolStrategySteps.t.sol:E2EBalancerV3StablePoolMathSwapStepForkTest",
+      "category": "public RPC availability"
+    },
+    {
+      "suite": "test/rrfm/p/PRawPerSecondCalculator.t.sol:PRawPerSecondCalculatorTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/rrfm/pi/BasicPIRawPerSecondCalculator.sol:BasicPIRawPerSecondCalculatorTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/rrfm/pi/PIRawPerSecondCalculator.t.sol:PIRawPerSecondCalculatorTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/rrfm/pi/PIScaledPerSecondCalculator.t.sol:PIScaledPerSecondCalculatorTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/rrfm/setter/PIDRateSetter.t.sol:PIDRateSetterTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/AccountingEngine.t.sol:SingleAccountingEngineTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/CollateralAuctionHouse.t.sol:FactorySingleCollateralAuctionHouseTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/CollateralAuctionHouse.t.sol:OrphanSingleCollateralAuctionHouseTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SAFEEngine.t.sol:SingleLiquidationTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SAFEEngine.t.sol:SingleSAFEDebtLimitTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SaveSAFE.t.sol:SingleSaveSAFETest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SettlementSurplusAuctioneer.t.sol:SingleSettlementSurplusAuctioneerTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/StabilityFeeTreasury.t.sol:SingleStabilityFeeTreasuryTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SurplusAuctionHouse.t.sol:SingleBurningSurplusAuctionHouseTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SurplusAuctionHouse.t.sol:SingleMixedStratSurplusAuctionHouseTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/SurplusAuctionHouse.t.sol:SingleRecyclingSurplusAuctionHouseTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/single/TaxCollector.t.sol:SingleTaxCollectorTest",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/Authorizable.t.sol:Unit_Authorizable_IsAuthorized",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/CollateralAuctionHouse.t.sol:Unit_CollateralAuctionHouse_BuyCollateral",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/CollateralAuctionHouse.t.sol:Unit_CollateralAuctionHouse_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/CollateralAuctionHouseFactory.t.sol:Unit_CollateralAuctionHouseFactory_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/DebtAuctionHouse.t.sol:Unit_DebtAuctionHouse_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/Disableable.t.sol:Unit_Disableable_WhenDisabled",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/Disableable.t.sol:Unit_Disableable_WhenEnabled",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/GlobalSettlement.t.sol:Unit_GlobalSettlement_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/OracleRelayer.t.sol:Unit_OracleRelayer_RedemptionPrice",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/PostSettlementSurplusAuctionHouse.t.sol:Unit_PostSettlementSurplusAuctionHouse_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/SAFEEngine.t.sol:Unit_SAFEEngine_ModifyCollateralBalance",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/SettlementSurplusAuctioneer.t.sol:Unit_SettlementSurplusAuctioneer_AuctionSurplus",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/SettlementSurplusAuctioneer.t.sol:Unit_SettlementSurplusAuctioneer_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/StabilityFeeTreasury.t.sol:Unit_StabilityFeeTreasury_JoinAllCoins",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/StabilityFeeTreasury.t.sol:Unit_StabilityFeeTreasury_PullFunds",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/SurplusAuctionHouse.t.sol:Unit_SurplusAuctionHouse_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/SurplusAuctionHouse.t.sol:Unit_SurplusAuctionHouse_StartAuction",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/TaxCollector.t.sol:Unit_TaxCollector_DistributeTax",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/TaxCollector.t.sol:Unit_TaxCollector_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/TaxCollector.t.sol:Unit_TaxCollector_SplitTaxIncome",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/TaxCollector.t.sol:Unit_TaxCollector_TaxSingle",
+      "category": "legacy testFail naming"
+    },
+    {
+      "suite": "test/unit/jobs/AccountingJob.t.sol:Unit_AccountingJob_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    },
+    {
+      "suite": "test/unit/jobs/OracleJob.t.sol:Unit_OracleJob_ModifyParameters",
+      "category": "legacy expected-error mismatch"
+    }
+  ],
+  "remoteCi": {
+    "runUrl": "https://github.com/hai-on-op/core/actions/runs/40123603899",
+    "commit": "fbbfa5c",
+    "overallTests": "failed",
+    "passed": 1952,
+    "failed": 113,
+    "newIssuerAndMigratorTests": {
+      "passed": 33,
+      "failed": 0
+    },
+    "canonicalForkTest": "opt-in skipped",
+    "failureCategories": {
+      "legacyTestFailNaming": 79,
+      "legacyExpectedErrorMismatch": 10,
+      "configuredOpRpcDnsResolution": 24
+    },
+    "baselineEvidence": "Every one of 113 failures belongs to one of 39 existing test files byte-for-byte unchanged from de5a2d0. All 79 testFail names exist in baseline; the ten expected-error cases match the local baseline failures. CI nightly enumerates unsupported testFail methods individually rather than the local Foundry grouping.",
+    "limitations": "Remote overall CI remains failing. Configured RPC DNS failure differs from the public-RPC rate limiting in local comparison; this is not an exact remote baseline rerun."
+  },
+  "manualPreparationEvidence": "script/aero/evidence/manual-preparation-validation.json"
+}

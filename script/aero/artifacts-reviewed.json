@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "contractSourceCommit": "f45547e90249d569e61a667db029a903d6bd04da",
+  "compilerVersion": "0.8.20+commit.a1b79de6",
+  "evmVersion": "shanghai",
+  "optimizerRuns": 10000,
+  "contracts": {
+    "HaiAero": {
+      "source": "src/contracts/tokens/HaiAero.sol",
+      "artifact": "out/HaiAero.sol/HaiAero.json",
+      "creationBytecodeHash": "0xc95e5884f1dd1325164d6c208d6aae9bdb5e6be7433d6aeeb9a07d69852876cd",
+      "metadataHash": "0x51587b4de3c7ab338df170d1fc612e2a4d35031ecf489f30ebe6540b784720cf",
+      "constructorTypes": ["address", "address", "address", "address", "uint256"]
+    },
+    "HaiAeroMigrator": {
+      "source": "src/contracts/tokens/HaiAeroMigrator.sol",
+      "artifact": "out/HaiAeroMigrator.sol/HaiAeroMigrator.json",
+      "creationBytecodeHash": "0xb9ed3104f1db731804cd80c7749c46001ec478b024ce3368a09d76dab3121a7e",
+      "metadataHash": "0x240c353f4578565ab0ab528bbde3c7c0f98c1fcb72cd9ce40a5cb9d1afe6ede4",
+      "constructorTypes": ["address", "address", "uint256", "uint256[]", "address"]
+    }
+  }
+}

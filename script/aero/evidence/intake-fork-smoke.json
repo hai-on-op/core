@@ -1,0 +1,19 @@
+{
+  "localForkOnly": true,
+  "scenario": "active finite migrated position",
+  "chainId": 8453,
+  "pinnedBlock": 53038227,
+  "pinnedBlockHash": "0x0de4c95c70ae87344f9a395accc17c7866c65ffbe8c698d005e04cefdea7ba69",
+  "checks": [
+    "Actual legacy Base finite NFT8814 migrates through canonical migration contract",
+    "New NFT ID and exact principal derive from actual canonical settlement receipt",
+    "Reviewed issuer deployment initcode, sender, runtime and Safe identities verified",
+    "Verified upgradeToPermanentStake succeeds without reset or deallocation",
+    "Safe-owned intake mints exact principal without transferring custody",
+    "Issuer returns to paused state and duplicate recognition is rejected"
+  ],
+  "limits": [
+    "Confirmed deployer and Safe are impersonated only on the local fork; no production transaction occurred.",
+    "Anvil finality is simulated. Calls run sequentially in the rehearsal; the production Safe package requires the whole ordered batch atomically."
+  ]
+}
