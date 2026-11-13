@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@defi-wonderland/solidity-utils": "0.0.0-4298c6c6",
+    "@hyperlane-xyz/core": "12.2.0",
     "@openzeppelin/contracts": "5.0.1",
     "@pythnetwork/pyth-sdk-solidity": "^4.2.0",
     "@uniswap/v3-periphery": "https://github.com/Uniswap/v3-periphery.git#0.8",
