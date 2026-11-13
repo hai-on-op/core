@@ -1,3 +1,6 @@
+node_modules/@hyperlane-xyz/core/:@openzeppelin/contracts/=node_modules/@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-4.9.3/contracts/
+node_modules/@hyperlane-xyz/core/:@openzeppelin/contracts-upgradeable/=node_modules/@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-upgradeable-4.9.3/contracts/
+@hyperlane-xyz/core/=node_modules/@hyperlane-xyz/core/
 @pythnetwork/pyth-sdk-solidity/=node_modules/@pythnetwork/pyth-sdk-solidity
 @defi-wonderland/solidity-utils/=node_modules/@defi-wonderland/solidity-utils/solidity/
 @openzeppelin/=node_modules/@openzeppelin/

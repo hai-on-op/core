@@ -205,6 +205,11 @@
     ds-test "https://github.com/dapphub/ds-test"
     forge-std "https://github.com/foundry-rs/forge-std"
 
+"@hyperlane-xyz/core@12.2.0":
+  version "12.2.0"
+  resolved "https://registry.yarnpkg.com/@hyperlane-xyz/core/-/core-12.2.0.tgz#38560955fc22e022b1d9ecd6a8663189fcbd2b45"
+  integrity sha512-PoXNUI+RtRjjS2dcLnoTXHmG9mlyJYK31J8Cb82VtU9d1ujQz5Krv+qkavFMWx4arWPsLL0vSn1OfijQ7n4Ajw==
+
 "@jridgewell/resolve-uri@^3.0.3":
   version "3.1.0"
   resolved "https://registry.yarnpkg.com/@jridgewell/resolve-uri/-/resolve-uri-3.1.0.tgz#2203b118c157721addfe69d47b70465463066d78"
