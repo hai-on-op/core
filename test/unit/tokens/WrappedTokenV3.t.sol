@@ -8,7 +8,6 @@ import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 import {ReentrancyGuard} from '@openzeppelin/contracts/utils/ReentrancyGuard.sol';
 
-import {Assertions} from '@libraries/Assertions.sol';
 import {Encoding} from '@libraries/Encoding.sol';
 
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
@@ -898,7 +897,7 @@ contract Unit_WrappedTokenV3_ModifyParameters is Base {
     for (uint256 _i; _i < _wrappers.length; ++_i) {
       WrappedTokenV3 _wrapper = _wrappers[_i];
       vm.chainId(_chains[_i]);
-      vm.expectRevert(Assertions.NullAddress.selector);
+      vm.expectRevert(IWrappedTokenV3.WrappedTokenV3_InvalidConfiguration.selector);
       _wrapper.modifyParameters('baseTokenManager', abi.encode(address(0)));
       vm.expectRevert(Encoding.Encoding_InvalidDataLength.selector);
       _wrapper.modifyParameters('baseTokenManager', hex'01');

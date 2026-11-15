@@ -12,8 +12,9 @@ import {Nonces} from '@openzeppelin/contracts/utils/Nonces.sol';
 
 import {HypERC20} from '@hyperlane-xyz/core/contracts/token/HypERC20.sol';
 import {Math} from '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-4.9.3/contracts/utils/math/Math.sol';
-import {PausableUpgradeable} from
-  '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-upgradeable-4.9.3/contracts/security/PausableUpgradeable.sol';
+import {
+  PausableUpgradeable
+} from '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-upgradeable-4.9.3/contracts/security/PausableUpgradeable.sol';
 
 import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
 import {IWrappedTokenV3} from '@interfaces/tokens/IWrappedTokenV3.sol';
@@ -22,7 +23,6 @@ import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
 
 import {Encoding} from '@libraries/Encoding.sol';
-import {Assertions} from '@libraries/Assertions.sol';
 
 /**
  * @title  WrappedTokenV3
@@ -42,7 +42,6 @@ contract WrappedTokenV3 is
 {
   using SafeERC20 for IERC20;
   using Encoding for bytes;
-  using Assertions for address;
 
   // --- Constants ---
 
@@ -94,10 +93,10 @@ contract WrappedTokenV3 is
     if (
       (_config.chainId != 10 && _config.chainId != 8453) || block.chainid != _config.chainId
         || localDomain != _config.chainId || _config.baseToken.code.length == 0
-        || IERC20Metadata(_config.baseToken).decimals() != 18 || _config.treasury == address(0)
-        || _config.treasury == address(this) || _config.bridgeOwner == address(0) || _config.bridgeOwner == address(this)
-        || _config.bridgeOwner == BURN_ADDRESS
+        || IERC20Metadata(_config.baseToken).decimals() != 18 || _config.bridgeOwner == address(0)
+        || _config.bridgeOwner == address(this) || _config.bridgeOwner == BURN_ADDRESS
     ) revert WrappedTokenV3_InvalidConfiguration();
+    _checkBaseTokenManager(_config.treasury);
     if (_config.chainId == 8453) {
       if (_config.baseTokenNFT.code.length == 0 || IAeroVotingEscrow(_config.baseTokenNFT).TOKEN() != _config.baseToken)
       {
@@ -238,10 +237,31 @@ contract WrappedTokenV3 is
 
   /// @inheritdoc Modifiable
   function _validateParameters() internal view override {
-    baseTokenManager.assertNonNull();
+    _checkBaseTokenManager(baseTokenManager);
   }
 
   // --- Overrides ---
+
+  /**
+   * @notice Bridge wrapped tokens to a usable EVM recipient
+   * @dev Validate before charging fees, burning tokens, or dispatching the message
+   * @param _destination Hyperlane domain receiving the tokens
+   * @param _recipient Canonically encoded destination address
+   * @param _amount Amount of wrapped tokens to bridge [wad]
+   * @return _messageId ID of the dispatched message
+   */
+  function transferRemote(
+    uint32 _destination,
+    bytes32 _recipient,
+    uint256 _amount
+  ) public payable override returns (bytes32 _messageId) {
+    if (
+      uint256(_recipient) >> 160 != 0 || _recipient == bytes32(0)
+        || _recipient == bytes32(uint256(uint160(BURN_ADDRESS))) || _recipient == routers(_destination)
+    ) revert WrappedTokenV3_InvalidRecipient();
+
+    return super.transferRemote(_destination, _recipient, _amount);
+  }
 
   /// @inheritdoc IERC20Permit
   /// @dev Uses OpenZeppelin's EIP-2612 algorithm with HypERC20's allowance storage
@@ -276,6 +296,16 @@ contract WrappedTokenV3 is
   }
 
   // --- Internal Methods ---
+
+  /**
+   * @notice Check that deposits will go to a usable treasury address
+   * @param _manager Address receiving the underlying tokens and NFTs
+   */
+  function _checkBaseTokenManager(address _manager) internal view {
+    if (_manager == address(0) || _manager == address(this) || _manager == BURN_ADDRESS) {
+      revert WrappedTokenV3_InvalidConfiguration();
+    }
+  }
 
   /**
    * @notice Read the underlying principal of an sAERO position
