@@ -21,6 +21,13 @@ out = 'out'
 libs = ['lib']
 fuzz_runs = 1000
 optimizer_runs = 10_000
+# Use via-IR for V3 to fit the EIP-170 size limit at the default optimizer runs.
+additional_compiler_profiles = [
+  { name = "wrapped_token_v3", via_ir = true }
+]
+compilation_restrictions = [
+  { paths = "src/contracts/tokens/WrappedTokenV3.sol", via_ir = true }
+]
 block_timestamp = 1675855961
 fs_permissions = [{ access = "write", path = "./test/simulations"}]
 
