@@ -53,7 +53,7 @@ interface IWrappedTokenV3 is IERC20Permit, IModifiable {
 
   // --- Errors ---
 
-  /// @notice Throws when the deployment configuration is invalid
+  /// @notice Throws when the deployment configuration or an updated treasury address is invalid
   error WrappedTokenV3_InvalidConfiguration();
 
   /// @notice Throws when the current chain differs from the deployment chain
@@ -65,7 +65,7 @@ interface IWrappedTokenV3 is IERC20Permit, IModifiable {
   /// @notice Throws when a deposit is empty or a migration would mint zero tokens
   error WrappedTokenV3_InvalidAmount();
 
-  /// @notice Throws when the recipient is null, the wrapper, or the burn address
+  /// @notice Throws when the recipient is null, the receiving wrapper, the burn address, or a noncanonical EVM address
   error WrappedTokenV3_InvalidRecipient();
 
   /// @notice Throws when the treasury attempts to deposit backing

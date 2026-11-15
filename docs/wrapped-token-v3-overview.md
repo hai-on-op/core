@@ -65,6 +65,8 @@ Before opening migration, we need to check that the migrated backing covers the 
 
 Both contracts use Hyperlane's `HypERC20`. Calling `transferRemote` burns haiAERO on the source chain. Once the destination accepts the message from the configured counterpart, it mints the same amount there.
 
+Before burning, V3 rejects recipients that are zero, the dead address, or the enrolled destination wrapper. The `bytes32` recipient must contain a normal EVM address with its upper 12 bytes zeroed. Invalid recipients revert on the sending chain without charging fees or changing supply.
+
 Using the earlier example, someone deposits 100 xAERO on OP and gets 100 haiAERO. If they bridge 40 haiAERO to Base, they end up with 60 on OP and 40 on Base after the message arrives. The 100 xAERO is still in our OP treasury until we redeem it. Redeeming and staking that backing doesn't change their haiAERO balances.
 
 We need to count pending bridge messages when comparing supply and backing, because those tokens have been burned on one chain but haven't been minted on the other yet.
@@ -83,7 +85,7 @@ modifyParameters('baseTokenManager', abi.encode(newManager))
 
 That changes where future deposits go. It doesn't move assets out of the previous treasury or change either address's authorization. A deposit uses the manager selected at the start of the call, even if an authorized callback changes the setting during that transaction.
 
-The initial manager can be a Safe, another contract or an ordinary wallet. It can't be zero or the wrapper itself. Later updates use V2's nonzero-address check. A contract receiving NFTs needs to support ERC721 receipt.
+The manager can be a Safe, another contract or an ordinary wallet. Both construction and later updates reject zero, the wrapper itself, and the dead address. A contract receiving NFTs needs to support ERC721 receipt.
 
 Both instances start paused. Pausing stops token deposits, NFT deposits and migration together. Transfers, permit approvals and bridging keep working.
 
@@ -124,4 +126,14 @@ forge build src/contracts/tokens/WrappedTokenV3.sol --evm-version shanghai
 FOUNDRY_FUZZ_RUNS=128 FOUNDRY_FUZZ_SEED=69 forge test --match-path 'test/unit/tokens/WrappedTokenV3.t.sol' --evm-version shanghai
 ```
 
-The local tests cover deposits, NFT custody, migration, authorization, signatures and supply across the two instances. They use a mock mailbox. We still need a live rehearsal for bridge verification and delivery, xAERO redemption, route availability and collateral onboarding before we call the migration ready to ship.
+The unit tests cover deposits, NFT custody, migration, authorization, signatures and supply across the two instances using a mock mailbox. Additional regressions in `test/audit/WrappedTokenV3Audit.t.sol` check the treasury and bridge recipient guards and use Hyperlane's real mailbox with two local test validators for signed transfers, replay protection and forged-message rejection.
+
+The optional fork tests exercise AERO and sAERO deposits into the Base treasury Safe, xAERO deposits, and the legacy migration sources on OP. Run all V3 checks with Foundry `1.9.0`:
+
+```sh
+FOUNDRY_FUZZ_RUNS=128 FOUNDRY_FUZZ_SEED=69 RUN_PR161_FORK_AUDIT=true \
+  forge test --no-dynamic-test-linking --match-contract '(Unit_WrappedTokenV3|Audit_WrappedTokenV3)' \
+  --evm-version shanghai -vv
+```
+
+The fork tests use fixed blocks and public RPC endpoints. They select the Prague execution runtime for deployed Aero code while keeping V3's compiler target at Shanghai, and skip unless `RUN_PR161_FORK_AUDIT=true`. They seed test balances and do not verify reserve sufficiency. We still need a live rehearsal for the production bridge verification and delivery, xAERO redemption, route availability and collateral onboarding before we call the migration ready to ship.
