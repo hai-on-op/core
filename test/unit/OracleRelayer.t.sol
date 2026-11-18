@@ -409,7 +409,7 @@ contract Unit_OracleRelayer_RedemptionPrice is Base {
     oracleRelayer.redemptionPrice();
   }
 
-  function testFail_Get_RedemptionPrice_Call_Internal_UpdateRedemptionPrice(
+  function test_DoesNotUpdateRedemptionPriceUntilTimestampAdvances(
     uint256 _timestamp,
     uint256 _redemptionPriceUpdateTime
   ) public {
@@ -417,7 +417,7 @@ contract Unit_OracleRelayer_RedemptionPrice is Base {
     _mockRedemptionPriceUpdateTime(_redemptionPriceUpdateTime);
     vm.warp(_timestamp);
 
-    vm.expectEmit();
+    vm.expectEmit(address(oracleRelayer), 0);
     emit UpdateRedemptionPriceCalled();
 
     oracleRelayer.redemptionPrice();

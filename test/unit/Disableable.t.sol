@@ -105,9 +105,7 @@ contract Unit_Disableable_WhenEnabled is Base {
     disableable.whenEnabledModifier();
   }
 
-  function testFail_WhenEnabled() public {
-    vm.expectRevert(IDisableable.ContractIsDisabled.selector);
-
+  function test_AllowsCallWhenEnabled() public {
     disableable.whenEnabledModifier();
   }
 }
@@ -124,9 +122,7 @@ contract Unit_Disableable_WhenDisabled is Base {
     disableable.whenDisabledModifier();
   }
 
-  function testFail_WhenDisabled() public happyPath {
-    vm.expectRevert(IDisableable.ContractIsEnabled.selector);
-
+  function test_AllowsCallWhenDisabled() public happyPath {
     disableable.whenDisabledModifier();
   }
 }

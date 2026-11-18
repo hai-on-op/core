@@ -1410,7 +1410,7 @@ contract Unit_CollateralAuctionHouse_BuyCollateral is Base {
     collateralAuctionHouse.buyCollateral(_buyCollateralScenario.auction.id, _buyCollateralScenario.bid);
   }
 
-  function testFail_Emit_SettleAuction(BuyCollateralScenario memory _buyCollateralScenario)
+  function test_DoesNotEmitSettleAuctionWhileAuctionIsOpen(BuyCollateralScenario memory _buyCollateralScenario)
     public
     happyPath(_buyCollateralScenario)
   {
@@ -1424,7 +1424,7 @@ contract Unit_CollateralAuctionHouse_BuyCollateral is Base {
     bool _soldAll = _computeSoldAll(_leftToSell, _leftToRaise);
 
     vm.assume(!_soldAll);
-    vm.expectEmit(false, false, false, false);
+    vm.expectEmit(false, false, false, false, address(collateralAuctionHouse), 0);
     emit SettleAuction(
       _buyCollateralScenario.auction.id,
       block.timestamp,
@@ -1679,11 +1679,11 @@ contract Unit_CollateralAuctionHouse_ModifyParameters is Base {
     collateralAuctionHouse.modifyParameters('perSecondDiscountUpdateRate', abi.encode(_perSecondDiscountUpdateRate));
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
 
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    collateralAuctionHouse.modifyParameters('unrecognizedParam', _data);
+    collateralAuctionHouse.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

@@ -2,18 +2,13 @@
 pragma solidity 0.8.20;
 
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 
 import {MockPIDCalculator} from '../utils/mock/MockPIDCalculator.sol';
 import {IPIDRateSetter, PIDRateSetter} from '@contracts/PIDRateSetter.sol';
 import {OracleForTest as OracleForTest} from '@test/mocks/OracleForTest.sol';
 
 import {IOracleRelayer, OracleRelayer as MockOracleRelayer} from '@contracts/OracleRelayer.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-
-  function etch(address, bytes memory) public virtual;
-}
 
 contract PIDRateSetterTest is DSTest {
   Hevm hevm;
@@ -80,8 +75,9 @@ contract PIDRateSetterTest is DSTest {
     assertEq(oracleRelayer.redemptionRate(), RAY + 2);
   }
 
-  function testFail_update_before_period_passed() public {
+  function test_Revert_update_before_period_passed() public {
     rateSetter.updateRate();
+    hevm.expectRevert(IPIDRateSetter.PIDRateSetter_RateSetterCooldown.selector);
     rateSetter.updateRate();
   }
 

@@ -925,10 +925,10 @@ contract Unit_DebtAuctionHouse_ModifyParameters is Base {
     debtAuctionHouse.modifyParameters('protocolToken', abi.encode(0));
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    debtAuctionHouse.modifyParameters('unrecognizedParam', _data);
+    debtAuctionHouse.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

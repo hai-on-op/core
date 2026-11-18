@@ -281,21 +281,14 @@ contract Unit_SettlementSurplusAuctioneer_AuctionSurplus is Base {
     settlementSurplusAuctioneer.auctionSurplus();
   }
 
-  function testFail_Emit_AuctionSurplus_A(
-    uint256 _lastSurplusTime,
-    uint256 _surplusDelay,
-    uint256 _surplusAmount,
-    uint256 _coinBalance,
-    uint256 _idA,
-    uint256 _idB
-  ) public happyPath(_lastSurplusTime, _surplusDelay, _surplusAmount, _coinBalance, _idA, _idB) {
-    vm.assume(_coinBalance < _surplusAmount);
-    vm.assume(_coinBalance == 0);
+  function test_DoesNotEmitAuctionSurplusWhenBalanceIsZero(uint256 _surplusAmount) public {
+    vm.assume(_surplusAmount > 0);
+    _mockValues(0, 0, _surplusAmount, 0, 1, 2);
 
-    vm.expectEmit();
-    emit AuctionSurplus(_idA, block.timestamp, 0);
+    vm.expectEmit(false, false, false, false, address(settlementSurplusAuctioneer), 0);
+    emit AuctionSurplus(0, block.timestamp, 0);
 
-    settlementSurplusAuctioneer.auctionSurplus();
+    assertEq(settlementSurplusAuctioneer.auctionSurplus(), 0);
   }
 
   function test_Emit_AuctionSurplus_B(
@@ -315,21 +308,13 @@ contract Unit_SettlementSurplusAuctioneer_AuctionSurplus is Base {
     settlementSurplusAuctioneer.auctionSurplus();
   }
 
-  function testFail_Emit_AuctionSurplus_B(
-    uint256 _lastSurplusTime,
-    uint256 _surplusDelay,
-    uint256 _surplusAmount,
-    uint256 _coinBalance,
-    uint256 _idA,
-    uint256 _idB
-  ) public happyPath(_lastSurplusTime, _surplusDelay, _surplusAmount, _coinBalance, _idA, _idB) {
-    vm.assume(_coinBalance >= _surplusAmount);
-    vm.assume(_surplusAmount == 0);
+  function test_DoesNotEmitAuctionSurplusWhenSurplusAmountIsZero(uint256 _coinBalance) public {
+    _mockValues(0, 0, 0, _coinBalance, 1, 2);
 
-    vm.expectEmit();
-    emit AuctionSurplus(_idB, block.timestamp, _coinBalance - _surplusAmount);
+    vm.expectEmit(false, false, false, false, address(settlementSurplusAuctioneer), 0);
+    emit AuctionSurplus(0, block.timestamp, _coinBalance);
 
-    settlementSurplusAuctioneer.auctionSurplus();
+    assertEq(settlementSurplusAuctioneer.auctionSurplus(), 0);
   }
 }
 
@@ -362,11 +347,11 @@ contract Unit_SettlementSurplusAuctioneer_ModifyParameters is Base {
     assertEq(address(settlementSurplusAuctioneer.surplusAuctionHouse()), _surplusAuctionHouse);
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
 
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    settlementSurplusAuctioneer.modifyParameters('unrecognizedParam', _data);
+    settlementSurplusAuctioneer.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

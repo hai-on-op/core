@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IDisableable} from '@interfaces/utils/IDisableable.sol';
+import {Assertions} from '@libraries/Assertions.sol';
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 
 import {ISurplusAuctionHouse, SurplusAuctionHouse} from '@contracts/SurplusAuctionHouse.sol';
 import {
@@ -13,10 +16,6 @@ import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
 import {CoinJoin} from '@contracts/utils/CoinJoin.sol';
 import {SystemCoin} from '@contracts/tokens/SystemCoin.sol';
 import {ProtocolToken} from '@contracts/tokens/ProtocolToken.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract GuyBurningSurplusAuction {
   SurplusAuctionHouse surplusAuctionHouse;
@@ -258,12 +257,13 @@ contract SingleBurningSurplusAuctionHouseTest is DSTest {
     assertTrue(GuyBurningSurplusAuction(ali).try_increaseBidSize(id, 1 ether));
   }
 
-  function testFail_terminate_prematurely() public {
+  function test_Revert_terminate_prematurely() public {
     uint256 id = surplusAuctionHouse.startAuction({_amountToSell: 100 ether, _initialBid: 0});
     // amount to buy taken from creator
     assertEq(safeEngine.coinBalance(address(this)), 900 ether);
 
     GuyBurningSurplusAuction(ali).increaseBidSize(id, 1 ether);
+    hevm.expectRevert(IDisableable.ContractIsEnabled.selector);
     surplusAuctionHouse.terminateAuctionPrematurely(id);
   }
 
@@ -330,9 +330,9 @@ contract SingleRecyclingSurplusAuctionHouseTest is DSTest {
     assertEq(safeEngine.coinBalance(address(surplusAuctionHouse)), 100 ether);
   }
 
-  function testFail_start_auction_when_prot_token_receiver_null() public {
-    surplusAuctionHouse.modifyParameters('bidReceiver', abi.encode(0));
-    surplusAuctionHouse.startAuction({_amountToSell: 100 ether, _initialBid: 0});
+  function test_Revert_setting_null_bid_receiver() public {
+    hevm.expectRevert(Assertions.NullAddress.selector);
+    surplusAuctionHouse.modifyParameters('bidReceiver', abi.encode(address(0)));
   }
 
   function test_increase_bid_same_bidder() public {
@@ -395,12 +395,13 @@ contract SingleRecyclingSurplusAuctionHouseTest is DSTest {
     assertTrue(GuyRecyclingSurplusAuction(ali).try_increaseBidSize(id, 1 ether));
   }
 
-  function testFail_terminate_prematurely() public {
+  function test_Revert_terminate_prematurely() public {
     uint256 id = surplusAuctionHouse.startAuction({_amountToSell: 100 ether, _initialBid: 0});
     // amount to buy taken from creator
     assertEq(safeEngine.coinBalance(address(this)), 900 ether);
 
     GuyRecyclingSurplusAuction(ali).increaseBidSize(id, 1 ether);
+    hevm.expectRevert(IDisableable.ContractIsEnabled.selector);
     surplusAuctionHouse.terminateAuctionPrematurely(id);
   }
 
@@ -467,9 +468,9 @@ contract SingleMixedStratSurplusAuctionHouseTest is DSTest {
     assertEq(safeEngine.coinBalance(address(surplusAuctionHouse)), 100 ether);
   }
 
-  function testFail_start_auction_when_prot_token_receiver_null() public {
-    surplusAuctionHouse.modifyParameters('bidReceiver', abi.encode(0));
-    surplusAuctionHouse.startAuction({_amountToSell: 100 ether, _initialBid: 0});
+  function test_Revert_setting_null_bid_receiver() public {
+    hevm.expectRevert(Assertions.NullAddress.selector);
+    surplusAuctionHouse.modifyParameters('bidReceiver', abi.encode(address(0)));
   }
 
   function test_increase_bid_same_bidder() public {
@@ -535,12 +536,13 @@ contract SingleMixedStratSurplusAuctionHouseTest is DSTest {
     assertTrue(GuyRecyclingSurplusAuction(ali).try_increaseBidSize(id, 1 ether));
   }
 
-  function testFail_terminate_prematurely() public {
+  function test_Revert_terminate_prematurely() public {
     uint256 id = surplusAuctionHouse.startAuction({_amountToSell: 100 ether, _initialBid: 0});
     // amount to buy taken from creator
     assertEq(safeEngine.coinBalance(address(this)), 900 ether);
 
     GuyRecyclingSurplusAuction(ali).increaseBidSize(id, 1 ether);
+    hevm.expectRevert(IDisableable.ContractIsEnabled.selector);
     surplusAuctionHouse.terminateAuctionPrematurely(id);
   }
 

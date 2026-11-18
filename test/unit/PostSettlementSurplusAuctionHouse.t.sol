@@ -694,10 +694,10 @@ contract Unit_PostSettlementSurplusAuctionHouse_ModifyParameters is Base {
     postSettlementSurplusAuctionHouse.modifyParameters('protocolToken', abi.encode(0));
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    postSettlementSurplusAuctionHouse.modifyParameters('unrecognizedParam', _data);
+    postSettlementSurplusAuctionHouse.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

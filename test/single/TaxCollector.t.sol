@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IDisableable} from '@interfaces/utils/IDisableable.sol';
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 
 import {TaxCollectorForTest as TaxCollector, ITaxCollector} from '@test/mocks/TaxCollectorForTest.sol';
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
 
 import {RAY} from '@libraries/Math.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract SingleTaxCollectorTest is DSTest {
   Hevm hevm;
@@ -279,22 +277,26 @@ contract SingleTaxCollectorTest is DSTest {
     assertTrue(taxCollector.collectedManyTax(0, 1));
   }
 
-  function testFail_cut_at_hundred() public {
+  function test_allows_full_secondary_tax_cut() public {
+    taxCollector.initializeCollateralType('i', abi.encode(ITaxCollector.TaxCollectorCollateralParams(RAY)));
     taxCollector.modifyParameters('maxSecondaryReceivers', abi.encode(10));
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
       abi.encode(ITaxCollector.TaxReceiver({receiver: address(this), taxPercentage: 1 ether, canTakeBackTax: false}))
     );
+    assertEq(taxCollector.cData('i').secondaryReceiverAllotedTax, 1 ether);
   }
 
-  function testFail_add_over_maxSecondaryReceivers() public {
+  function test_Revert_add_over_maxSecondaryReceivers() public {
+    taxCollector.initializeCollateralType('i', abi.encode(ITaxCollector.TaxCollectorCollateralParams(RAY)));
     taxCollector.modifyParameters('maxSecondaryReceivers', abi.encode(1));
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
       abi.encode(ITaxCollector.TaxReceiver({receiver: address(this), taxPercentage: 0.01 ether, canTakeBackTax: false}))
     );
+    hevm.expectRevert(ITaxCollector.TaxCollector_ExceedsMaxReceiverLimit.selector);
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
@@ -302,13 +304,15 @@ contract SingleTaxCollectorTest is DSTest {
     );
   }
 
-  function testFail_modify_cut_total_over_hundred() public {
+  function test_Revert_modify_cut_total_over_hundred() public {
+    taxCollector.initializeCollateralType('i', abi.encode(ITaxCollector.TaxCollectorCollateralParams(RAY)));
     taxCollector.modifyParameters('maxSecondaryReceivers', abi.encode(1));
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
       abi.encode(ITaxCollector.TaxReceiver({receiver: address(this), taxPercentage: 0.01 ether, canTakeBackTax: false}))
     );
+    hevm.expectRevert(ITaxCollector.TaxCollector_TaxCutTooBig.selector);
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
@@ -316,9 +320,11 @@ contract SingleTaxCollectorTest is DSTest {
     );
   }
 
-  function testFail_tax_receiver_primaryTaxReceiver() public {
+  function test_Revert_tax_receiver_primaryTaxReceiver() public {
+    taxCollector.initializeCollateralType('i', abi.encode(ITaxCollector.TaxCollectorCollateralParams(RAY)));
     taxCollector.modifyParameters('maxSecondaryReceivers', abi.encode(1));
     taxCollector.modifyParameters('primaryTaxReceiver', abi.encode(ali));
+    hevm.expectRevert(ITaxCollector.TaxCollector_PrimaryReceiverCannotBeSecondary.selector);
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
@@ -326,8 +332,10 @@ contract SingleTaxCollectorTest is DSTest {
     );
   }
 
-  function testFail_tax_receiver_null() public {
+  function test_Revert_tax_receiver_null() public {
+    taxCollector.initializeCollateralType('i', abi.encode(ITaxCollector.TaxCollectorCollateralParams(RAY)));
     taxCollector.modifyParameters('maxSecondaryReceivers', abi.encode(1));
+    hevm.expectRevert(ITaxCollector.TaxCollector_NullAccount.selector);
     taxCollector.modifyParameters(
       'i',
       'secondaryTaxReceiver',
@@ -595,7 +603,7 @@ contract SingleTaxCollectorTest is DSTest {
     assertEq(wad(safeEngine.coinBalance(char)) * ray(100 ether) / uint256(currentRates), 4_499_999_999_999_999_999_960);
   }
 
-  function testFail_tax_when_safe_engine_is_disabled() public {
+  function test_Revert_tax_when_safe_engine_is_disabled() public {
     ITaxCollector.TaxCollectorCollateralParams memory _taxCollectorCollateralParams =
       ITaxCollector.TaxCollectorCollateralParams({stabilityFee: RAY});
     taxCollector.initializeCollateralType('i', abi.encode(_taxCollectorCollateralParams));
@@ -617,6 +625,7 @@ contract SingleTaxCollectorTest is DSTest {
 
     safeEngine.disableContract();
     hevm.warp(block.timestamp + 10);
+    hevm.expectRevert(IDisableable.ContractIsDisabled.selector);
     taxCollector.taxSingle('i');
   }
 
