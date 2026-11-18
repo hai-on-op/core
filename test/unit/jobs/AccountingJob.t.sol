@@ -360,11 +360,11 @@ contract Unit_AccountingJob_ModifyParameters is Base {
     accountingJob.modifyParameters('rewardAmount', abi.encode(0));
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
 
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    accountingJob.modifyParameters('unrecognizedParam', _data);
+    accountingJob.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

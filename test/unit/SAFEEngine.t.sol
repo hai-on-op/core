@@ -227,11 +227,11 @@ contract Unit_SAFEEngine_ModifyCollateralBalance is Base {
     assertEq(safeEngine.tokenCollateral(_cType, account), _intialCollateral.add(_wad));
   }
 
-  function testFail_Emit_TransferCollateral_Null(uint256 _initialCollateral) public authorized {
+  function test_DoesNotEmitTransferCollateralForZeroAmount(uint256 _initialCollateral) public authorized {
     _assumeHappyPath(_initialCollateral, 0);
     _mockTokenCollateral(collateralType, account, _initialCollateral);
 
-    vm.expectEmit();
+    vm.expectEmit(false, false, false, false, address(safeEngine), 0);
     emit TransferCollateral(collateralType, address(0), account, 0);
 
     safeEngine.modifyCollateralBalance(collateralType, account, 0);

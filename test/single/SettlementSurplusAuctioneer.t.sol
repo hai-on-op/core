@@ -2,20 +2,20 @@
 pragma solidity 0.8.20;
 
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 import {CoinForTest} from '@test/mocks/CoinForTest.sol';
 import {DisableableForTest} from '@test/mocks/DisableableForTest.sol';
 import {
   IPostSettlementSurplusAuctionHouse,
   PostSettlementSurplusAuctionHouse
 } from '@contracts/settlement/PostSettlementSurplusAuctionHouse.sol';
-import {SettlementSurplusAuctioneer} from '@contracts/settlement/SettlementSurplusAuctioneer.sol';
+import {
+  ISettlementSurplusAuctioneer,
+  SettlementSurplusAuctioneer
+} from '@contracts/settlement/SettlementSurplusAuctioneer.sol';
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
 import {IAccountingEngine, AccountingEngine} from '@contracts/AccountingEngine.sol';
 import {CoinJoin} from '@contracts/utils/CoinJoin.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract SingleSettlementSurplusAuctioneerTest is DSTest {
   Hevm hevm;
@@ -87,15 +87,17 @@ contract SingleSettlementSurplusAuctioneerTest is DSTest {
     assertTrue(address(surplusAuctioneer.surplusAuctionHouse()) == address(0x1234));
   }
 
-  function testFail_auction_when_accounting_still_enabled() public {
+  function test_Revert_auction_when_accounting_still_enabled() public {
     safeEngine.createUnbackedDebt(address(0), address(surplusAuctioneer), rad(100 ether * 10 ** 9));
+    hevm.expectRevert(ISettlementSurplusAuctioneer.SSA_AccountingEngineStillEnabled.selector);
     surplusAuctioneer.auctionSurplus();
   }
 
-  function testFail_auction_without_waiting_for_delay() public {
+  function test_Revert_auction_without_waiting_for_delay() public {
     accountingEngine.disableContract();
     safeEngine.createUnbackedDebt(address(0), address(surplusAuctioneer), rad(500 ether * 10 ** 9));
     surplusAuctioneer.auctionSurplus();
+    hevm.expectRevert(ISettlementSurplusAuctioneer.SSA_SurplusAuctionDelayNotPassed.selector);
     surplusAuctioneer.auctionSurplus();
   }
 

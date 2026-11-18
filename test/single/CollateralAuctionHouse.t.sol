@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {Assertions} from '@libraries/Assertions.sol';
 import {HaiTest} from '@test/utils/HaiTest.t.sol';
 
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
@@ -168,7 +169,8 @@ abstract contract SingleCollateralAuctionHouseTest is HaiTest {
     _modifyParameters('collateralType', 'minDiscount', abi.encode(1 ether));
   }
 
-  function testFail_max_discount_lower_than_min() public {
+  function test_Revert_max_discount_lower_than_min() public {
+    vm.expectRevert(abi.encodeWithSelector(Assertions.NotGreaterOrEqualThan.selector, 0.95e18, 1 ether - 1));
     _modifyParameters('collateralType', 'maxDiscount', abi.encode(1 ether - 1));
   }
 
@@ -181,19 +183,20 @@ abstract contract SingleCollateralAuctionHouseTest is HaiTest {
     });
   }
 
-  function testFail_buyCollateral_inexistent_auction() public {
+  function test_Revert_buyCollateral_inexistent_auction() public {
     // can't buyCollateral on non-existent
+    vm.expectRevert(ICollateralAuctionHouse.CAH_InexistentAuction.selector);
     collateralAuctionHouse.buyCollateral(42, 5 * WAD);
   }
 
-  function testFail_buyCollateral_null_auction() public {
+  function test_Revert_buyCollateral_zero_bid() public {
     collateralAuctionHouse.startAuction({
       _collateralToSell: 100 ether,
       _amountToRaise: 50 * RAD,
       _forgoneCollateralReceiver: safeAuctioned,
       _auctionIncomeRecipient: auctionIncomeRecipient
     });
-    // can't buy collateral on non-existent
+    vm.expectRevert(ICollateralAuctionHouse.CAH_InvalidBid.selector);
     collateralAuctionHouse.buyCollateral(1, 0);
   }
 
@@ -328,11 +331,12 @@ abstract contract SingleCollateralAuctionHouseTest is HaiTest {
     assertEq(safeEngine.tokenCollateral('collateralType', address(safeAuctioned)), 1 ether - 526_315_789_473_684_210);
   }
 
-  function testFail_start_tiny_collateral_auction() public {
+  function test_Revert_start_tiny_collateral_auction() public {
     oracleRelayer.setRedemptionPrice(2 * RAY);
     collateralFSM.setPriceAndValidity(200 ether, true);
     safeEngine.createUnbackedDebt(address(0), ali, rad(200 * RAD - 200 ether));
 
+    vm.expectRevert(ICollateralAuctionHouse.CAH_DustyAuction.selector);
     collateralAuctionHouse.startAuction({
       _collateralToSell: 100,
       _amountToRaise: 50,
@@ -466,7 +470,8 @@ abstract contract SingleCollateralAuctionHouseTest is HaiTest {
     assertEq(safeEngine.tokenCollateral('collateralType', address(safeAuctioned)), 0);
   }
 
-  function testFail_terminate_inexistent() public {
+  function test_Revert_terminate_inexistent() public {
+    vm.expectRevert(ICollateralAuctionHouse.CAH_InexistentAuction.selector);
     collateralAuctionHouse.terminateAuctionPrematurely(1);
   }
 

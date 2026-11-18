@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 import {CoinForTest} from '@test/mocks/CoinForTest.sol';
 
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
@@ -24,11 +25,6 @@ import {
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 
 import {RAY, WAD} from '@libraries/Math.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-  function prank(address) external virtual;
-}
 
 contract Feed {
   bytes32 public price;
@@ -320,13 +316,15 @@ contract SingleSaveSAFETest is DSTest {
     _liquidateSAFE();
   }
 
-  function testFail_missing_function_saviour() public {
+  function test_Revert_missing_function_saviour() public {
     MissingFunctionSaviour saviour = new MissingFunctionSaviour();
+    hevm.expectRevert(bytes(''));
     liquidationEngine.connectSAFESaviour(address(saviour));
   }
 
-  function testFail_faulty_returnable_function_saviour() public {
+  function test_Revert_faulty_returnable_function_saviour() public {
     FaultyReturnableSaviour saviour = new FaultyReturnableSaviour();
+    hevm.expectRevert(bytes(''));
     liquidationEngine.connectSAFESaviour(address(saviour));
   }
 

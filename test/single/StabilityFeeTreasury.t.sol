@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {IAuthorizable} from '@interfaces/utils/IAuthorizable.sol';
+import {Assertions} from '@libraries/Assertions.sol';
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 
 import {SystemCoin} from '@contracts/tokens/SystemCoin.sol';
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
@@ -10,10 +13,6 @@ import {IStabilityFeeTreasury} from '@interfaces/IStabilityFeeTreasury.sol';
 import {CoinJoin} from '@contracts/utils/CoinJoin.sol';
 
 import {HOUR} from '@libraries/Math.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract Usr {
   function approveSAFEModification(address safeEngine, address lad) external {
@@ -150,12 +149,14 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(stabilityFeeTreasury.allowance(alice).perHour, 1 ether);
   }
 
-  function testFail_give_non_relied() public {
+  function test_Revert_give_non_relied() public {
+    hevm.expectRevert(IAuthorizable.Unauthorized.selector);
     usr.giveFunds(address(stabilityFeeTreasury), address(usr), rad(5 ether));
   }
 
-  function testFail_take_non_relied() public {
+  function test_Revert_take_non_relied() public {
     stabilityFeeTreasury.giveFunds(address(usr), rad(5 ether));
+    hevm.expectRevert(IAuthorizable.Unauthorized.selector);
     usr.takeFunds(address(stabilityFeeTreasury), address(usr), rad(2 ether));
   }
 
@@ -170,17 +171,18 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(safeEngine.coinBalance(address(stabilityFeeTreasury)), rad(197 ether));
   }
 
-  function testFail_give_more_debt_than_coin() public {
+  function test_Revert_give_more_debt_than_coin() public {
     safeEngine.createUnbackedDebt(
       address(stabilityFeeTreasury), address(this), safeEngine.coinBalance(address(stabilityFeeTreasury)) + 1
     );
 
     assertEq(safeEngine.coinBalance(address(usr)), 0);
     assertEq(safeEngine.coinBalance(address(stabilityFeeTreasury)), rad(200 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_OutstandingBadDebt.selector);
     stabilityFeeTreasury.giveFunds(address(usr), rad(5 ether));
   }
 
-  function testFail_give_more_debt_than_coin_after_join() public {
+  function test_Revert_give_more_debt_than_coin_after_join() public {
     systemCoin.transfer(address(stabilityFeeTreasury), 100 ether);
     safeEngine.createUnbackedDebt(
       address(stabilityFeeTreasury),
@@ -190,27 +192,32 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
 
     assertEq(safeEngine.coinBalance(address(usr)), 0);
     assertEq(safeEngine.coinBalance(address(stabilityFeeTreasury)), rad(200 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_OutstandingBadDebt.selector);
     stabilityFeeTreasury.giveFunds(address(usr), rad(5 ether));
   }
 
-  function testFail_pull_above_setTotalAllowance() public {
+  function test_Revert_pull_above_setTotalAllowance() public {
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
-    usr.pullFunds(address(stabilityFeeTreasury), address(usr), rad(11 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_NotAllowed.selector);
+    usr.pullFunds(address(stabilityFeeTreasury), address(usr), 11 ether);
   }
 
-  function testFail_pull_null_tkn_amount() public {
+  function test_Revert_pull_null_tkn_amount() public {
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_NullTransferAmount.selector);
     usr.pullFunds(address(stabilityFeeTreasury), address(usr), 0);
   }
 
-  function testFail_pull_null_account() public {
+  function test_Revert_pull_null_account() public {
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
-    usr.pullFunds(address(stabilityFeeTreasury), address(0), rad(1 ether));
+    hevm.expectRevert(Assertions.NullAddress.selector);
+    usr.pullFunds(address(stabilityFeeTreasury), address(0), 1 ether);
   }
 
-  function testFail_pull_random_token() public {
+  function test_Revert_pull_to_surplus_receiver() public {
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
-    usr.pullFunds(address(stabilityFeeTreasury), address(usr), rad(1 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_DstCannotBeAccounting.selector);
+    usr.pullFunds(address(stabilityFeeTreasury), alice, 1 ether);
   }
 
   function test_pull_funds_no_block_limit() public {
@@ -242,25 +249,27 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(safeEngine.coinBalance(address(stabilityFeeTreasury)), rad(199.1 ether));
   }
 
-  function testFail_pull_funds_when_funds_below_pull_threshold() public {
+  function test_Revert_pull_funds_when_funds_below_pull_threshold() public {
     stabilityFeeTreasury.modifyParameters(
       'pullFundsMinThreshold', abi.encode(safeEngine.coinBalance(address(stabilityFeeTreasury)) + 1)
     );
     stabilityFeeTreasury.setPerHourAllowance(address(usr), rad(1 ether));
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_BelowPullFundsMinThreshold.selector);
     usr.pullFunds(address(stabilityFeeTreasury), address(usr), 0.9 ether);
   }
 
-  function testFail_pull_funds_more_debt_than_coin() public {
+  function test_Revert_pull_funds_more_debt_than_coin() public {
     stabilityFeeTreasury.setPerHourAllowance(address(usr), rad(1 ether));
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
     safeEngine.createUnbackedDebt(
       address(stabilityFeeTreasury), address(this), safeEngine.coinBalance(address(stabilityFeeTreasury)) + 1
     );
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_OutstandingBadDebt.selector);
     usr.pullFunds(address(stabilityFeeTreasury), address(usr), 0.9 ether);
   }
 
-  function testFail_pull_funds_more_debt_than_coin_post_join() public {
+  function test_Revert_pull_funds_more_debt_than_coin_post_join() public {
     systemCoin.transfer(address(stabilityFeeTreasury), 100 ether);
     stabilityFeeTreasury.setPerHourAllowance(address(usr), rad(1 ether));
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
@@ -269,6 +278,7 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
       address(this),
       safeEngine.coinBalance(address(stabilityFeeTreasury)) + rad(100 ether) + 1
     );
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_OutstandingBadDebt.selector);
     usr.pullFunds(address(stabilityFeeTreasury), address(usr), 0.9 ether);
   }
 
@@ -305,15 +315,17 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(safeEngine.coinBalance(address(stabilityFeeTreasury)), rad(100.1 ether));
   }
 
-  function testFail_pull_funds_above_block_limit() public {
+  function test_Revert_pull_funds_above_hourly_allowance() public {
     stabilityFeeTreasury.setPerHourAllowance(address(usr), rad(1 ether));
     stabilityFeeTreasury.setTotalAllowance(address(usr), rad(10 ether));
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_PerHourLimitExceeded.selector);
     usr.pullFunds(address(stabilityFeeTreasury), address(usr), 10 ether);
   }
 
-  function testFail_transferSurplusFunds_before_surplusDelay() public {
+  function test_Revert_transferSurplusFunds_before_surplusDelay() public {
     stabilityFeeTreasury.modifyParameters('surplusTransferDelay', abi.encode(10 minutes));
     hevm.warp(block.timestamp + 9 minutes);
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_TransferCooldownNotPassed.selector);
     stabilityFeeTreasury.transferSurplusFunds();
   }
 
@@ -344,7 +356,7 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(safeEngine.coinBalance(address(charlie)), rad(130 ether));
   }
 
-  function testFail_transferSurplusFunds_more_debt_than_coin() public {
+  function test_Revert_transferSurplusFunds_more_debt_than_coin() public {
     address charlie = address(0x12345);
     stabilityFeeTreasury.modifyParameters('extraSurplusReceiver', abi.encode(charlie));
 
@@ -358,6 +370,7 @@ contract SingleStabilityFeeTreasuryTest is DSTest {
     assertEq(safeEngine.debtBalance(address(stabilityFeeTreasury)), rad(161 ether));
 
     hevm.warp(block.timestamp + 10 minutes);
+    hevm.expectRevert(IStabilityFeeTreasury.SFTreasury_OutstandingBadDebt.selector);
     stabilityFeeTreasury.transferSurplusFunds();
   }
 

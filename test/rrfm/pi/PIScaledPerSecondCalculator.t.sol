@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.20;
 
+import {stdError} from 'forge-std/StdError.sol';
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 
 import {PIDController as PIScaledPerSecondCalculator, IPIDController} from '@contracts/PIDController.sol';
 
@@ -10,10 +12,6 @@ import {MockOracleRelayer} from '../utils/mock/MockOracleRelayer.sol';
 import {OracleForTest} from '@test/mocks/OracleForTest.sol';
 
 import {Math} from '@libraries/Math.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract PIScaledPerSecondCalculatorTest is DSTest {
   using Math for uint256;
@@ -198,23 +196,26 @@ contract PIScaledPerSecondCalculatorTest is DSTest {
     assertEq(_deviation.integral, 0);
   }
 
-  function testFail_update_invalid_market_price() public {
+  function test_Revert_update_invalid_market_price() public {
     orcl = new OracleForTest(1 ether);
     orcl.setPriceAndValidity(1 ether, false);
 
     rateSetter.modifyParameters('orcl', address(orcl));
     hevm.warp(block.timestamp + calculator.params().integralPeriodSize + 1);
+    hevm.expectRevert('MockPIDRateSetter/invalid-oracle-value');
     rateSetter.updateRate(address(this));
   }
 
-  function testFail_update_same_period_warp() public {
+  function test_Revert_update_same_period_warp() public {
     hevm.warp(block.timestamp + calculator.params().integralPeriodSize + 1);
     rateSetter.updateRate(address(this));
+    hevm.expectRevert(IPIDController.PIDController_ComputeRateCooldown.selector);
     rateSetter.updateRate(address(this));
   }
 
-  function testFail_update_same_period_no_warp() public {
+  function test_Revert_update_same_period_no_warp() public {
     rateSetter.updateRate(address(this));
+    hevm.expectRevert(IPIDController.PIDController_ComputeRateCooldown.selector);
     rateSetter.updateRate(address(this));
   }
 
@@ -433,12 +434,13 @@ contract PIScaledPerSecondCalculatorTest is DSTest {
     assertEq(iTerm, 180_890_393_042_274_651_359_195_727_600);
   }
 
-  function testFail_redemption_way_higher_than_market() public {
+  function test_Revert_redemption_way_higher_than_market() public {
     assertEq(uint256(calculator.deviationObservation().integral), 0);
     calculator.modifyParameters('noiseBarrier', abi.encode(EIGHTEEN_DECIMAL_NUMBER - 1));
 
     oracleRelayer.modifyParameters('redemptionPrice', FORTY_FIVE_DECIMAL_NUMBER * EIGHTEEN_DECIMAL_NUMBER);
 
+    hevm.expectRevert(stdError.arithmeticError);
     rateSetter.updateRate(address(this));
   }
 
