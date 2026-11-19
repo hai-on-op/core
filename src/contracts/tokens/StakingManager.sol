@@ -13,6 +13,7 @@ import {IStakingToken} from '@interfaces/tokens/IStakingToken.sol';
 import {IRewardPool} from '@interfaces/tokens/IRewardPool.sol';
 
 import {IStakingManager} from '@interfaces/tokens/IStakingManager.sol';
+import {StakingEscrow} from '@contracts/tokens/StakingEscrow.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
 import {Modifiable} from '@contracts/utils/Modifiable.sol';
@@ -54,6 +55,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
   /// @inheritdoc IStakingManager
   mapping(address => uint256) public stakedBalances;
+
+  /// @notice Per-staker KITE custody, delegated to the staking account
+  mapping(address => address) public stakingEscrows;
 
   /// @inheritdoc IStakingManager
   uint256 public totalKiteRewardsAvailable;
@@ -137,8 +141,9 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     // Mint stKITE
     stakingToken.mint(_account, _wad);
 
-    // transfer KITE
-    protocolToken.safeTransferFrom(msg.sender, address(this), _wad);
+    // Keep staked KITE delegated to its owner.
+    if (stakingEscrows[_account] == address(0)) stakingEscrows[_account] = address(new StakingEscrow(_account));
+    protocolToken.safeTransferFrom(msg.sender, stakingEscrows[_account], _wad);
 
     // Call stake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
@@ -174,6 +179,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
       _pendingWithdrawals[msg.sender] = PendingWithdrawal({amount: _wad, timestamp: block.timestamp});
     }
 
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(address(0));
+
     // Call decreaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
       RewardType storage _rewardType = _rewardTypes[_i];
@@ -203,6 +210,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
     stakedBalances[msg.sender] += _withdrawalAmount; // use stored amount
 
     totalStaked += _withdrawalAmount;
+
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(msg.sender);
 
     // Call increaseStake in the reward pools
     for (uint256 _i = 0; _i < rewards; _i++) {
@@ -236,7 +245,8 @@ contract StakingManager is Authorizable, Modifiable, IStakingManager {
 
     stakingToken.burnFrom(msg.sender, _withdrawalAmount);
 
-    protocolToken.safeTransfer(msg.sender, _withdrawalAmount);
+    protocolToken.safeTransferFrom(stakingEscrows[msg.sender], msg.sender, _withdrawalAmount);
+    StakingEscrow(stakingEscrows[msg.sender]).delegate(msg.sender);
 
     emit StakingManagerWithdrawn(msg.sender, _withdrawalAmount);
   }
