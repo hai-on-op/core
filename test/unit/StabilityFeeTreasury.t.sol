@@ -336,11 +336,9 @@ contract Unit_StabilityFeeTreasury_JoinAllCoins is Base {
     stabilityFeeTreasury.joinAllCoins();
   }
 
-  function testFail_Emit_JoinCoins(uint256 _systemCoinBalance) public happyPath(_systemCoinBalance) {
-    vm.assume(!_joinCoins(_systemCoinBalance));
-
-    vm.expectEmit(false, false, false, false);
-    emit JoinCoins(_systemCoinBalance);
+  function test_DoesNotEmitJoinCoinsWhenBalanceIsZero() public happyPath(0) {
+    vm.expectEmit(false, false, false, false, address(stabilityFeeTreasury), 0);
+    emit JoinCoins(0);
 
     stabilityFeeTreasury.joinAllCoins();
   }
@@ -905,13 +903,12 @@ contract Unit_StabilityFeeTreasury_PullFunds is Base {
     stabilityFeeTreasury.pullFunds(_pullFundsScenario.dstAccount, _pullFundsScenario.wad);
   }
 
-  function testFail_Emit_PullFunds_DstAccIsStabilityFeeTreasury(PullFundsScenario memory _pullFundsScenario) public {
-    _pullFundsScenario.dstAccount = address(stabilityFeeTreasury);
+  function test_DoesNotEmitPullFundsWhenDestinationIsTreasury(uint256 _wad) public {
+    vm.expectEmit(false, false, false, false, address(stabilityFeeTreasury), 0);
+    emit PullFunds(user, address(stabilityFeeTreasury), 0);
 
-    vm.expectEmit(false, false, false, false);
-    emit PullFunds(user, address(stabilityFeeTreasury), _pullFundsScenario.wad * RAY);
-
-    stabilityFeeTreasury.pullFunds(_pullFundsScenario.dstAccount, _pullFundsScenario.wad);
+    vm.prank(user);
+    stabilityFeeTreasury.pullFunds(address(stabilityFeeTreasury), _wad);
   }
 
   function test_Revert_DstCannotBeAccounting(PullFundsScenario memory _pullFundsScenario) public {

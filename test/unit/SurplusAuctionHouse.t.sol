@@ -262,15 +262,15 @@ contract Unit_SurplusAuctionHouse_StartAuction is Base {
     surplusAuctionHouse.startAuction(_amountToSell, _initialBid);
   }
 
-  function testFail_Revert_NullProtTokenReceiver_Burning(uint256 _amountToSell, uint256 _initialBid) public {
+  function test_StartsAuctionWithNullReceiverWhenBurning(uint256 _amountToSell, uint256 _initialBid) public {
     vm.startPrank(authorizedAccount);
 
     _mockBidReceiver(address(0));
     _mockRecyclingPercentage(0);
 
-    vm.expectRevert(ISurplusAuctionHouse.SAH_NullProtTokenReceiver.selector);
+    uint256 _id = surplusAuctionHouse.startAuction(_amountToSell, _initialBid);
 
-    surplusAuctionHouse.startAuction(_amountToSell, _initialBid);
+    assertEq(_id, 1);
   }
 
   function test_Revert_Overflow(uint256 _amountToSell, uint256 _initialBid) public {
@@ -938,10 +938,10 @@ contract Unit_SurplusAuctionHouse_ModifyParameters is Base {
     surplusAuctionHouse.modifyParameters('bidReceiver', abi.encode(0));
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    surplusAuctionHouse.modifyParameters('unrecognizedParam', _data);
+    surplusAuctionHouse.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

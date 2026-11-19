@@ -1328,11 +1328,11 @@ contract Unit_GlobalSettlement_ModifyParameters is Base {
     assertEq(globalSettlement.params().shutdownCooldown, _shutdownCooldown);
   }
 
-  function test_Revert_UnrecognizedParam(bytes memory _data) public {
+  function test_Revert_UnrecognizedParam(bytes32 _value) public {
     vm.startPrank(authorizedAccount);
 
     vm.expectRevert(IModifiable.UnrecognizedParam.selector);
 
-    globalSettlement.modifyParameters('unrecognizedParam', _data);
+    globalSettlement.modifyParameters('unrecognizedParam', abi.encode(_value));
   }
 }

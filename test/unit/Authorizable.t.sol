@@ -146,9 +146,7 @@ contract Unit_Authorizable_IsAuthorized is Base {
     authorizable.isAuthorizedModifier();
   }
 
-  function testFail_IsAuthorized() public happyPath {
-    vm.expectRevert(IAuthorizable.Unauthorized.selector);
-
+  function test_AllowsAuthorizedCaller() public happyPath {
     authorizable.isAuthorizedModifier();
   }
 

@@ -2,6 +2,7 @@
 pragma solidity 0.8.20;
 
 import 'ds-test/test.sol';
+import {Vm as Hevm} from 'forge-std/Vm.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
 
 import {ISAFEEngine, SAFEEngine} from '@contracts/SAFEEngine.sol';
@@ -14,10 +15,6 @@ import {
 } from '@contracts/settlement/PostSettlementSurplusAuctionHouse.sol';
 import {SettlementSurplusAuctioneer} from '@contracts/settlement/SettlementSurplusAuctioneer.sol';
 import {CoinJoin} from '@contracts/utils/CoinJoin.sol';
-
-abstract contract Hevm {
-  function warp(uint256) public virtual;
-}
 
 contract SingleAccountingEngineTest is DSTest {
   Hevm hevm;
@@ -231,8 +228,9 @@ contract SingleAccountingEngineTest is DSTest {
     assertTrue(!can_auction_debt());
   }
 
-  function testFail_pop_debt_after_being_popped() public {
+  function test_Revert_pop_debt_after_being_popped() public {
     _popDebtFromQueue(100 ether);
+    hevm.expectRevert(IAccountingEngine.AccEng_NullAmount.selector);
     accountingEngine.popDebtFromQueue(block.timestamp);
   }
 
