@@ -27,8 +27,8 @@ interface IModifiablePerCollateral is IAuthorizable, IModifiable {
   // --- Methods ---
 
   /**
-   * @notice Register a new collateral type in the SAFEEngine
-   * @param _cType Collateral type to register
+   * @notice Initialize a new collateral type in the implementing contract
+   * @param _cType Collateral type to initialize
    * @param _collateralParams Collateral parameters
    */
   function initializeCollateralType(bytes32 _cType, bytes memory _collateralParams) external;

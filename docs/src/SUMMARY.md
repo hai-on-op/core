@@ -31,6 +31,7 @@
   - [Authorizable](detailed/utils/authorizable.md)
   - [Modifiable](detailed/utils/modifiable.md)
   - [Disableable](detailed/utils/disableable.md)
+  - [AutoLiner](detailed/utils/autoliner.md)
   - [❱ Factories](detailed/utils/factory/README.md)
     - [Factory Child](detailed/utils/factory/factory_child.md)
     - [Authorizable Child](detailed/utils/factory/authorizable_child.md)
