@@ -19,7 +19,7 @@ html.light .sidebar {
   background-size: contain;
   background-repeat: no-repeat;
   background-position: center center;
-  background-image: var(--logo-h);
+  background-image: var(--logo-word);
 }
 .sidebar .chapter {
   margin: 0;

@@ -11,30 +11,36 @@ html.ayu #theme-toggle-dark {
 
 /* Overwrite dark theme colors */
 html.ayu {
-  --bg: #040c20;
+  --bg: #15161b;
   --fg: rgba(255, 255, 255, 0.87);
-  --sidebar-bg: #040c20;
+  --sidebar-bg: #15161b;
   --sidebar-fg: rgba(255, 255, 255, 0.5);
-  --sidebar-active: #ff9d0a;
+  --sidebar-active: #f2d86a;
   --border: rgba(255, 255, 255, 0.12);
   --border-active: rgba(255, 255, 255, 0.3);
   --link-visited: #acacac;
   --logo-h: url(/images/logo.png);
-  --quote-bg: #040c20;
+  --logo-word: url(/images/logo-word.png);
+  --quote-bg: #1f202a;
+  --inline-code-color: #ffc2ab;
+  --theme-hover: #1f202a;
 }
 
 /* Overwrite light theme colors */
 html.light {
-  --bg: #fff;
+  --bg: #eee6f7;
   --fg: rgba(0, 0, 0, 0.87);
-  --sidebar-bg: #fff;
+  --sidebar-bg: #eee6f7;
   --sidebar-fg: rgba(0, 0, 0, 0.54);
-  --sidebar-active: #ff9d0a;
+  --sidebar-active: #e75966;
   --border: rgba(0, 0, 0, 0.12);
   --border-active: rgba(0, 0, 0, 0.3);
   --link-visited: #909090;
   --logo-h: url(/images/logo.png);
-  --quote-bg: #fff;
+  --logo-word: url(/images/logo-word.png);
+  --quote-bg: #f3edf9;
+  --inline-code-color: #46495d;
+  --theme-hover: #f3edf9;
 }
 
 h1,
