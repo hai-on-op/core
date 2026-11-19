@@ -3,7 +3,7 @@ pragma solidity 0.8.20;
 
 import {AeroEscrowMock, AeroMigrationTokenMock} from '@test/mocks/AeroMigrationMocks.sol';
 
-import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
+import {IAeroVotingEscrow} from '@interfaces/external/IAeroVotingEscrow.sol';
 import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 contract WrappedTokenV3EscrowMock is AeroEscrowMock {

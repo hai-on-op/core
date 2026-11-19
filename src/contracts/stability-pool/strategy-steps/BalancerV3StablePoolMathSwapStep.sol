@@ -6,12 +6,10 @@ import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
-import {
-  IBalancerV3RouterStableMath,
-  IBalancerV3VaultHooksConfig,
-  IBalancerV3VaultStableMath,
-  IBalancerV3StablePoolLike
-} from '@interfaces/external/IBalancerV3StableMath.sol';
+import {IBalancerV3RouterStableMath} from '@interfaces/external/IBalancerV3RouterStableMath.sol';
+import {IBalancerV3StablePoolLike} from '@interfaces/external/IBalancerV3StablePoolLike.sol';
+import {IBalancerV3VaultHooksConfig} from '@interfaces/external/IBalancerV3VaultHooksConfig.sol';
+import {IBalancerV3VaultStableMath} from '@interfaces/external/IBalancerV3VaultStableMath.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.20;
 import {Test} from 'forge-std/Test.sol';
 import {WrappedTokenV3, IWrappedTokenV3} from '@contracts/tokens/WrappedTokenV3.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
-import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
+import {IAeroVotingEscrow} from '@interfaces/external/IAeroVotingEscrow.sol';
 
 interface ILegacyWrappedTokenV2Audit {
   function migrateV1toV2(address recipient, uint256 amount) external;

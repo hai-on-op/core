@@ -3,7 +3,8 @@ pragma solidity 0.8.20;
 
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {ERC20ForTest} from '@test/mocks/ERC20ForTest.sol';
-import {IVelodromeRouterV2, IVeloCLRouter} from '@interfaces/external/IStrategyStepExternal.sol';
+import {IVeloCLRouter} from '@interfaces/external/IVeloCLRouter.sol';
+import {IVelodromeRouterV2} from '@interfaces/external/IVelodromeRouterV2.sol';
 
 contract MockBalancerRouterForTest {
   address public immutable mockVault;

@@ -4,7 +4,12 @@ pragma solidity 0.8.20;
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC20Permit} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol';
 
-import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
+import {ITokenBridge} from '@hyperlane-xyz/core/contracts/interfaces/ITokenBridge.sol';
+import {
+  IERC20Upgradeable
+} from '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-upgradeable-4.9.3/contracts/token/ERC20/IERC20Upgradeable.sol';
+
+import {IAeroVotingEscrow} from '@interfaces/external/IAeroVotingEscrow.sol';
 import {IModifiable} from '@interfaces/utils/IModifiable.sol';
 
 /**
@@ -13,7 +18,7 @@ import {IModifiable} from '@interfaces/utils/IModifiable.sol';
  *         sAERO NFTs on Base, and migration of legacy wrapped tokens on Optimism
  * @dev    ERC20 and bridge functions are inherited from HypERC20
  */
-interface IWrappedTokenV3 is IERC20Permit, IModifiable {
+interface IWrappedTokenV3 is IERC20Upgradeable, IERC20Permit, ITokenBridge, IModifiable {
   // --- Events ---
 
   /**
