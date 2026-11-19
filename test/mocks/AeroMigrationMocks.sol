@@ -5,7 +5,7 @@ import {ERC20} from '@openzeppelin/contracts/token/ERC20/ERC20.sol';
 import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {ERC721} from '@openzeppelin/contracts/token/ERC721/ERC721.sol';
 
-import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
+import {IAeroVotingEscrow} from '@interfaces/external/IAeroVotingEscrow.sol';
 
 contract AeroMigrationTokenMock is ERC20 {
   bool public chargeFee;

@@ -5,7 +5,7 @@ import {IERC20} from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {IERC20Metadata} from '@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol';
 import {SafeERC20} from '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
 import {IStrategyStep} from '@interfaces/IStrategyStep.sol';
-import {IVelodromeRouterV2} from '@interfaces/external/IStrategyStepExternal.sol';
+import {IVelodromeRouterV2} from '@interfaces/external/IVelodromeRouterV2.sol';
 import {IBaseOracle} from '@interfaces/oracles/IBaseOracle.sol';
 import {FixedPointMathLib} from '@libraries/FixedPointMathLib.sol';
 

@@ -11,12 +11,14 @@ import {EIP712} from '@openzeppelin/contracts/utils/cryptography/EIP712.sol';
 import {Nonces} from '@openzeppelin/contracts/utils/Nonces.sol';
 
 import {HypERC20} from '@hyperlane-xyz/core/contracts/token/HypERC20.sol';
+import {ITokenBridge} from '@hyperlane-xyz/core/contracts/interfaces/ITokenBridge.sol';
+import {TokenRouter} from '@hyperlane-xyz/core/contracts/token/libs/TokenRouter.sol';
 import {Math} from '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-4.9.3/contracts/utils/math/Math.sol';
 import {
   PausableUpgradeable
 } from '@hyperlane-xyz/core/dependencies/@openzeppelin-contracts-upgradeable-4.9.3/contracts/security/PausableUpgradeable.sol';
 
-import {IAeroVotingEscrow} from '@interfaces/external/IAeroMigration.sol';
+import {IAeroVotingEscrow} from '@interfaces/external/IAeroVotingEscrow.sol';
 import {IWrappedTokenV3} from '@interfaces/tokens/IWrappedTokenV3.sol';
 
 import {Authorizable} from '@contracts/utils/Authorizable.sol';
@@ -254,7 +256,7 @@ contract WrappedTokenV3 is
     uint32 _destination,
     bytes32 _recipient,
     uint256 _amount
-  ) public payable override returns (bytes32 _messageId) {
+  ) public payable override(ITokenBridge, TokenRouter) returns (bytes32 _messageId) {
     if (
       uint256(_recipient) >> 160 != 0 || _recipient == bytes32(0)
         || _recipient == bytes32(uint256(uint160(BURN_ADDRESS))) || _recipient == routers(_destination)
